@@ -153,12 +153,6 @@ export class Engine {
 
     this.cameraCtrl.setPointer(ndcX, ndcY);
 
-    // If user is actively dragging/orbiting the camera or just finished zooming/rotating, do not fling particles!
-    if (this.cameraCtrl.isDragging || (performance.now() - this.cameraCtrl.lastCameraMoveTime < 150)) {
-      this.pointerVelWorld.set(0, 0, 0);
-      return;
-    }
-
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.cameraCtrl.camera);
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -167,14 +161,11 @@ export class Engine {
 
     if (hit) {
       const now = performance.now() / 1000;
-      const dt = Math.max(0.001, Math.min(0.1, now - this.lastPointerTime));
+      const dt = Math.max(0.001, now - this.lastPointerTime);
       this.lastPointerTime = now;
 
       if (this.lastPointerWorld.x < 900) {
-        const delta = new THREE.Vector3().subVectors(hit, this.lastPointerWorld).divideScalar(dt);
-        // Clamp to prevent wild acceleration bursts
-        delta.clampLength(0, 2.5);
-        this.pointerVelWorld.copy(delta);
+        this.pointerVelWorld.subVectors(hit, this.lastPointerWorld).divideScalar(dt);
       }
       this.lastPointerWorld.copy(hit);
       this.pointerWorld.copy(hit);
@@ -182,19 +173,18 @@ export class Engine {
       if (this.params.draw) {
         const normX = (hit.x * 0.5 + 0.5);
         const normY = (hit.y * 0.5 + 0.5);
-        const dirX = Math.min(1.5, Math.max(-1.5, this.pointerVelWorld.x * 0.1));
-        const dirY = Math.min(1.5, Math.max(-1.5, this.pointerVelWorld.y * 0.1));
+        const dirX = Math.min(2.0, Math.max(-2.0, this.pointerVelWorld.x * 0.1));
+        const dirY = Math.min(2.0, Math.max(-2.0, this.pointerVelWorld.y * 0.1));
         this.flowField.addStroke(normX, normY, dirX, dirY, 0.07, 1.2);
       }
     }
   }
 
   public triggerSplash(): void {
-    const s = Math.max(0.2, this.params.splash);
     this.pointerVelWorld.set(
-      (Math.random() - 0.5) * 2.2 * s,
-      (Math.random() - 0.5) * 2.2 * s,
-      1.5 * s
+      (Math.random() - 0.5) * 8.0,
+      (Math.random() - 0.5) * 8.0,
+      4.0
     );
   }
 
@@ -246,12 +236,9 @@ export class Engine {
     );
   }
 
-  public getScanProgress(): number {
-    return this.scanProgress;
-  }
-
   public getTrackerPoints(): TrackerPoint[] {
-    return this.renderer.getTrackerPoints(this.cameraCtrl.camera, 28);
+    const count = this.params.trackers === 'dense' ? 40 : 12;
+    return this.renderer.getTrackerPoints(this.cameraCtrl.camera, count);
   }
 
   public resize(width: number, height: number): void {

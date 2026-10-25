@@ -56,8 +56,7 @@ class App {
     this.thumbs = new Thumbs(
       '#thumbnail-strip',
       (idx) => this.switchImage(idx),
-      () => this.dropzone.openPicker(),
-      (idx) => this.deleteImage(idx)
+      () => this.dropzone.openPicker()
     );
 
     // 4. Initialize Dropzone
@@ -141,24 +140,7 @@ class App {
     // Update 2D tracker HUD (only if an image is loaded)
     if (this.images.length > 0) {
       const trackers = this.engine.getTrackerPoints();
-      const lightHexMap: Record<string, string> = {
-        cream: '#f2e6c9',
-        ice: '#bfe0ff',
-        orange: '#ff9a3c',
-        red: '#ff4a3d',
-        green: '#40e0b0',
-        violet: '#8e6bff',
-        off: '#ffffff',
-      };
-      const lightHex = lightHexMap[this.params.light] || '#f2e6c9';
-      this.hud.render(
-        trackers,
-        this.params.links,
-        this.params.scan,
-        this.engine.getScanProgress(),
-        this.params.line.angle,
-        lightHex
-      );
+      this.hud.render(trackers, this.params.marks, this.params.links);
     } else {
       this.hud.render([], false, false);
     }
@@ -293,27 +275,6 @@ class App {
     if (this.images.length <= 1) return;
     const nextIdx = (this.activeIndex + 1) % this.images.length;
     this.switchImage(nextIdx);
-  }
-
-  public async deleteImage(index: number): Promise<void> {
-    if (index < 0 || index >= this.images.length) return;
-    this.images.splice(index, 1);
-
-    if (this.images.length === 0) {
-      this.activeIndex = 0;
-      this.thumbs.setImages([]);
-      this.engine.setHasActiveImage(false);
-      this.frame.setReadout(0, 0, 'NO PICTURES');
-      this.dropzone.showOverlay(true);
-      return;
-    }
-
-    const nextIndex = Math.min(index, this.images.length - 1);
-    this.activeIndex = nextIndex;
-    this.thumbs.setImages(this.images, nextIndex);
-    const cached = await this.getSampleDataForImage(this.images[nextIndex]);
-    this.engine.loadSampleData(cached.sampleData, cached.sampleData);
-    this.frame.setReadout(nextIndex + 1, this.images.length, this.images[nextIndex].hash);
   }
 
   public async handleFiles(files: File[]): Promise<void> {

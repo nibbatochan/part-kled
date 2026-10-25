@@ -13,8 +13,7 @@ export class CameraController {
   private targetZoom = 1.6;
   private currentZoom = 1.6;
 
-  public isDragging = false;
-  public lastCameraMoveTime = 0;
+  private isDragging = false;
   private lastPointerX = 0;
   private lastPointerY = 0;
 
@@ -66,7 +65,6 @@ export class CameraController {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       this.targetZoom = Math.max(0.6, Math.min(3.5, this.targetZoom + e.deltaY * 0.0015));
-      this.lastCameraMoveTime = performance.now();
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -75,7 +73,6 @@ export class CameraController {
         this.isDragging = true;
         this.lastPointerX = e.clientX;
         this.lastPointerY = e.clientY;
-        this.lastCameraMoveTime = performance.now();
       }
     };
 
@@ -91,7 +88,6 @@ export class CameraController {
           -Math.PI / 3,
           Math.min(Math.PI / 3, this.targetRotationX + dy * 0.005)
         );
-        this.lastCameraMoveTime = performance.now();
       }
     };
 

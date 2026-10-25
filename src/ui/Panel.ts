@@ -32,6 +32,7 @@ export class Panel {
 
     this.bindSliders();
     this.bindToggles();
+    this.bindSegments();
     this.bindModes();
     this.bindSwatches();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
@@ -57,29 +58,10 @@ export class Panel {
   }
 
   public toggleLight(): void {
-    const directions: Params['lightDirection'][] = ['left', 'top', 'bottom', 'highlights'];
-    if (!this.params.lightOn) {
-      this.params.lightOn = true;
-      this.params.lightDirection = 'left';
-    } else {
-      const curIdx = directions.indexOf(this.params.lightDirection);
-      if (curIdx === -1 || curIdx === directions.length - 1) {
-        this.params.lightOn = false;
-      } else {
-        this.params.lightDirection = directions[curIdx + 1];
-      }
-    }
-    this.updateLightButtonUi();
-    this.onParamsChangeCb(this.params);
-  }
-
-  private updateLightButtonUi(): void {
+    this.params.lightOn = !this.params.lightOn;
     const btn = document.getElementById('btn-light');
-    if (!btn) return;
-    btn.classList.toggle('active', this.params.lightOn);
-    const sym = this.params.lightOn ? '●' : '○';
-    const label = this.params.lightOn ? this.params.lightDirection.toUpperCase() : 'OFF';
-    btn.innerHTML = `<span class="symbol dot">${sym}</span> LIGHT: ${label} <span class="kbd-hint">S</span>`;
+    btn?.classList.toggle('active', this.params.lightOn);
+    this.onParamsChangeCb(this.params);
   }
 
   private bindSliders(): void {
@@ -110,6 +92,20 @@ export class Panel {
           const newVal = !this.params[key];
           (this.params[key] as boolean) = newVal;
           btn.classList.toggle('active', newVal);
+          this.onParamsChangeCb(this.params);
+        }
+      });
+    });
+  }
+
+  private bindSegments(): void {
+    const trackerBtns = document.querySelectorAll<HTMLButtonElement>('[data-seg="trackers"] .seg-btn');
+    trackerBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.value as 'sparse' | 'dense';
+        if (val) {
+          this.params.trackers = val;
+          trackerBtns.forEach((b) => b.classList.toggle('active', b === btn));
           this.onParamsChangeCb(this.params);
         }
       });
@@ -237,14 +233,19 @@ export class Panel {
     if (slDepth) slDepth.value = this.params.depth.toString();
 
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['draw', 'track', 'links', 'scan', 'trails'];
+    const toggleKeys: (keyof Params)[] = ['draw', 'track', 'links', 'scan', 'trails', 'marks'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
     });
 
     // Light toggle button
-    this.updateLightButtonUi();
+    const btnLight = document.getElementById('btn-light');
+    if (btnLight) btnLight.classList.toggle('active', this.params.lightOn);
+
+    // Trackers
+    const trackerBtns = document.querySelectorAll<HTMLButtonElement>('[data-seg="trackers"] .seg-btn');
+    trackerBtns.forEach((b) => b.classList.toggle('active', b.dataset.value === this.params.trackers));
 
     // Travel
     const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');

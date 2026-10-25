@@ -97,12 +97,11 @@ export class ParticleRenderer {
         tVel: { value: null },
         tColor: { value: null },
         tColorNext: { value: null },
-        uSize: { value: 2.6 },
+        uSize: { value: 2.2 },
         uDpr: { value: Math.min(2.0, window.devicePixelRatio || 1.0) },
         uMorph: { value: 0.0 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
-        uLightMode: { value: 0.0 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uLine: { value: new THREE.Vector2(0.4, 0.3) },
@@ -255,13 +254,6 @@ export class ParticleRenderer {
     pu['uMorph'].value = morphProgress;
     pu['uLightColor'].value.copy(lightVec);
     pu['uLightOn'].value = params.lightOn ? 1.0 : 0.0;
-    const lightModeMap: Record<Params['lightDirection'], number> = {
-      left: 0.0,
-      top: 1.0,
-      bottom: 2.0,
-      highlights: 3.0,
-    };
-    pu['uLightMode'].value = lightModeMap[params.lightDirection] ?? 0.0;
     pu['uScan'].value = scanProgress;
     pu['uScanActive'].value = params.scan ? 1.0 : 0.0;
     pu['uNegative'].value = isNegative ? 1.0 : 0.0;

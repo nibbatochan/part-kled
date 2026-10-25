@@ -1,5 +1,5 @@
 // src/depth/DepthEstimator.ts
-import { boxFilter, guidedFilter, medianFilter3x3, normalizeDepth, upsampleBilinear } from './refine';
+import { guidedFilter, medianFilter3x3, normalizeDepth, upsampleBilinear } from './refine';
 
 export interface DepthResult {
   depth: Float32Array; // values [0..1]
@@ -87,10 +87,27 @@ export class DepthEstimator {
       console.warn('Transformers pipeline execution failed, using edge-refined depth fallback:', e);
     }
 
-    // Advanced multi-scale computer-vision depth pipeline
+    // High-quality photometric & shape fallback if neural model is not active
     if (!rawDepth) {
-      onProgress?.(0.6, 'COMPUTING PHOTOMETRIC 3D RELIEF...');
-      rawDepth = computePhotometricDepth(d, guideI, alphaMask, w, h);
+      onProgress?.(0.6, 'COMPUTING PHOTOMETRIC RELIEF...');
+      rawDepth = new Float32Array(n);
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxDist = Math.hypot(cx, cy);
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          const a = alphaMask[i];
+          if (a < 0.05) {
+            rawDepth[i] = 0;
+            continue;
+          }
+          const lum = guideI[i];
+          const distNorm = 1.0 - Math.min(1.0, Math.hypot(x - cx, y - cy) / (maxDist * 0.75));
+          rawDepth[i] = 0.4 * lum + 0.6 * distNorm;
+        }
+      }
     }
 
     onProgress?.(0.85, 'REFINING DEPTH EDGES...');
@@ -143,119 +160,4 @@ export class DepthEstimator {
       canvas: depthCanvas,
     };
   }
-}
-
-/**
- * Multi-scale computer vision depth estimation:
- * 1. Automatic foreground segmentation (alpha mask or boundary color difference)
- * 2. Silhouette distance transform (provides anatomical convex volume for the subject)
- * 3. Multi-scale photometric shape-from-shading (large-scale diffuse volume + mid-scale ridges)
- * 4. Sobel edge gradient relief
- */
-export function computePhotometricDepth(
-  rgba: Uint8ClampedArray | Uint8Array,
-  lum: Float32Array,
-  alphaMask: Float32Array,
-  w: number,
-  h: number
-): Float32Array {
-  const n = w * h;
-  const depth = new Float32Array(n);
-
-  // 1. Identify foreground mask
-  let hasExplicitAlpha = false;
-  for (let i = 0; i < n; i++) {
-    if (alphaMask[i] < 0.9) {
-      hasExplicitAlpha = true;
-      break;
-    }
-  }
-
-  const isForeground = new Uint8Array(n);
-  if (hasExplicitAlpha) {
-    for (let i = 0; i < n; i++) {
-      isForeground[i] = alphaMask[i] > 0.08 ? 1 : 0;
-    }
-  } else {
-    // Sample border colors to detect dominant background tone
-    let cornerR = 0, cornerG = 0, cornerB = 0;
-    const borderSamples = [0, w - 1, (h - 1) * w, (h - 1) * w + w - 1];
-    borderSamples.forEach(idx => {
-      cornerR += rgba[idx * 4];
-      cornerG += rgba[idx * 4 + 1];
-      cornerB += rgba[idx * 4 + 2];
-    });
-    cornerR /= 4; cornerG /= 4; cornerB /= 4;
-
-    for (let i = 0; i < n; i++) {
-      const dr = Math.abs(rgba[i * 4] - cornerR);
-      const dg = Math.abs(rgba[i * 4 + 1] - cornerG);
-      const db = Math.abs(rgba[i * 4 + 2] - cornerB);
-      const diff = (dr + dg + db) / 3;
-      isForeground[i] = diff > 16 || lum[i] > 0.12 ? 1 : 0;
-    }
-  }
-
-  // 2. Fast 2-pass distance transform from boundary
-  const dist = new Float32Array(n);
-  const INF = 999999;
-  for (let i = 0; i < n; i++) {
-    dist[i] = isForeground[i] ? INF : 0;
-  }
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
-      if (dist[idx] > 0) {
-        let minD = dist[idx];
-        if (x > 0) minD = Math.min(minD, dist[idx - 1] + 1);
-        if (y > 0) minD = Math.min(minD, dist[idx - w] + 1);
-        dist[idx] = minD;
-      }
-    }
-  }
-  let maxDist = 1;
-  for (let y = h - 1; y >= 0; y--) {
-    for (let x = w - 1; x >= 0; x--) {
-      const idx = y * w + x;
-      if (dist[idx] > 0) {
-        let minD = dist[idx];
-        if (x < w - 1) minD = Math.min(minD, dist[idx + 1] + 1);
-        if (y < h - 1) minD = Math.min(minD, dist[idx + w] + 1);
-        dist[idx] = minD;
-        if (minD > maxDist && minD < INF) maxDist = minD;
-      }
-    }
-  }
-
-  const normDist = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    if (dist[i] < INF && dist[i] > 0) {
-      normDist[i] = Math.sqrt(dist[i] / maxDist);
-    }
-  }
-
-  // 3. Multi-scale luminance: large-scale smooth volume vs local detail ridges
-  const smoothLum = boxFilter(lum, w, h, 14);
-  const midLum = boxFilter(lum, w, h, 4);
-
-  // 4. Combine into rich 3D topographic relief
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const idx = y * w + x;
-      if (!isForeground[idx]) {
-        depth[idx] = 0;
-        continue;
-      }
-
-      const ridge = midLum[idx] - smoothLum[idx];
-      const dx = (lum[idx + 1] - lum[idx - 1]) * 0.5;
-      const dy = (lum[idx + w] - lum[idx - w]) * 0.5;
-      const edge = Math.min(1.0, Math.hypot(dx, dy) * 2.5);
-
-      const val = 0.45 * normDist[idx] + 0.35 * smoothLum[idx] + 0.20 * Math.max(0, ridge * 2.0) - edge * 0.12;
-      depth[idx] = Math.max(0.02, Math.min(1.0, val));
-    }
-  }
-
-  return depth;
 }
