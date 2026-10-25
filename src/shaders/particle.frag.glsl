@@ -6,6 +6,7 @@ varying vec4 vColor;
 varying float vSpeed;
 varying float vScanGlow;
 varying float vFade;
+varying float vGrain;
 
 // 4x4 Bayer dither matrix
 const float bayerMatrix[16] = float[16](
@@ -21,19 +22,15 @@ void main() {
   float r2 = dot(coord, coord) * 4.0; // r2 in [0, 1]
   if (r2 > 1.0) discard;
 
-  float alpha = exp(-3.5 * r2) * vFade;
-  if (alpha < 0.015) discard;
+  // Hard-edged grain dot with a 1px soft rim, not a blurred sprite
+  float alpha = (1.0 - smoothstep(0.55, 1.0, r2)) * vFade;
+  if (alpha < 0.02) discard;
 
   vec3 rgb = vColor.rgb;
 
-  // Rich saturation & brightness boost matching reference image
-  float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
-  rgb = mix(vec3(lum), rgb, 1.45); // 45% saturation punch for rich orange, skin, and vivid auras
-  rgb = pow(max(rgb, vec3(0.0)), vec3(0.88));
-
-  // ~4 particles land on every pixel of a dense area and blend additively, so each dot carries
-  // only a fraction of its colour. Overlap rebuilds the picture instead of clipping to white.
-  if (uOnWhite < 0.5) rgb *= 0.55;
+  // Colour is the sampled source colour. No saturation, gamma or brightness change here.
+  // On dark paper the dots are accumulated as (colour * weight, weight) and the composite pass
+  // divides by the total weight, so brightness equals the source however many dots overlap.
 
   if (uNegative > 0.5) {
     rgb = 1.0 - rgb;
@@ -44,13 +41,12 @@ void main() {
     alpha *= 0.85;
   }
 
-  // Ordered dither to prevent dark gradient quantization
-  int x = int(mod(gl_FragCoord.x, 4.0));
-  int y = int(mod(gl_FragCoord.y, 4.0));
-  float dither = (bayerMatrix[y * 4 + x] - 0.5) * (1.0 / 255.0);
-  rgb += dither;
-
   if (vColor.a < 0.05) discard;
 
-  gl_FragColor = vec4(rgb, alpha * vColor.a);
+  float a = alpha * vColor.a;
+  if (uOnWhite > 0.5) {
+    gl_FragColor = vec4(rgb, a);
+  } else {
+    gl_FragColor = vec4(rgb * a, a);
+  }
 }

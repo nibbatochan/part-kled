@@ -32,7 +32,7 @@ export class CameraController {
     this.bindEvents();
   }
 
-  public update(depthParam: number): void {
+  public update(depthParam: number, time: number = 0): void {
     // Smooth dampening towards target rotation and zoom
     const lerpFactor = 0.08;
     this.currentRotationX += (this.targetRotationX - this.currentRotationX) * lerpFactor;
@@ -41,8 +41,14 @@ export class CameraController {
 
     // Additional parallax from pointer movement scaled by DEPTH slider
     const parallaxAmt = 0.18 * depthParam;
-    const finalRotX = this.currentRotationX + this.pointerParallaxY * parallaxAmt;
-    const finalRotY = this.currentRotationY + this.pointerParallaxX * parallaxAmt;
+    // Idle sway: a very slow, never-repeating left/right turn (a few overlapping sines), so the
+    // picture always feels like it is hanging in space and can be touched. Scales with DEPTH.
+    const swayAmt = 0.35 + 0.65 * depthParam;
+    const swayY = (Math.sin(time * 0.23) * 0.10 + Math.sin(time * 0.11 + 1.7) * 0.07 + Math.sin(time * 0.37 + 0.4) * 0.02) * swayAmt;
+    const swayX = (Math.sin(time * 0.17 + 2.3) * 0.035 + Math.sin(time * 0.09) * 0.02) * swayAmt;
+
+    const finalRotX = this.currentRotationX + this.pointerParallaxY * parallaxAmt + swayX;
+    const finalRotY = this.currentRotationY + this.pointerParallaxX * parallaxAmt + swayY;
 
     const dist = this.currentZoom;
     this.camera.position.x = dist * Math.sin(finalRotY) * Math.cos(finalRotX);

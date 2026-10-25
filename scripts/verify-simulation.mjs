@@ -36,19 +36,13 @@ async function main() {
   await page.screenshot({ path: 'docs/screenshots/sim-1-base.png' });
   console.log('Saved: docs/screenshots/sim-1-base.png');
 
-  // 2. Enable Marks and Links (matches ref-2)
-  // Check if MARKS button is active
-  const marksBtn = await page.$('[data-toggle="marks"]');
-  const marksClass = await marksBtn?.getAttribute('class');
-  if (!marksClass?.includes('active')) {
-    await marksBtn?.click();
-  }
-  const linksBtn = await page.$('[data-toggle="links"]');
-  await linksBtn?.click();
+  // 2. Enable SCAN
+  const scanBtn = await page.$('[data-toggle="scan"]');
+  await scanBtn?.click();
   await page.waitForTimeout(500);
 
-  await page.screenshot({ path: 'docs/screenshots/sim-2-trackers.png' });
-  console.log('Saved: docs/screenshots/sim-2-trackers.png');
+  await page.screenshot({ path: 'docs/screenshots/sim-2-scan.png' });
+  console.log('Saved: docs/screenshots/sim-2-scan.png');
 
   // 3. Move cursor to center of face (approx 720, 320) and click for splash burst (matches ref-3)
   await page.mouse.move(720, 320);

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { CameraController } from './Camera';
 import { FlowField } from './FlowField';
-import { ParticleRenderer, type RenderContext, type TrackerPoint } from './ParticleRenderer';
+import { ParticleRenderer, type RenderContext } from './ParticleRenderer';
 import { type SamplePointData } from './Sampler';
 import { Simulation } from './Simulation';
 import { defaults, type Params } from './params';
@@ -45,7 +45,7 @@ export class Engine {
 
   // Scan state
   private scanProgress = 0.0;
-  private scanSpeed = 0.35; // sweeps in ~2.8s
+  private scanSpeed = 0.155; // one scan every ~6.5s
 
   constructor(canvas: HTMLCanvasElement, pointCount: number = 65536) {
     this.canvas = canvas;
@@ -88,7 +88,6 @@ export class Engine {
 
     this.hasActiveImage = true;
     this.renderer.setHasActiveImage(true);
-    this.renderer.setTrackerFeaturePoints(currentData.home, currentData.count, currentData.color);
 
     // 1. Current Home & Color
     this.tHomeCurrent = new THREE.DataTexture(
@@ -130,6 +129,7 @@ export class Engine {
     this.tColorNext.needsUpdate = true;
 
     this.sim.setHomeTextures(this.tHomeCurrent, this.tHomeNext);
+    this.sim.setExtent(currentData.halfW, currentData.halfH);
   }
 
   public startMorph(onComplete?: () => void): void {
@@ -189,7 +189,7 @@ export class Engine {
         // Smooth and clamp so a single jumpy event cannot catapult the particles
         this.pointerVelWorld.lerp(inst, 0.5);
         const mag = this.pointerVelWorld.length();
-        if (mag > 6) this.pointerVelWorld.multiplyScalar(6 / mag);
+        if (mag > 3) this.pointerVelWorld.multiplyScalar(3 / mag);
       }
       this.lastPointerWorld.copy(hit);
       this.pointerWorld.copy(hit);
@@ -216,7 +216,7 @@ export class Engine {
   }
 
   public update(dt: number, time: number): void {
-    this.cameraCtrl.update(this.params.depth);
+    this.cameraCtrl.update(this.params.depth, time);
 
     if (this.isMorphing) {
       const elapsed = (performance.now() - this.morphStartTime) / 1000;
@@ -283,25 +283,6 @@ export class Engine {
     );
   }
 
-  public getTrackerPoints(): TrackerPoint[] {
-    const count = this.params.trackers === 'dense' ? 40 : 12;
-    const pointer = this.pointerInside && this.pointerWorld.x < 900 ? this.pointerWorld : undefined;
-    return this.renderer.getTrackerPoints(
-      this.cameraCtrl.camera,
-      count,
-      this.params.depth,
-      pointer,
-      this.params.track
-    );
-  }
-
-  /** Cursor position in screen pixels, for HUD overlays (null when it is off the stage). */
-  public getPointerScreen(): { x: number; y: number } | null {
-    if (!this.pointerInside || this.pointerWorld.x >= 900) return null;
-    const p = this.pointerWorld.clone().project(this.cameraCtrl.camera);
-    const rect = this.canvas.getBoundingClientRect();
-    return { x: (p.x * 0.5 + 0.5) * rect.width, y: (-p.y * 0.5 + 0.5) * rect.height };
-  }
 
   public resize(width: number, height: number): void {
     this.cameraCtrl.resize(width, height);

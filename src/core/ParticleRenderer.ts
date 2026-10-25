@@ -20,17 +20,6 @@ export interface RenderContext {
 /** Depth relief scale: must match `home.z *= uDepth * 0.55` in the sim shaders. */
 export const DEPTH_RELIEF = 0.55;
 
-export interface TrackerPoint {
-  id: number;
-  worldX: number;
-  worldY: number;
-  worldZ: number;
-  screenX: number;
-  screenY: number;
-  /** 0..1 closeness to the cursor, for highlighting */
-  near: number;
-}
-
 const LIGHT_COLORS: Record<string, THREE.Vector3> = {
   cream: new THREE.Vector3(0.95, 0.90, 0.79),
   ice: new THREE.Vector3(0.75, 0.88, 1.0),
@@ -67,7 +56,6 @@ export class ParticleRenderer {
   private texHeight: number;
   private particleCount: number;
 
-  private trackerWorldPositions: THREE.Vector3[] = [];
   private hasActiveImage: boolean = false;
 
   constructor(
@@ -144,6 +132,14 @@ export class ParticleRenderer {
         tScene: { value: null },
         tTrail: { value: null },
         uTrailsEnabled: { value: 1.0 },
+        uBlack: { value: 0.0 },
+        uWhite: { value: 1.0 },
+        uGamma: { value: 1.0 },
+        uContrast: { value: 0.0 },
+        uHue: { value: 0.0 },
+        uSaturation: { value: 1.0 },
+        uBW: { value: 0.0 },
+        uTrailGain: { value: 1.0 },
         uOnWhite: { value: 0.0 },
       },
       depthTest: false,
@@ -178,7 +174,7 @@ export class ParticleRenderer {
         tVel: { value: null },
         tColor: { value: null },
         tColorNext: { value: null },
-        uSize: { value: 1.3 },
+        uSize: { value: 1.0 },
         uDpr: { value: Math.min(2.0, window.devicePixelRatio || 1.0) },
         uMorph: { value: 0.0 },
         uDrift: { value: 0.8 },
@@ -187,6 +183,9 @@ export class ParticleRenderer {
         uLightOn: { value: 1.0 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
+        uScanMode: { value: 0.0 },
+        uZScale: { value: 0.14 },
+        uScanCenter: { value: new THREE.Vector2(0, 0) },
         uLine: { value: new THREE.Vector2(1.0, 0.0) },
         uPointer: { value: new THREE.Vector3(999, 999, 0) },
         uPointerOn: { value: 0.0 },
@@ -207,8 +206,9 @@ export class ParticleRenderer {
   }
 
   private initStreaks(): void {
-    // One streak per 4 particles: enough for silky trails without washing out the picture
-    const streakCount = Math.floor(this.particleCount / 4);
+    // Up to one streak per 2 particles. The shader keeps half of them at low DRIFT and all of
+    // them at maximum DRIFT, so trails grow with the slider without washing out the picture.
+    const streakCount = Math.floor(this.particleCount / 2);
     const vertCount = streakCount * 2;
 
     const geometry = new THREE.BufferGeometry();
@@ -217,7 +217,7 @@ export class ParticleRenderer {
     const dummyPositions = new Float32Array(vertCount * 3);
 
     for (let i = 0; i < streakCount; i++) {
-      const pIdx = i * 4;
+      const pIdx = i * 2;
       const u = (pIdx % this.texWidth + 0.5) / this.texWidth;
       const v = (Math.floor(pIdx / this.texWidth) + 0.5) / this.texHeight;
 
@@ -251,6 +251,12 @@ export class ParticleRenderer {
         uLightOn: { value: 1.0 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
+        uScanMode: { value: 0.0 },
+        uTrailAmount: { value: 1.0 },
+        uTrailDetail: { value: 0.5 },
+        uTrailStrength: { value: 1.0 },
+        uZScale: { value: 0.14 },
+        uScanCenter: { value: new THREE.Vector2(0, 0) },
         uNegative: { value: 0.0 },
         uOnWhite: { value: 0.0 },
       },
@@ -288,53 +294,6 @@ export class ParticleRenderer {
     this.streakMesh.visible = hasImage;
   }
 
-  /**
-   * Choose up to 40 tracker anchors on bright, opaque parts of the subject. Greedy farthest-point
-   * ordering spreads them evenly, so the first 12 (SPARSE) already cover the whole picture.
-   */
-  public setTrackerFeaturePoints(homeData: Float32Array, pointCount: number, colorData?: Uint8Array): void {
-    this.trackerWorldPositions = [];
-    if (!this.hasActiveImage) return;
-
-    const candidates: THREE.Vector3[] = [];
-    const stride = Math.max(1, Math.floor(pointCount / 6000));
-    for (let i = 0; i < pointCount; i += stride) {
-      const idx = i * 4;
-      if (colorData) {
-        const lum = (colorData[idx] * 0.299 + colorData[idx + 1] * 0.587 + colorData[idx + 2] * 0.114) / 255;
-        if (colorData[idx + 3] < 40 || lum < 0.22) continue;
-      }
-      candidates.push(new THREE.Vector3(homeData[idx], homeData[idx + 1], homeData[idx + 2]));
-    }
-    if (candidates.length === 0) return;
-
-    const centroid = new THREE.Vector3();
-    candidates.forEach((c) => centroid.add(c));
-    centroid.divideScalar(candidates.length);
-
-    const minDist = new Float32Array(candidates.length).fill(Infinity);
-    let next = 0;
-    let best = Infinity;
-    candidates.forEach((c, i) => {
-      const d = c.distanceToSquared(centroid);
-      if (d < best) { best = d; next = i; }
-    });
-
-    const want = Math.min(40, candidates.length);
-    for (let n = 0; n < want; n++) {
-      const chosen = candidates[next];
-      this.trackerWorldPositions.push(chosen.clone());
-      let far = -1;
-      let farIdx = 0;
-      for (let i = 0; i < candidates.length; i++) {
-        const d = candidates[i].distanceToSquared(chosen);
-        if (d < minDist[i]) minDist[i] = d;
-        if (minDist[i] > far) { far = minDist[i]; farIdx = i; }
-      }
-      next = farIdx;
-    }
-  }
-
   public render(
     camera: THREE.PerspectiveCamera,
     posTexture: THREE.Texture,
@@ -356,13 +315,17 @@ export class ParticleRenderer {
       : LIGHT_COLORS.off;
 
     const isOnWhite = params.background === 'white';
-    const isNegative = params.colorMode === 'negative';
+    const isNegative = false; // colour mode is TRUE or B&W now; B&W is applied in the composite
 
     if (isOnWhite) {
       this.pointsMaterial.blending = THREE.NormalBlending;
       this.streakMaterial.blending = THREE.NormalBlending;
     } else {
-      this.pointsMaterial.blending = THREE.AdditiveBlending;
+      // Points write premultiplied (colour * weight, weight): plain ONE/ONE accumulation
+      this.pointsMaterial.blending = THREE.CustomBlending;
+      this.pointsMaterial.blendEquation = THREE.AddEquation;
+      this.pointsMaterial.blendSrc = THREE.OneFactor;
+      this.pointsMaterial.blendDst = THREE.OneFactor;
       this.streakMaterial.blending = THREE.AdditiveBlending;
     }
 
@@ -385,6 +348,9 @@ export class ParticleRenderer {
     pu['uTime'].value = ctx.time;
     pu['uScan'].value = scanProgress;
     pu['uScanActive'].value = params.scan ? 1.0 : 0.0;
+    pu['uScanMode'].value = params.scanMode;
+    pu['uZScale'].value = params.depth * 0.55 * 0.5;
+    pu['uScanCenter'].value.set(ctx.pointerOn ? ctx.pointer.x : 0, ctx.pointerOn ? ctx.pointer.y : 0);
     pu['uNegative'].value = isNegative ? 1.0 : 0.0;
     pu['uOnWhite'].value = isOnWhite ? 1.0 : 0.0;
 
@@ -403,9 +369,16 @@ export class ParticleRenderer {
       su['uDrift'].value = params.drift;
       su['uGather'].value = params.gather;
       // Drift sets how long the velocity streaks are (world units)
-      su['uStreakLength'].value = (0.05 + params.drift * 0.16) * (0.5 + 0.5 * params.line.length);
+      su['uStreakLength'].value = params.trail.length * (0.035 + params.drift * 0.13) * (0.5 + 0.5 * params.line.length) *
+        (1.0 + 0.2 * Math.min(1, Math.max(0, (params.drift - 0.8) / 0.2)));
       su['uScan'].value = scanProgress;
       su['uScanActive'].value = params.scan ? 1.0 : 0.0;
+      su['uScanMode'].value = params.scanMode;
+      su['uTrailAmount'].value = params.trail.amount;
+      su['uTrailDetail'].value = params.trail.detail;
+      su['uTrailStrength'].value = params.trail.strength;
+      su['uZScale'].value = params.depth * 0.55 * 0.5;
+      su['uScanCenter'].value.set(ctx.pointerOn ? ctx.pointer.x : 0, ctx.pointerOn ? ctx.pointer.y : 0);
       su['uLightColor'].value.copy(lightVec);
       su['uLightOn'].value = params.lightOn ? 1.0 : 0.0;
       su['uNegative'].value = isNegative ? 1.0 : 0.0;
@@ -465,62 +438,16 @@ export class ParticleRenderer {
     cu['tTrail'].value = this.rtTrailA.texture;
     cu['uTrailsEnabled'].value = params.trails ? 1.0 : 0.0;
     cu['uOnWhite'].value = isOnWhite ? 1.0 : 0.0;
+    cu['uBlack'].value = params.fx.black;
+    cu['uWhite'].value = params.fx.white;
+    cu['uGamma'].value = params.fx.gamma;
+    cu['uContrast'].value = params.fx.contrast;
+    cu['uHue'].value = params.fx.hue;
+    cu['uSaturation'].value = params.fx.saturation;
+    cu['uBW'].value = params.colorMode === 'bw' ? 1.0 : 0.0;
+    cu['uTrailGain'].value = params.trail.strength;
 
     this.renderer.render(this.quadScene, this.quadCamera);
-  }
-
-  public getTrackerPoints(
-    camera: THREE.PerspectiveCamera,
-    count: number,
-    depth: number = 0.5,
-    pointer?: THREE.Vector3,
-    follow: boolean = false
-  ): TrackerPoint[] {
-    if (!this.hasActiveImage || this.trackerWorldPositions.length === 0) {
-      return [];
-    }
-
-    const result: TrackerPoint[] = [];
-    const n = Math.min(count, this.trackerWorldPositions.length);
-
-    const halfW = this.width / 2;
-    const halfH = this.height / 2;
-    const tempVec = new THREE.Vector3();
-
-    for (let i = 0; i < n; i++) {
-      const wPos = this.trackerWorldPositions[i];
-      // Same relief scale as the sim, so the brackets sit on the particles they label
-      const z = wPos.z * depth * DEPTH_RELIEF;
-      let wx = wPos.x;
-      let wy = wPos.y;
-
-      // TRACK: trackers lean toward the cursor, like the reference
-      let near = 0;
-      if (pointer && follow) {
-        const dx = pointer.x - wx;
-        const dy = pointer.y - wy;
-        const d2 = dx * dx + dy * dy;
-        near = Math.exp(-d2 / 0.09);
-        wx += dx * 0.28 * near;
-        wy += dy * 0.28 * near;
-      }
-
-      tempVec.set(wx, wy, z).project(camera);
-      const sx = tempVec.x * halfW + halfW;
-      const sy = -tempVec.y * halfH + halfH;
-
-      result.push({
-        id: i + 1,
-        worldX: wx,
-        worldY: wy,
-        worldZ: z,
-        screenX: sx,
-        screenY: sy,
-        near,
-      });
-    }
-
-    return result;
   }
 
   public resize(width: number, height: number): void {

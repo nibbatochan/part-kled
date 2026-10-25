@@ -18,8 +18,6 @@
         <div id="frame-readout" class="frame-readout">01 / 01 &nbsp; 3B4E83186AA6E41A83DDEE</div>
       </div>
 
-      <!-- Tracker Canvas / 2D Overlay for brackets and links -->
-      <canvas id="hud-canvas" class="hud-canvas"></canvas>
 
       <!-- UI Shell Layer -->
       <div id="ui-layer" class="ui-layer">
@@ -46,7 +44,81 @@
               <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
             </svg>
           </button>
+          <button id="fx-btn" class="text-link" aria-label="Effects">FX</button>
           <button id="credits-btn" class="text-link" aria-label="Credits and Notices">CREDITS</button>
+        </div>
+
+        <!-- Effects panel: opens from FX at the top right, closes with its × or Escape -->
+        <div id="fx-panel" class="fx-panel hidden" role="dialog" aria-label="Effects">
+          <div class="fx-header">
+            <span class="fx-title">EFFECTS</span>
+            <button id="fx-close" class="close-btn" aria-label="Close effects">&times;</button>
+          </div>
+          <div class="fx-section">
+            <span class="seg-label">LEVELS</span>
+              <div class="slider-group fx-slider" data-path="fx.black">
+                <label for="fx-fx-black">BLACK</label>
+                <input type="range" id="fx-fx-black" data-path="fx.black" min="0" max="0.5" step="0.005" />
+                <output></output>
+              </div>
+              <div class="slider-group fx-slider" data-path="fx.white">
+                <label for="fx-fx-white">WHITE</label>
+                <input type="range" id="fx-fx-white" data-path="fx.white" min="0.5" max="1" step="0.005" />
+                <output></output>
+              </div>
+              <div class="slider-group fx-slider" data-path="fx.gamma">
+                <label for="fx-fx-gamma">GAMMA</label>
+                <input type="range" id="fx-fx-gamma" data-path="fx.gamma" min="0.4" max="2.2" step="0.01" />
+                <output></output>
+              </div>
+          </div>
+          <div class="fx-section">
+            <span class="seg-label">CURVE</span>
+              <div class="slider-group fx-slider" data-path="fx.contrast">
+                <label for="fx-fx-contrast">CONTRAST</label>
+                <input type="range" id="fx-fx-contrast" data-path="fx.contrast" min="-1" max="1" step="0.01" />
+                <output></output>
+              </div>
+          </div>
+          <div class="fx-section">
+            <span class="seg-label">COLOUR</span>
+              <div class="slider-group fx-slider" data-path="fx.hue">
+                <label for="fx-fx-hue">HUE</label>
+                <input type="range" id="fx-fx-hue" data-path="fx.hue" min="-180" max="180" step="1" />
+                <output></output>
+              </div>
+              <div class="slider-group fx-slider" data-path="fx.saturation">
+                <label for="fx-fx-saturation">SATURATION</label>
+                <input type="range" id="fx-fx-saturation" data-path="fx.saturation" min="0" max="2" step="0.01" />
+                <output></output>
+              </div>
+          </div>
+          <div class="fx-section">
+            <span class="seg-label">TRAILS</span>
+              <div class="slider-group fx-slider" data-path="trail.amount">
+                <label for="fx-trail-amount">AMOUNT</label>
+                <input type="range" id="fx-trail-amount" data-path="trail.amount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group fx-slider" data-path="trail.strength">
+                <label for="fx-trail-strength">STRENGTH</label>
+                <input type="range" id="fx-trail-strength" data-path="trail.strength" min="0" max="2" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group fx-slider" data-path="trail.length">
+                <label for="fx-trail-length">LENGTH</label>
+                <input type="range" id="fx-trail-length" data-path="trail.length" min="0.3" max="2" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group fx-slider" data-path="trail.detail">
+                <label for="fx-trail-detail">DETAIL</label>
+                <input type="range" id="fx-trail-detail" data-path="trail.detail" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+          </div>
+          <div class="fx-footer">
+            <button id="fx-reset" class="text-link" type="button">RESET</button>
+          </div>
         </div>
 
         <!-- Left Thumbnail Strip -->
@@ -102,15 +174,9 @@
             <div class="toggle-group">
               <button class="toggle-btn" data-toggle="draw">DRAW</button>
               <button class="toggle-btn active" data-toggle="track">TRACK</button>
-              <button class="toggle-btn" data-toggle="links">LINKS</button>
               <button class="toggle-btn" data-toggle="scan">SCAN</button>
+              <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
               <button class="toggle-btn active" data-toggle="trails">TRAILS</button>
-              <button class="toggle-btn active" data-toggle="marks">MARKS</button>
-            </div>
-            <div class="seg-group" data-seg="trackers">
-              <span class="seg-label">TRACKERS</span>
-              <button class="seg-btn active" data-value="sparse">SPARSE</button>
-              <button class="seg-btn" data-value="dense">DENSE</button>
             </div>
           </div>
         </div>
@@ -119,14 +185,24 @@
         <div class="ctrl-bottom-right">
           <!-- LINE Direction Widget -->
           <div class="line-widget-container">
-            <span class="widget-label">LINE</span>
-            <div id="line-widget" class="line-widget-box">
-              <svg id="line-svg" width="36" height="36" viewBox="0 0 36 36">
-                <line id="line-vector" x1="10" y1="30" x2="26" y2="6" stroke="var(--ink)" stroke-width="1.2" />
-                <circle id="line-handle-start" cx="10" cy="30" r="2.2" fill="var(--ink)" />
-                <circle id="line-handle-end" cx="26" cy="6" r="2.2" fill="var(--ink)" />
+            <span class="widget-label">DRIFT DIRECTION</span>
+            <div id="line-widget" class="line-widget-box" role="slider" tabindex="0"
+                 aria-label="Drift direction" title="Drag to aim the drift. Distance from centre sets strength. Double-click to reset.">
+              <svg id="line-svg" width="88" height="88" viewBox="0 0 88 88">
+                <circle class="dial-ring" cx="44" cy="44" r="40" />
+                <g class="dial-ticks">
+                  <line x1="44" y1="4" x2="44" y2="9" />
+                  <line x1="84" y1="44" x2="79" y2="44" />
+                  <line x1="44" y1="84" x2="44" y2="79" />
+                  <line x1="4" y1="44" x2="9" y2="44" />
+                </g>
+                <line id="line-vector" class="dial-vector" x1="44" y1="44" x2="44" y2="44" />
+                <polygon id="line-arrow" class="dial-arrow" points="0,0" />
+                <circle id="line-handle-end" class="dial-handle" cx="44" cy="44" r="4.5" />
+                <circle class="dial-center" cx="44" cy="44" r="1.8" />
               </svg>
             </div>
+            <span id="line-readout" class="line-readout">0&deg; &middot; 90%</span>
           </div>
 
           <div class="modes-and-swatches">
@@ -140,7 +216,7 @@
             </div>
             <div class="mode-row">
               <span class="mode-label">ON WHITE</span>
-              <button class="mode-btn" data-colormode="negative">NEGATIVE</button>
+              <button class="mode-btn" data-colormode="bw">B&amp;W</button>
               <button class="mode-btn active" data-colormode="true">TRUE</button>
             </div>
             <div class="swatches-row">

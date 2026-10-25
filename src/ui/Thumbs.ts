@@ -1,6 +1,8 @@
 // src/ui/Thumbs.ts
 import type { ProcessedImage } from '../utils/image';
 
+export const MAX_IMAGES = 5;
+
 export class Thumbs {
   private container: HTMLElement;
   private addSlotBtn: HTMLElement;
@@ -8,17 +10,20 @@ export class Thumbs {
   private activeIndex: number = 0;
   private onSelectCb: (index: number) => void;
   private onAddClickCb: () => void;
+  private onDeleteCb: (index: number) => void;
 
   constructor(
     containerSelector: string,
     onSelect: (index: number) => void,
-    onAddClick: () => void
+    onAddClick: () => void,
+    onDelete: (index: number) => void
   ) {
     const el = document.querySelector<HTMLElement>(containerSelector);
     if (!el) throw new Error('Thumbs container not found');
     this.container = el;
     this.onSelectCb = onSelect;
     this.onAddClickCb = onAddClick;
+    this.onDeleteCb = onDelete;
 
     const addBtn = document.getElementById('add-slot-btn');
     if (!addBtn) throw new Error('Add slot button not found');
@@ -29,13 +34,13 @@ export class Thumbs {
   }
 
   public setImages(images: ProcessedImage[], activeIndex: number = 0): void {
-    this.images = images.slice(0, 4);
+    this.images = images.slice(0, MAX_IMAGES);
     this.activeIndex = Math.max(0, Math.min(activeIndex, this.images.length - 1));
     this.render();
   }
 
   public addImage(image: ProcessedImage): number {
-    if (this.images.length >= 4) return this.activeIndex;
+    if (this.images.length >= MAX_IMAGES) return this.activeIndex;
     this.images.push(image);
     this.activeIndex = this.images.length - 1;
     this.render();
@@ -76,8 +81,19 @@ export class Thumbs {
       box.className = 'slot-box';
       box.style.backgroundImage = `url(${img.thumbUrl})`;
 
+      const del = document.createElement('button');
+      del.className = 'slot-delete';
+      del.title = 'Delete picture';
+      del.setAttribute('aria-label', `Delete picture ${idx + 1}`);
+      del.innerHTML = '<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2l8 8M10 2l-8 8"/></svg>';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onDeleteCb(idx);
+      });
+
       slot.appendChild(num);
       slot.appendChild(box);
+      slot.appendChild(del);
 
       slot.addEventListener('click', () => {
         this.setActiveIndex(idx);
@@ -86,7 +102,7 @@ export class Thumbs {
       this.container.appendChild(slot);
     });
 
-    if (this.images.length < 4) {
+    if (this.images.length < MAX_IMAGES) {
       this.container.appendChild(this.addSlotBtn);
     }
 

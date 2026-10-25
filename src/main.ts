@@ -5,9 +5,8 @@ import { sampleImageParticles, type SamplePointData } from './core/Sampler';
 import { DepthEstimator } from './depth/DepthEstimator';
 import { Dropzone } from './ui/Dropzone';
 import { Frame } from './ui/Frame';
-import { Hud } from './ui/Hud';
 import { Panel } from './ui/Panel';
-import { Thumbs } from './ui/Thumbs';
+import { MAX_IMAGES, Thumbs } from './ui/Thumbs';
 import { processImageFile, type ProcessedImage } from './utils/image';
 import { setupKeyboardShortcuts } from './utils/keys';
 
@@ -20,7 +19,6 @@ interface CachedSample {
 class App {
   private params: Params;
   public engine!: Engine;
-  private hud!: Hud;
   private frame!: Frame;
   private thumbs!: Thumbs;
   private dropzone!: Dropzone;
@@ -38,15 +36,13 @@ class App {
     const stageCanvas = document.getElementById('stage') as HTMLCanvasElement;
     if (!stageCanvas) throw new Error('Stage canvas missing');
 
-    // 1. Initialize Engine & Hud
+    // 1. Initialize Engine
     this.engine = new Engine(stageCanvas, this.params.pointCount);
     this.engine.setParams(this.params);
     this.engine.setHasActiveImage(false);
 
     (window as any).__engine = this.engine;
     (window as any).__app = this;
-
-    this.hud = new Hud('hud-canvas');
 
     // 2. Initialize Frame overlay
     this.frame = new Frame('#frame-svg', '#frame-readout');
@@ -56,7 +52,8 @@ class App {
     this.thumbs = new Thumbs(
       '#thumbnail-strip',
       (idx) => this.switchImage(idx),
-      () => this.dropzone.openPicker()
+      () => this.dropzone.openPicker(),
+      (idx) => this.deleteImage(idx)
     );
 
     // 4. Initialize Dropzone
@@ -127,7 +124,6 @@ class App {
       const w = window.innerWidth;
       const h = window.innerHeight;
       this.engine.resize(w, h);
-      this.hud.resize(w, h);
     });
   }
 
@@ -137,14 +133,6 @@ class App {
 
     // Update 3D simulation and render
     this.engine.update(dt, currentTime / 1000);
-
-    // Update 2D tracker HUD (only if an image is loaded)
-    if (this.images.length > 0) {
-      const trackers = this.engine.getTrackerPoints();
-      this.hud.render(trackers, this.params.marks, this.params.links, this.engine.getPointerScreen());
-    } else {
-      this.hud.render([], false, false);
-    }
 
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -165,9 +153,7 @@ class App {
       return this.sampleCache.get(img.id)!;
     }
 
-    this.setProgress(true, 'ESTIMATING DEPTH...', 0.3);
-
-    // Check if pre-baked depth map exists for sample
+    // Check if pre-baked depth map exists for sample (instant, no loader)
     let depthArr: Float32Array | null = null;
     const baseName = img.name.replace(/\.[^.]+$/, '');
     if (baseName.startsWith('sample-')) {
@@ -203,8 +189,20 @@ class App {
       depthArr = depthResult.depth;
     }
 
-    this.setProgress(true, 'SAMPLING PARTICLES...', 0.9);
-    const sampleData = sampleImageParticles(img.canvas, depthArr);
+    // Sampling blocks the main thread for a moment: show the loader only for that real work,
+    // and let the browser paint it before the work starts.
+    this.setProgress(true, 'BUILDING PARTICLES...', 0.95);
+    // (timeout fallback: requestAnimationFrame never fires in a background tab)
+    await new Promise<void>((r) => {
+      requestAnimationFrame(() => setTimeout(r, 0));
+      setTimeout(r, 80);
+    });
+    let sampleData: SamplePointData;
+    try {
+      sampleData = sampleImageParticles(img.canvas, depthArr);
+    } finally {
+      this.setProgress(false);
+    }
 
     const cached: CachedSample = {
       image: img,
@@ -212,7 +210,6 @@ class App {
       sampleData,
     };
     this.sampleCache.set(img.id, cached);
-    this.setProgress(false);
     return cached;
   }
 
@@ -278,10 +275,31 @@ class App {
     this.switchImage(nextIdx);
   }
 
+  public async deleteImage(index: number): Promise<void> {
+    if (index < 0 || index >= this.images.length) return;
+    const [removed] = this.images.splice(index, 1);
+    this.sampleCache.delete(removed.id);
+
+    if (this.images.length === 0) {
+      this.activeIndex = 0;
+      this.thumbs.setImages([], 0);
+      this.engine.setHasActiveImage(false);
+      this.frame.setReadout(0, 0, 'NO PICTURES');
+      this.dropzone.showOverlay(true);
+      return;
+    }
+
+    const nextIdx = Math.min(this.activeIndex, this.images.length - 1);
+    this.activeIndex = nextIdx;
+    this.thumbs.setImages(this.images, nextIdx);
+    // Rebuild the GPU pair from whatever remains (the morph partner may have changed)
+    await this.switchImage(nextIdx);
+  }
+
   public async handleFiles(files: File[]): Promise<void> {
     this.dropzone.showOverlay(false);
     for (const f of files) {
-      if (this.images.length >= 4) break;
+      if (this.images.length >= MAX_IMAGES) break;
       const proc = await processImageFile(f);
       this.images.push(proc);
     }

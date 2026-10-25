@@ -7,14 +7,14 @@ describe('params', () => {
       ...defaults,
       drift: 0.42,
       splash: 0.99,
-      trackers: 'dense',
+      scan: true,
       line: { angle: 1.2, length: 0.7 },
     };
     const serialized = serializeParams(custom);
     const parsed = parseParams(serialized);
     expect(parsed.drift).toBe(0.42);
     expect(parsed.splash).toBe(0.99);
-    expect(parsed.trackers).toBe('dense');
+    expect(parsed.scan).toBe(true);
     expect(parsed.line.angle).toBe(1.2);
     expect(parsed.line.length).toBe(0.7);
   });

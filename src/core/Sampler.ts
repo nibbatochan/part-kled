@@ -6,6 +6,18 @@ export interface SamplePointData {
   texWidth: number;
   texHeight: number;
   activeSubjectPixels: number;
+  /** Half-size of the sampled subject in world units */
+  halfW: number;
+  halfH: number;
+}
+
+/** Cheap integer hash -> [0, 1). Independent stream per (index, salt). */
+export function hash01(i: number, salt: number): number {
+  let h = (Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967296;
 }
 
 /** R2 low discrepancy sequence */
@@ -179,7 +191,8 @@ export function computeImportanceWeights(
       }
 
       const tone = Math.pow(lum[idx], 1.2);
-      weights[idx] = mask[idx] * (0.05 + 0.95 * edge + 0.55 * tone + 0.3 * sat[idx]);
+      // Flat areas need enough grain to read as a photo, so the floor is high
+      weights[idx] = mask[idx] * (0.4 + 0.6 * edge + 0.5 * tone + 0.2 * sat[idx]);
     }
   }
 
@@ -223,7 +236,7 @@ export function sampleImageParticles(
 
   const aspect = w / h;
 
-  // 1024 x 512 = 524,288 particles: fine enough that line work and skin tone read as a picture
+  // 1024 x 512 = 524,288 particles
   const texWidth = 1024;
   const texHeight = 512;
   const N = texWidth * texHeight;
@@ -232,14 +245,17 @@ export function sampleImageParticles(
   const color = new Uint8Array(N * 4);
 
   for (let i = 0; i < N; i++) {
-    const u = r2Sequence1D(i);
+    // Stratified jittered pick: even coverage of the weight CDF, but no fixed lattice.
+    // (A low-discrepancy sequence on both the pick and the jitter makes repeating S-curve bands.)
+    const u = (i + hash01(i, 1)) / N;
     const targetVal = u * totalWeight;
     const px = lowerBound(cdf, targetVal);
 
     const basePxX = px % w;
     const basePxY = Math.floor(px / w);
 
-    const { jx, jy } = r2Jitter(i);
+    const jx = hash01(i, 2) - 0.5;
+    const jy = hash01(i, 3) - 0.5;
     const x = Math.max(0, Math.min(w - 1, basePxX + jx));
     const y = Math.max(0, Math.min(h - 1, basePxY + jy));
 
@@ -260,7 +276,7 @@ export function sampleImageParticles(
     home[homeIdx + 0] = (x / w - 0.5) * aspect;
     home[homeIdx + 1] = 0.5 - y / h;
     home[homeIdx + 2] = (zDepth - 0.5);
-    home[homeIdx + 3] = 1.0;
+    home[homeIdx + 3] = 0.0; // light weight, filled below once the colour is sampled
 
     // High-fidelity bilinear color interpolation
     const idx00 = (y0 * w + x0) * 4;
@@ -277,7 +293,25 @@ export function sampleImageParticles(
     color[colIdx + 1] = Math.round(rgba[idx00 + 1] * w00 + rgba[idx10 + 1] * w10 + rgba[idx01 + 1] * w01 + rgba[idx11 + 1] * w11);
     color[colIdx + 2] = Math.round(rgba[idx00 + 2] * w00 + rgba[idx10 + 2] * w10 + rgba[idx01 + 2] * w01 + rgba[idx11 + 2] * w11);
     color[colIdx + 3] = Math.round(rgba[idx00 + 3] * w00 + rgba[idx10 + 3] * w10 + rgba[idx01 + 3] * w01 + rgba[idx11 + 3] * w11);
+
+    // Light weight: how bright the source pixel is. Bright particles stream more often.
+    const lr = color[colIdx + 0] / 255;
+    const lg = color[colIdx + 1] / 255;
+    const lb = color[colIdx + 2] / 255;
+    home[homeIdx + 3] = Math.min(1, 0.299 * lr + 0.587 * lg + 0.114 * lb);
   }
+
+  // Subject half-extent: 1st..99th percentile of the particle positions (ignores stray specks)
+  const xs = new Float32Array(N);
+  const ys = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    xs[i] = Math.abs(home[i * 4]);
+    ys[i] = Math.abs(home[i * 4 + 1]);
+  }
+  xs.sort();
+  ys.sort();
+  const halfW = Math.max(0.1, xs[Math.floor(N * 0.99)]);
+  const halfH = Math.max(0.1, ys[Math.floor(N * 0.99)]);
 
   return {
     home,
@@ -286,5 +320,7 @@ export function sampleImageParticles(
     texWidth,
     texHeight,
     activeSubjectPixels: activeCount,
+    halfW,
+    halfH,
   };
 }

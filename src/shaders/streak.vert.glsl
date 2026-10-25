@@ -11,6 +11,11 @@ uniform vec3  uLightColor;
 uniform float uLightOn;
 uniform float uScan;
 uniform float uScanActive;
+uniform float uScanMode;
+uniform float uZScale;
+uniform float uTrailAmount;
+uniform float uTrailDetail;
+uniform vec2  uScanCenter;
 
 attribute vec2 ref;
 attribute float isTail; // 0.0 for head, 1.0 for tail
@@ -25,6 +30,13 @@ void kill() {
 }
 
 void main() {
+  // 70% of the lines at low DRIFT, rising to every line at maximum
+  float keep = fract(sin(dot(ref, vec2(12.9898, 78.233))) * 43758.5453);
+  if (keep > uTrailAmount * mix(0.7, 1.0, smoothstep(0.5, 1.0, uDrift))) {
+    kill();
+    return;
+  }
+
   vec4 posData = texture2D(tPos, ref);
   vec3 pos = posData.xyz;
   float age = posData.w;
@@ -53,10 +65,7 @@ void main() {
     return;
   }
 
-  // Saturated, brightened colour on streaks
   float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
-  col.rgb = mix(vec3(lum), col.rgb, 1.35);
-  col.rgb = pow(max(col.rgb, vec3(0.0)), vec3(0.9)) * 1.25;
 
   // Extrude backwards along the real velocity: silky velocity streaks
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
@@ -67,7 +76,8 @@ void main() {
   vec3 finalPos = pos;
   if (isTail > 0.5) {
     finalPos = pos - dir * len;
-    vAlpha = 0.0;
+    // Detail 1: the tail fades to nothing (crisp taper). Detail 0: the tail keeps most of its glow.
+    vAlpha = 0.6 * (1.0 - uTrailDetail) * fade;
   } else {
     vAlpha = 0.9 * fade;
   }
@@ -75,12 +85,9 @@ void main() {
   // SCAN lights the streaks inside the band
   if (uScanActive > 0.5) {
     vec2 sd = normalize(uLine + vec2(1e-4, 0.0));
-    float u = dot(pos.xy, sd);
-    float c = mix(-0.85, 0.85, uScan);
-    float bd = (u - c) / 0.05;
-    float g = exp(-bd * bd);
+    float g = scanBand(pos.xy, sd, uScan, uScanMode, uScanCenter, pos.z, uZScale, lum);
     vec3 tint = (uLightOn > 0.5 ? uLightColor : vec3(1.0, 0.95, 0.88));
-    col.rgb += tint * g * (0.3 + 0.9 * lum);
+    col.rgb += tint * g * (0.12 + 0.4 * lum);
     vAlpha = min(1.0, vAlpha * (1.0 + 0.5 * g));
   }
 

@@ -1,4 +1,22 @@
 // src/core/params.ts
+/** Colour levels / curve / hue / saturation applied to the final picture. */
+export interface FxParams {
+  black: number;      // 0..0.5   levels: black point
+  white: number;      // 0.5..1   levels: white point
+  gamma: number;      // 0.4..2.2 levels: midtone gamma (1 = none)
+  contrast: number;   // -1..1    curve: contrast around mid grey
+  hue: number;        // -180..180 degrees
+  saturation: number; // 0..2     1 = unchanged
+}
+
+/** Drift trails. */
+export interface TrailParams {
+  amount: number;   // 0..1 share of trail lines drawn
+  strength: number; // 0..2 brightness of trails
+  length: number;   // 0.3..2 trail length multiplier
+  detail: number;   // 0..1 0 = soft full-length glow, 1 = crisp tapered tails
+}
+
 export interface Params {
   // sliders, all 0..1
   drift: number;   // default 0.8: noise flow around home
@@ -8,16 +26,14 @@ export interface Params {
 
   // toggles
   draw: boolean;    // paint flow strokes
-  track: boolean;   // pointer repel + tracker follow
-  links: boolean;   // lines between trackers
+  track: boolean;   // pointer repel
+  scanMode: number; // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH
   scan: boolean;    // sweep line
   trails: boolean;  // fading streaks
-  marks: boolean;   // bracket labels
 
-  trackers: 'sparse' | 'dense';      // 12 vs 40 boxes
   travel: 'swarm' | 'melt';
   background: 'dark' | 'white';      // ON WHITE
-  colorMode: 'true' | 'negative';
+  colorMode: 'true' | 'bw';          // TRUE colour or black & white
   light: 'cream' | 'ice' | 'orange' | 'red' | 'green' | 'violet' | 'off';
   lightOn: boolean;                  // S key
 
@@ -25,6 +41,9 @@ export interface Params {
   lineMode: 'streak' | 'dot';        // dot vs line rendering
   pointCount: number; // dynamically adapted to subject image
   quality: 'auto' | 'low' | 'high';
+
+  fx: FxParams;
+  trail: TrailParams;
 }
 
 export const defaults: Params = {
@@ -35,22 +54,23 @@ export const defaults: Params = {
 
   draw: false,
   track: true,
-  links: true,
   scan: false,
+  scanMode: 0,
   trails: true,
-  marks: true,
 
-  trackers: 'sparse',
   travel: 'swarm',
   background: 'dark',
   colorMode: 'true',
   light: 'cream',
   lightOn: true,
 
-  line: { angle: 0.14, length: 0.9 }, // direction the particles drift, as drawn in the LINE box
+  line: { angle: 0.2, length: 0.9 }, // direction the particles drift, as drawn in the LINE box
   lineMode: 'streak',
   pointCount: 524288,
   quality: 'auto',
+
+  fx: { black: 0, white: 1, gamma: 1, contrast: 0, hue: 0, saturation: 1 },
+  trail: { amount: 1, strength: 1, length: 1, detail: 0.5 },
 };
 
 export const presets: Record<string, Partial<Params>> = {
@@ -75,8 +95,6 @@ export const presets: Record<string, Partial<Params>> = {
     splash: 0.4,
     gather: 0.85,
     scan: true,
-    links: true,
-    marks: true,
   },
 };
 
@@ -94,6 +112,8 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
         ...fallback.line,
         ...(parsed.line || {}),
       },
+      fx: { ...fallback.fx, ...(parsed.fx || {}) },
+      trail: { ...fallback.trail, ...(parsed.trail || {}) },
     };
   } catch {
     return { ...fallback };
@@ -101,7 +121,7 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
 }
 
 // v2: defaults and simulation changed, so older saved settings would look wrong
-const STORAGE_KEY = 'particle_depth_studio_params_v2';
+const STORAGE_KEY = 'particle_depth_studio_params_v3';
 
 export function saveToStorage(params: Params): void {
   try {

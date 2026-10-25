@@ -39,8 +39,6 @@ async function main() {
       pointsVisible: pointsMesh?.visible,
       streaksVisible: streaksMesh?.visible,
       hasActiveImage: engine.hasActiveImage,
-      trackerPointsCount: engine.getTrackerPoints().length,
-      sampleTracker: engine.getTrackerPoints()[0] || null,
     };
   });
 

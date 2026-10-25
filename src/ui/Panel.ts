@@ -2,6 +2,8 @@
 import { defaults, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
 
+const SCAN_MODES = ['SWEEP', 'RING', 'RADAR', 'LINES', 'DEPTH'];
+
 export class Panel {
   private params: Params;
   private lineWidget: LineWidget;
@@ -31,8 +33,9 @@ export class Panel {
     this.lineWidget.setValue(this.params.line);
 
     this.bindSliders();
+    this.bindEffects();
     this.bindToggles();
-    this.bindSegments();
+    this.bindScanMode();
     this.bindModes();
     this.bindSwatches();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
@@ -83,6 +86,50 @@ export class Panel {
     });
   }
 
+  /** Effects tab: every [data-path] slider writes to a nested Params field, e.g. "fx.black". */
+  private bindEffects(): void {
+    const panel = document.getElementById('fx-panel');
+    const fxBtn = document.getElementById('fx-btn');
+    const closeFx = () => panel?.classList.add('hidden');
+    fxBtn?.addEventListener('click', () => panel?.classList.toggle('hidden'));
+    document.getElementById('fx-close')?.addEventListener('click', closeFx);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel && !panel.classList.contains('hidden')) closeFx();
+    });
+
+    document.getElementById('fx-reset')?.addEventListener('click', () => {
+      this.params.fx = { ...defaults.fx };
+      this.params.trail = { ...defaults.trail };
+      this.syncUiToParams();
+      this.onParamsChangeCb(this.params);
+    });
+
+    document.querySelectorAll<HTMLInputElement>('#fx-panel input[type="range"][data-path]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const [group, key] = (input.dataset.path ?? '').split('.') as ['fx' | 'trail', string];
+        const bag = this.params[group] as unknown as Record<string, number>;
+        bag[key] = parseFloat(input.value);
+        this.updateFxOutput(input);
+        this.onParamsChangeCb(this.params);
+      });
+    });
+  }
+
+  private updateFxOutput(input: HTMLInputElement): void {
+    const out = input.parentElement?.querySelector('output');
+    const decimals = input.step.includes('.') ? (input.step.split('.')[1]?.length ?? 2) : 0;
+    if (out) out.textContent = Number(input.value).toFixed(decimals);
+  }
+
+  private syncEffects(): void {
+    document.querySelectorAll<HTMLInputElement>('#fx-panel input[type="range"][data-path]').forEach((input) => {
+      const [group, key] = (input.dataset.path ?? '').split('.') as ['fx' | 'trail', string];
+      const bag = this.params[group] as unknown as Record<string, number>;
+      input.value = String(bag[key]);
+      this.updateFxOutput(input);
+    });
+  }
+
   private bindToggles(): void {
     const toggles = document.querySelectorAll<HTMLButtonElement>('.toggle-btn');
     toggles.forEach((btn) => {
@@ -98,17 +145,14 @@ export class Panel {
     });
   }
 
-  private bindSegments(): void {
-    const trackerBtns = document.querySelectorAll<HTMLButtonElement>('[data-seg="trackers"] .seg-btn');
-    trackerBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const val = btn.dataset.value as 'sparse' | 'dense';
-        if (val) {
-          this.params.trackers = val;
-          trackerBtns.forEach((b) => b.classList.toggle('active', b === btn));
-          this.onParamsChangeCb(this.params);
-        }
-      });
+  // Refresh button next to SCAN: cycles through the scan styles and turns scanning on
+  private bindScanMode(): void {
+    const btn = document.getElementById('scan-mode-btn');
+    btn?.addEventListener('click', () => {
+      this.params.scanMode = (this.params.scanMode + 1) % SCAN_MODES.length;
+      this.params.scan = true;
+      this.syncUiToParams();
+      this.onParamsChangeCb(this.params);
     });
   }
 
@@ -130,7 +174,7 @@ export class Panel {
     const colorModeBtns = document.querySelectorAll<HTMLButtonElement>('[data-colormode]');
     colorModeBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
-        const val = btn.dataset.colormode as 'true' | 'negative';
+        const val = btn.dataset.colormode as 'true' | 'bw';
         if (val) {
           this.params.colorMode = val;
           colorModeBtns.forEach((b) => b.classList.toggle('active', b === btn));
@@ -233,19 +277,21 @@ export class Panel {
     if (slDepth) slDepth.value = this.params.depth.toString();
 
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['draw', 'track', 'links', 'scan', 'trails', 'marks'];
+    const toggleKeys: (keyof Params)[] = ['draw', 'track', 'scan', 'trails'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
     });
 
+    this.syncEffects();
+
+    // Scan style label
+    const scanLabel = document.getElementById('scan-mode-label');
+    if (scanLabel) scanLabel.textContent = SCAN_MODES[this.params.scanMode] ?? SCAN_MODES[0];
+
     // Light toggle button
     const btnLight = document.getElementById('btn-light');
     if (btnLight) btnLight.classList.toggle('active', this.params.lightOn);
-
-    // Trackers
-    const trackerBtns = document.querySelectorAll<HTMLButtonElement>('[data-seg="trackers"] .seg-btn');
-    trackerBtns.forEach((b) => b.classList.toggle('active', b.dataset.value === this.params.trackers));
 
     // Travel
     const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');

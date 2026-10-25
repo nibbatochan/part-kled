@@ -1,3 +1,5 @@
+import { MAX_IMAGES } from './Thumbs';
+
 // src/ui/Dropzone.ts
 export class Dropzone {
   private fileInput: HTMLInputElement;
@@ -66,7 +68,7 @@ export class Dropzone {
   private handleFiles(files: File[]): void {
     const valid = files.filter(f => /^image\/(png|jpeg|webp)$/i.test(f.type) || /\.(png|jpe?g|webp)$/i.test(f.name));
     if (valid.length > 0) {
-      this.onFilesCb(valid.slice(0, 4));
+      this.onFilesCb(valid.slice(0, MAX_IMAGES));
     }
   }
 }

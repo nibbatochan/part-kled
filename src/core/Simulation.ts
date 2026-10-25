@@ -56,6 +56,8 @@ export class Simulation {
     pu['uDepth'] = { value: 0.5 };
     pu['uMorph'] = { value: 0.0 };
     pu['uLine'] = { value: new THREE.Vector2(1.0, 0.0) };
+    pu['uExtent'] = { value: new THREE.Vector2(0.4, 0.5) };
+    pu['uTrails'] = { value: 1.0 };
 
     // Velocity uniforms
     const vu = this.velVariable.material.uniforms;
@@ -68,6 +70,10 @@ export class Simulation {
     vu['uMelt'] = { value: 0.0 };
     vu['uScan'] = { value: 0.0 };
     vu['uScanActive'] = { value: 0.0 };
+    vu['uScanMode'] = { value: 0.0 };
+    vu['uZScale'] = { value: 0.14 };
+    vu['uTrails'] = { value: 1.0 };
+    vu['uScanCenter'] = { value: new THREE.Vector2(0, 0) };
     vu['uSplash'] = { value: 0.5 };
 
     vu['uPointer'] = { value: new THREE.Vector3(999, 999, 0) };
@@ -122,6 +128,11 @@ export class Simulation {
     this.tHomeNextUniform.value = next;
   }
 
+  /** Half-size of the subject in world units; the stream placement is normalised to it. */
+  public setExtent(halfW: number, halfH: number): void {
+    this.posVariable.material.uniforms['uExtent'].value.set(halfW, halfH);
+  }
+
   public setFlowTexture(flow: THREE.Texture): void {
     this.tFlowUniform.value = flow;
   }
@@ -149,6 +160,7 @@ export class Simulation {
     this.posVariable.material.uniforms['uGather'].value = params.gather;
     this.posVariable.material.uniforms['uLine'].value.set(lineX, lineY);
     this.posVariable.material.uniforms['uDepth'].value = params.depth;
+    this.posVariable.material.uniforms['uTrails'].value = params.trails ? 1.0 : 0.0;
     this.posVariable.material.uniforms['uMorph'].value = morphProgress;
 
     const vu = this.velVariable.material.uniforms;
@@ -161,6 +173,10 @@ export class Simulation {
     vu['uMelt'].value = params.travel === 'melt' ? 1.0 : 0.0;
     vu['uScan'].value = scanProgress;
     vu['uScanActive'].value = params.scan ? 1.0 : 0.0;
+    vu['uScanMode'].value = params.scanMode;
+    vu['uZScale'].value = params.depth * 0.55 * 0.5;
+    vu['uTrails'].value = params.trails ? 1.0 : 0.0;
+    vu['uScanCenter'].value.set(pointerOn ? pointer.x : 0, pointerOn ? pointer.y : 0);
 
     vu['uSplash'].value = params.splash;
     vu['uPointer'].value.copy(pointer);

@@ -1,6 +1,6 @@
 # Particle Depth Studio
 
-An interactive WebGL2 particle simulation engine that turns up to four uploaded photos into a 524,288-particle, depth-driven 3D animation. The same core engine also compiles into a standalone, UI-free header embed (`<particle-hero>`) with zero depth-model downloads for portfolio websites.
+An interactive WebGL2 particle simulation engine that turns up to five uploaded photos into a 524,288-particle, depth-driven 3D animation. The same core engine also compiles into a standalone, UI-free header embed (`<particle-hero>`) with zero depth-model downloads for portfolio websites.
 
 Designed & built by **Sumanth Reddy**.
 
@@ -17,8 +17,7 @@ Designed & built by **Sumanth Reddy**.
   - **GATHER:** Spring force snapping particles back to their home positions
   - **DEPTH:** 3D parallax displacement and relief extrusion
   - **DRAW:** Paint directional flow strokes into a 256×256 decaying vector field
-  - **TRACK & MARKS:** Monospace tracker coordinate overlays (`NN +x.xx +y.xx +z.xx`) and corner brackets
-  - **LINKS:** Geometric spatial linkages between tracker nodes
+  - **TRACK:** Cursor interaction: particles react to the pointer
   - **SCAN:** Traveling directional sweep wave
   - **TRAILS:** Fine velocity streak line segments
   - **TRAVEL:** `SWARM` (cohesive cluster motion) vs `MELT` (gravitational downward sag)

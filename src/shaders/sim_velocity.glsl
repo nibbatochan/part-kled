@@ -16,6 +16,10 @@ uniform float uMelt;
 uniform float uScan;
 uniform float uScanActive;
 uniform float uSplash;
+uniform float uScanMode;
+uniform float uZScale;
+uniform float uTrails;
+uniform vec2  uScanCenter;
 
 uniform vec3  uPointer;     // world-space cursor position (z = 0 plane)
 uniform vec3  uPointerVel;  // world units / second
@@ -116,7 +120,9 @@ void main() {
   // Home position: morph between images, then depth relief
   float morphPhase = clamp(uMorph + (seed - 0.5) * 0.4, 0.0, 1.0);
   float morphFactor = smoothstep(0.0, 1.0, morphPhase);
-  vec3 home = mix(texture2D(tHome, uv).xyz, texture2D(tHomeNext, uv).xyz, morphFactor);
+  vec4 homeLight = mix(texture2D(tHome, uv), texture2D(tHomeNext, uv), morphFactor);
+  vec3 home = homeLight.xyz;
+  float light = homeLight.w;
   home.z *= uDepth * 0.55;
 
   // LINE: direction of travel. Length scales how hard the wind blows.
@@ -139,7 +145,7 @@ void main() {
   vec3 F = vec3(0.0);
 
   // GATHER: spring to home. High = crisp picture, low = loose cloud.
-  float k = mix(5.0, 42.0, uGather) * (1.0 - 0.55 * fall);
+  float k = mix(5.0, 42.0, uGather) * (1.0 - 0.2 * fall);
   float damp = mix(3.2, 9.5, uGather);
 
   if (!streaming) {
@@ -157,12 +163,12 @@ void main() {
 
     // Wind eases in from the body, so particles lift off instead of popping
     float ease = smoothstep(0.0, 0.55, a);
-    float windSpeed = (0.10 + 0.32 * uDrift) * mix(0.5, 1.0, lineLen) * (0.5 + 0.95 * h1);
-    windSpeed *= 1.0 + 0.9 * fall;                         // cursor stirs the stream up
+    float windSpeed = 0.9 * (0.10 + 0.42 * uDrift) * mix(0.5, 1.0, lineLen) * (0.5 + 0.95 * h1);
+    windSpeed *= 1.0 + 0.25 * fall;                        // cursor stirs the stream up a little
     vec2 target = lineDir * windSpeed * mix(0.35, 1.0, ease);
 
     // Fan out slightly with distance, shear stays small so streamlines stay silky
-    target += perp * (h2 - 0.5) * 0.22 * uDrift * phase;
+    target += perp * (h2 - 0.5) * 0.4 * uDrift * phase;
 
     // Melt: sag downward instead of sweeping sideways
     if (uMelt > 0.5) {
@@ -187,11 +193,11 @@ void main() {
 
   // SPLASH: cursor pushes particles apart and drags them along its motion
   if (uPointerOn > 0.5) {
-    float spl = 3.0 + 16.0 * uSplash;
+    float spl = 0.8 + 3.5 * uSplash;
     F.xy += cDir * fall * spl;
-    F.z  += fall * (1.5 + 5.0 * uSplash);                  // lifts toward the camera: bright cloud
-    F.xy += uPointerVel.xy * fall * (0.35 + 1.8 * uSplash);
-    F.xy += vec2(-cDir.y, cDir.x) * fall * (0.6 + 2.2 * uSplash); // swirl
+    F.z  += fall * (0.4 + 1.2 * uSplash);                  // gentle lift toward the camera
+    F.xy += uPointerVel.xy * fall * (0.1 + 0.45 * uSplash);
+    F.xy += vec2(-cDir.y, cDir.x) * fall * (0.15 + 0.5 * uSplash); // light swirl
   }
 
   // Click shockwave
@@ -206,15 +212,14 @@ void main() {
 
   // SCAN: a narrow band sweeps across the picture along LINE. Only the band moves.
   if (uScanActive > 0.5) {
-    float u = dot(p.xy, lineDir);
-    float c = mix(-0.85, 0.85, uScan);
-    float bd = (u - c) / 0.05;
-    float g = exp(-bd * bd);
-    g *= 1.0 + 1.6 * fall;                                  // stronger under the cursor
-    float wave = sin(dot(p.xy, perp) * 30.0 - uTime * 7.0 + h1 * 2.0);
-    F.xy += perp * wave * g * 2.4;
-    F.xy += lineDir * g * 1.1;
-    F.z  += g * (1.8 + 1.4 * wave);
+    vec2 sdir = scanDir(p.xy, lineDir, uScanMode, uScanCenter);
+    vec2 sperp = vec2(-sdir.y, sdir.x);
+    float g = scanBand(p.xy, lineDir, uScan, uScanMode, uScanCenter, p.z, uZScale, light);
+    g *= 1.0 + 0.4 * fall;                                  // a little stronger under the cursor
+    float wave = sin(dot(p.xy, sperp) * 30.0 - uTime * 7.0 + h1 * 2.0);
+    F.xy += sperp * wave * g * 1.2;
+    F.xy += sdir * g * 0.5;
+    F.z  += g * (0.9 + 0.7 * wave);
   }
 
   // MELT also drips the loosely held body a little
