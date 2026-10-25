@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:hero": "vite build --config vite.config.hero.ts",
+    "build:hero-lite": "vite build --config vite.config.hero-lite.ts",
     "preview": "vite preview",
     "test": "vitest run"
   },

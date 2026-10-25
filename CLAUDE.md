@@ -15,6 +15,7 @@ npm install            # deps (Node 20+)
 npm run dev            # Vite dev server, http://localhost:5173/
 npm run build          # tsc + vite build (studio app)
 npm run build:hero     # vite build --config vite.config.hero.ts (-> dist-hero/hero.js)
+npm run build:hero-lite # lite hero, no three.js (-> dist-hero-lite/hero-lite.js, ~8.7 kB gzip). Test page: /lite.html in dev
 npm test               # vitest run (tests/)
 npx tsc --noEmit       # typecheck only (tsconfig includes src, tests, vite.config.ts)
 ```
@@ -31,6 +32,7 @@ npx tsc --noEmit       # typecheck only (tsconfig includes src, tests, vite.conf
 - `src/shaders/`: GLSL (`sim_position`, `sim_velocity`, `particle.*`, `streak.*`, `trail_*`, `composite`). Imported via `vite-plugin-glsl`.
 - `src/depth/`: `DepthEstimator.ts` (Depth Anything V2 Small via `@huggingface/transformers`, WebGPU with WASM fallback), `refine.ts` (guided filter), `bake.ts` (offline baking for the hero).
 - `src/ui/`: vanilla-TS UI (`Panel`, `Frame`, `Thumbs`, `Dropzone`, `LineWidget` (drift dial)), with `panel.css` and `tokens.css`.
+- `src/lite/` + `src/hero-lite.ts`: lightweight hero engine (web-studio). Raw WebGL2, stateless vertex-shader motion (position = f(home, light, hash(id), time), no framebuffers), screen blending, points + instanced trail lines, 16-byte particles in one static buffer. `sample.ts` writes particles in a shuffled order so any prefix is an even subset; `LiteEngine.adapt` drops trails, then render scale, then draws fewer points when frames stay slow. Does not import three.js. Not tested on real low-end hardware yet.
 - `src/main.ts`: studio app (`App` class). `src/hero.ts`: hero embed entry point.
 - `tests/`: vitest unit tests (`params`, `sampler`).
 - `docs/`: `BUILD.md` is the spec and decision record. `RESEARCH_DISSOLUTION_EFFECT.md` covers the disintegration/trail effect. `reference/` and `screenshots/` hold visual references.
