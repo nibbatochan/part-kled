@@ -49,7 +49,7 @@ export interface Params {
 }
 
 export const defaults: Params = {
-  drift: 0.75,
+  drift: 0.6,
   splash: 0.5,
   gather: 0.5,
   depth: 0.5,
@@ -67,13 +67,13 @@ export const defaults: Params = {
   light: 'cream',
   lightOn: true,
 
-  line: { angle: 0.2, length: 0.9 }, // direction the particles drift, as drawn in the LINE box
+  line: { angle: 0.2, length: 0.5 }, // direction the particles drift, as drawn in the LINE box
   lineMode: 'streak',
   pointCount: 524288,
   quality: 'auto',
 
   fx: { black: 0, white: 1, gamma: 1, contrast: 0, opacity: 1, hue: 0, saturation: 1 },
-  trail: { amount: 1, strength: 1, length: 1, detail: 0.5 },
+  trail: { amount: 0.35, strength: 0.5, length: 0.6, detail: 0.25 },
 };
 
 export const presets: Record<string, Partial<Params>> = {
@@ -100,6 +100,19 @@ export const presets: Record<string, Partial<Params>> = {
     scan: true,
   },
 };
+
+/**
+ * Light start: flow, drift strength and every trail setting go back to their low defaults.
+ * Applied on every page load and whenever a new picture is added, so the first frames stay cheap.
+ */
+export function withLightStart(p: Params): Params {
+  return {
+    ...p,
+    drift: defaults.drift,
+    line: { ...p.line, length: defaults.line.length },
+    trail: { ...defaults.trail },
+  };
+}
 
 export function serializeParams(params: Params): string {
   return JSON.stringify(params);

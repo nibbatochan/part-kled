@@ -1,5 +1,5 @@
 // src/main.ts
-import { defaults, loadFromStorage, saveToStorage, type Params } from './core/params';
+import { defaults, loadFromStorage, saveToStorage, withLightStart, type Params } from './core/params';
 import { Engine } from './core/Engine';
 import { sampleImageParticles, type SamplePointData } from './core/Sampler';
 import { DepthEstimator } from './depth/DepthEstimator';
@@ -31,7 +31,7 @@ class App {
   private lastTime: number = performance.now();
 
   constructor() {
-    this.params = { ...loadFromStorage(), background: 'dark' }; // no light mode any more
+    this.params = withLightStart({ ...loadFromStorage(), background: 'dark' }); // no light mode any more
 
     const stageCanvas = document.getElementById('stage') as HTMLCanvasElement;
     if (!stageCanvas) throw new Error('Stage canvas missing');
@@ -306,6 +306,8 @@ class App {
       this.images.push(proc);
     }
 
+    // A new picture starts light: low flow, drift strength and trails
+    this.panel.setParams(withLightStart(this.panel.getParams()));
     this.thumbs.setImages(this.images, this.images.length - 1);
     this.switchImage(this.images.length - 1);
   }
