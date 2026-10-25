@@ -34,76 +34,103 @@ export class Hud {
   public render(
     trackers: TrackerPoint[],
     showMarks: boolean,
-    showLinks: boolean
+    showLinks: boolean,
+    pointer: { x: number; y: number } | null = null
   ): void {
     this.ctx.clearRect(0, 0, this.width, this.height);
     if (!showMarks && !showLinks) return;
 
     const ctx = this.ctx;
-    const ink = 'rgba(244, 244, 242, 0.75)';
-    const inkFaint = 'rgba(244, 244, 242, 0.18)';
+    const visible = trackers.filter(
+      (t) => t.screenX > -20 && t.screenX < this.width + 20 && t.screenY > -20 && t.screenY < this.height + 20
+    );
 
-    // 1. Draw LINKS between nearby trackers
-    if (showLinks && trackers.length > 1) {
-      ctx.strokeStyle = inkFaint;
+    // 1. LINKS: every tracker joins its nearest neighbours, so the network always reads as a web
+    //    across the subject. Lines brighten near the cursor, and the cursor is tied to its closest trackers.
+    if (showLinks && visible.length > 1) {
+      const maxLink = Math.min(this.width, this.height) * 0.42;
+      const drawn = new Set<string>();
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      const maxDist = 120; // screen distance threshold
-      for (let i = 0; i < trackers.length; i++) {
-        for (let j = i + 1; j < trackers.length; j++) {
-          const dx = trackers[i].screenX - trackers[j].screenX;
-          const dy = trackers[i].screenY - trackers[j].screenY;
-          const dist = Math.hypot(dx, dy);
-          if (dist < maxDist) {
-            ctx.moveTo(trackers[i].screenX, trackers[i].screenY);
-            ctx.lineTo(trackers[j].screenX, trackers[j].screenY);
-          }
+
+      for (let i = 0; i < visible.length; i++) {
+        const a = visible[i];
+        const nearest = visible
+          .map((b, j) => ({ j, d: Math.hypot(a.screenX - b.screenX, a.screenY - b.screenY) }))
+          .filter((o) => o.j !== i && o.d < maxLink)
+          .sort((p, q) => p.d - q.d)
+          .slice(0, 2);
+
+        for (const { j, d } of nearest) {
+          const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+          if (drawn.has(key)) continue;
+          drawn.add(key);
+          const b = visible[j];
+          const boost = Math.max(a.near, b.near);
+          const alpha = (0.55 * (1 - d / maxLink) + 0.08) * (1 + boost * 1.4);
+          ctx.strokeStyle = `rgba(244, 244, 242, ${Math.min(0.85, alpha).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(a.screenX, a.screenY);
+          ctx.lineTo(b.screenX, b.screenY);
+          ctx.stroke();
         }
       }
-      ctx.stroke();
+
+      if (pointer) {
+        const closest = visible
+          .map((t) => ({ t, d: Math.hypot(t.screenX - pointer.x, t.screenY - pointer.y) }))
+          .sort((p, q) => p.d - q.d)
+          .slice(0, 3);
+        for (const { t, d } of closest) {
+          if (d > maxLink) continue;
+          ctx.strokeStyle = `rgba(244, 244, 242, ${(0.7 * (1 - d / maxLink) + 0.1).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(pointer.x, pointer.y);
+          ctx.lineTo(t.screenX, t.screenY);
+          ctx.stroke();
+        }
+      }
+
+      // Node dots so the web is visible even when MARKS is off
+      ctx.fillStyle = 'rgba(244, 244, 242, 0.9)';
+      for (const t of visible) {
+        ctx.beginPath();
+        ctx.arc(t.screenX, t.screenY, 1.6 + t.near * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // 2. Draw MARKS (corner brackets + label)
+    // 2. MARKS: corner brackets + "NN +x +y +z" label. The tracker under the cursor locks on.
     if (showMarks) {
-      const bracketSize = 7;
       const fmt = (n: number) => (n >= 0 ? `+${n.toFixed(2)}` : n.toFixed(2));
       const pad2 = (n: number) => n.toString().padStart(2, '0');
 
-      ctx.font = '8.5px "JetBrains Mono", monospace';
-      ctx.fillStyle = ink;
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1;
+      ctx.font = '8px "JetBrains Mono", monospace';
 
-      trackers.forEach((t) => {
+      visible.forEach((t) => {
         const x = t.screenX;
         const y = t.screenY;
+        const s = 7 + t.near * 4;
+        const arm = 4 + t.near * 2;
+        const a = 0.82 + t.near * 0.18;
 
-        // Skip if outside visible viewport
-        if (x < -20 || x > this.width + 20 || y < -20 || y > this.height + 20) return;
+        ctx.strokeStyle = `rgba(244, 244, 242, ${a.toFixed(2)})`;
+        ctx.fillStyle = `rgba(244, 244, 242, ${a.toFixed(2)})`;
+        ctx.lineWidth = 1 + t.near * 0.6;
 
-        // Draw 4 corner brackets
         ctx.beginPath();
-        // Top-left
-        ctx.moveTo(x - bracketSize, y - bracketSize + 4);
-        ctx.lineTo(x - bracketSize, y - bracketSize);
-        ctx.lineTo(x - bracketSize + 4, y - bracketSize);
-        // Top-right
-        ctx.moveTo(x + bracketSize - 4, y - bracketSize);
-        ctx.lineTo(x + bracketSize, y - bracketSize);
-        ctx.lineTo(x + bracketSize, y - bracketSize + 4);
-        // Bottom-left
-        ctx.moveTo(x - bracketSize, y + bracketSize - 4);
-        ctx.lineTo(x - bracketSize, y + bracketSize);
-        ctx.lineTo(x - bracketSize + 4, y + bracketSize);
-        // Bottom-right
-        ctx.moveTo(x + bracketSize - 4, y + bracketSize);
-        ctx.lineTo(x + bracketSize, y + bracketSize);
-        ctx.lineTo(x + bracketSize, y + bracketSize - 4);
+        ctx.moveTo(x - s, y - s + arm); ctx.lineTo(x - s, y - s); ctx.lineTo(x - s + arm, y - s);
+        ctx.moveTo(x + s - arm, y - s); ctx.lineTo(x + s, y - s); ctx.lineTo(x + s, y - s + arm);
+        ctx.moveTo(x - s, y + s - arm); ctx.lineTo(x - s, y + s); ctx.lineTo(x - s + arm, y + s);
+        ctx.moveTo(x + s - arm, y + s); ctx.lineTo(x + s, y + s); ctx.lineTo(x + s, y + s - arm);
         ctx.stroke();
 
-        // Label: NN +x.xx +y.xx +z.xx
         const label = `${pad2(t.id)} ${fmt(t.worldX)} ${fmt(t.worldY)} ${fmt(t.worldZ)}`;
-        ctx.fillText(label, x + bracketSize + 4, y + 3);
+        // Dark plate behind the text so labels stay readable over bright streaks
+        const textW = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(5, 5, 6, 0.4)';
+        ctx.fillRect(x + s + 2, y - 4, textW + 6, 10);
+        ctx.fillStyle = `rgba(244, 244, 242, ${a.toFixed(2)})`;
+        ctx.fillText(label, x + s + 5, y + 4);
       });
     }
   }

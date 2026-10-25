@@ -25,9 +25,15 @@ void main() {
       rgb = mix(rgb, trail.rgb, trail.a * 0.4);
     } else {
       // Additive velvety persistence glow
-      rgb += trail.rgb * 0.70;
+      rgb += trail.rgb * 0.30;
     }
     a = max(a, trail.a);
+  }
+
+  // Soft shoulder: dense, hot areas roll off toward white instead of clipping, and colour keeps
+  // its hue. Skipped on paper, where blending is not additive.
+  if (uOnWhite < 0.5) {
+    rgb = 1.0 - exp(-rgb * 1.9);
   }
 
   // 1/255 ordered dither to prevent banding in dark gradients

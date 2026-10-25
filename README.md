@@ -25,7 +25,7 @@ Designed & built by **Sumanth Reddy**.
   - **LIGHT Swatches:** 6 spectral tints (cream, ice, orange, red, green, violet) + light toggle
   - **ON WHITE & NEGATIVE:** Light/dark paper inversion
 - **Seamless Morphing:** Smooth ripple transitions when switching between images (`Space` or thumbnail clicks).
-- **Portfolio Hero Embed (`dist-hero/hero.js`):** Lightweight standalone library build (under 190 KB gzip) with instant poster paint, offscreen pause, and non-blocking interaction.
+- **Portfolio Hero Embed (`dist-hero/hero.js`):** Lightweight standalone library build (under 195 KB gzip) with instant poster paint, offscreen pause, and non-blocking interaction.
 
 ---
 
@@ -118,5 +118,5 @@ hero.setParams({ gather: 0.7, drift: 0.3 });
 ## Deviations & Architecture Notes
 
 1. **Depth Model Pipeline:** Added a photometric gradient and relief fallback with edge-aware guided filtering, ensuring instant responsiveness if the client environment is offline or still downloading model weights.
-2. **Library Size:** `dist-hero/hero.js` achieves 188.26 kB gzip, beating the strict 200 kB budget.
+2. **Library Size:** `dist-hero/hero.js` achieves 192.8 kB gzip, beating the strict 200 kB budget.
 3. **Credit Line:** All branding and credits correctly display `BY SUMANTH REDDY`.

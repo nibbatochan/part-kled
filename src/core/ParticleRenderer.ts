@@ -7,7 +7,18 @@ import streakFrag from '../shaders/streak.frag.glsl';
 import fullscreenVert from '../shaders/fullscreen.vert.glsl';
 import trailDecayFrag from '../shaders/trail_decay.frag.glsl';
 import compositeFrag from '../shaders/composite.frag.glsl';
+import { LIFECYCLE_GLSL } from '../shaders/lifecycle';
 import type { Params } from './params';
+
+/** Cursor / clock state shared with the point and streak shaders. */
+export interface RenderContext {
+  pointer: THREE.Vector3;
+  pointerOn: boolean;
+  time: number;
+}
+
+/** Depth relief scale: must match `home.z *= uDepth * 0.55` in the sim shaders. */
+export const DEPTH_RELIEF = 0.55;
 
 export interface TrackerPoint {
   id: number;
@@ -16,6 +27,8 @@ export interface TrackerPoint {
   worldZ: number;
   screenX: number;
   screenY: number;
+  /** 0..1 closeness to the cursor, for highlighting */
+  near: number;
 }
 
 const LIGHT_COLORS: Record<string, THREE.Vector3> = {
@@ -158,22 +171,27 @@ export class ParticleRenderer {
     geometry.setAttribute('ref', new THREE.BufferAttribute(refs, 2));
 
     this.pointsMaterial = new THREE.ShaderMaterial({
-      vertexShader: particleVert,
+      vertexShader: LIFECYCLE_GLSL + particleVert,
       fragmentShader: particleFrag,
       uniforms: {
         tPos: { value: null },
         tVel: { value: null },
         tColor: { value: null },
         tColorNext: { value: null },
-        uSize: { value: 1.05 },
+        uSize: { value: 1.3 },
         uDpr: { value: Math.min(2.0, window.devicePixelRatio || 1.0) },
         uMorph: { value: 0.0 },
         uDrift: { value: 0.8 },
+        uGather: { value: 0.5 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
-        uLine: { value: new THREE.Vector2(0.4, 0.3) },
+        uLine: { value: new THREE.Vector2(1.0, 0.0) },
+        uPointer: { value: new THREE.Vector3(999, 999, 0) },
+        uPointerOn: { value: 0.0 },
+        uSplash: { value: 0.5 },
+        uTime: { value: 0.0 },
         uNegative: { value: 0.0 },
         uOnWhite: { value: 0.0 },
       },
@@ -189,7 +207,8 @@ export class ParticleRenderer {
   }
 
   private initStreaks(): void {
-    const streakCount = Math.floor(this.particleCount / 2);
+    // One streak per 4 particles: enough for silky trails without washing out the picture
+    const streakCount = Math.floor(this.particleCount / 4);
     const vertCount = streakCount * 2;
 
     const geometry = new THREE.BufferGeometry();
@@ -198,7 +217,7 @@ export class ParticleRenderer {
     const dummyPositions = new Float32Array(vertCount * 3);
 
     for (let i = 0; i < streakCount; i++) {
-      const pIdx = i * 2;
+      const pIdx = i * 4;
       const u = (pIdx % this.texWidth + 0.5) / this.texWidth;
       const v = (Math.floor(pIdx / this.texWidth) + 0.5) / this.texHeight;
 
@@ -218,15 +237,16 @@ export class ParticleRenderer {
     geometry.setAttribute('isTail', new THREE.BufferAttribute(isTail, 1));
 
     this.streakMaterial = new THREE.ShaderMaterial({
-      vertexShader: streakVert,
+      vertexShader: LIFECYCLE_GLSL + streakVert,
       fragmentShader: streakFrag,
       uniforms: {
         tPos: { value: null },
         tVel: { value: null },
         tColor: { value: null },
-        uStreakLength: { value: 1.0 },
-        uLine: { value: new THREE.Vector2(0.85, 0.05) },
+        uStreakLength: { value: 0.2 },
+        uLine: { value: new THREE.Vector2(1.0, 0.0) },
         uDrift: { value: 0.8 },
+        uGather: { value: 0.5 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
         uScan: { value: 0.0 },
@@ -268,21 +288,50 @@ export class ParticleRenderer {
     this.streakMesh.visible = hasImage;
   }
 
-  public setTrackerFeaturePoints(homeData: Float32Array, pointCount: number): void {
+  /**
+   * Choose up to 40 tracker anchors on bright, opaque parts of the subject. Greedy farthest-point
+   * ordering spreads them evenly, so the first 12 (SPARSE) already cover the whole picture.
+   */
+  public setTrackerFeaturePoints(homeData: Float32Array, pointCount: number, colorData?: Uint8Array): void {
     this.trackerWorldPositions = [];
     if (!this.hasActiveImage) return;
 
-    // Pick 40 non-empty feature points spread out across the subject
-    const step = Math.max(1, Math.floor(pointCount / 60));
-    for (let i = 0; i < pointCount && this.trackerWorldPositions.length < 40; i += step) {
+    const candidates: THREE.Vector3[] = [];
+    const stride = Math.max(1, Math.floor(pointCount / 6000));
+    for (let i = 0; i < pointCount; i += stride) {
       const idx = i * 4;
-      const x = homeData[idx];
-      const y = homeData[idx + 1];
-      const z = homeData[idx + 2];
-      // Check that it's not empty space
-      if (Math.abs(x) > 0.001 || Math.abs(y) > 0.001 || Math.abs(z) > 0.001) {
-        this.trackerWorldPositions.push(new THREE.Vector3(x, y, z));
+      if (colorData) {
+        const lum = (colorData[idx] * 0.299 + colorData[idx + 1] * 0.587 + colorData[idx + 2] * 0.114) / 255;
+        if (colorData[idx + 3] < 40 || lum < 0.22) continue;
       }
+      candidates.push(new THREE.Vector3(homeData[idx], homeData[idx + 1], homeData[idx + 2]));
+    }
+    if (candidates.length === 0) return;
+
+    const centroid = new THREE.Vector3();
+    candidates.forEach((c) => centroid.add(c));
+    centroid.divideScalar(candidates.length);
+
+    const minDist = new Float32Array(candidates.length).fill(Infinity);
+    let next = 0;
+    let best = Infinity;
+    candidates.forEach((c, i) => {
+      const d = c.distanceToSquared(centroid);
+      if (d < best) { best = d; next = i; }
+    });
+
+    const want = Math.min(40, candidates.length);
+    for (let n = 0; n < want; n++) {
+      const chosen = candidates[next];
+      this.trackerWorldPositions.push(chosen.clone());
+      let far = -1;
+      let farIdx = 0;
+      for (let i = 0; i < candidates.length; i++) {
+        const d = candidates[i].distanceToSquared(chosen);
+        if (d < minDist[i]) minDist[i] = d;
+        if (minDist[i] > far) { far = minDist[i]; farIdx = i; }
+      }
+      next = farIdx;
     }
   }
 
@@ -294,7 +343,8 @@ export class ParticleRenderer {
     colorNextTexture: THREE.Texture,
     params: Params,
     morphProgress: number,
-    scanProgress: number
+    scanProgress: number,
+    ctx: RenderContext = { pointer: new THREE.Vector3(999, 999, 0), pointerOn: false, time: 0 }
   ): void {
     if (!this.hasActiveImage) {
       this.renderer.clear();
@@ -328,6 +378,11 @@ export class ParticleRenderer {
     pu['uLightColor'].value.copy(lightVec);
     pu['uLightOn'].value = params.lightOn ? 1.0 : 0.0;
     pu['uDrift'].value = params.drift;
+    pu['uGather'].value = params.gather;
+    pu['uSplash'].value = params.splash;
+    pu['uPointer'].value.copy(ctx.pointer);
+    pu['uPointerOn'].value = ctx.pointerOn ? 1.0 : 0.0;
+    pu['uTime'].value = ctx.time;
     pu['uScan'].value = scanProgress;
     pu['uScanActive'].value = params.scan ? 1.0 : 0.0;
     pu['uNegative'].value = isNegative ? 1.0 : 0.0;
@@ -346,8 +401,9 @@ export class ParticleRenderer {
       su['tColor'].value = colorTexture;
       su['uLine'].value.set(lineX, lineY);
       su['uDrift'].value = params.drift;
-      // Drift controls the trail's lengths toward the set direction (approx 20px - 70px)
-      su['uStreakLength'].value = (0.025 + params.drift * 0.075) * params.line.length;
+      su['uGather'].value = params.gather;
+      // Drift sets how long the velocity streaks are (world units)
+      su['uStreakLength'].value = (0.05 + params.drift * 0.16) * (0.5 + 0.5 * params.line.length);
       su['uScan'].value = scanProgress;
       su['uScanActive'].value = params.scan ? 1.0 : 0.0;
       su['uLightColor'].value.copy(lightVec);
@@ -415,7 +471,10 @@ export class ParticleRenderer {
 
   public getTrackerPoints(
     camera: THREE.PerspectiveCamera,
-    count: number
+    count: number,
+    depth: number = 0.5,
+    pointer?: THREE.Vector3,
+    follow: boolean = false
   ): TrackerPoint[] {
     if (!this.hasActiveImage || this.trackerWorldPositions.length === 0) {
       return [];
@@ -430,19 +489,34 @@ export class ParticleRenderer {
 
     for (let i = 0; i < n; i++) {
       const wPos = this.trackerWorldPositions[i];
-      tempVec.copy(wPos);
-      tempVec.project(camera);
+      // Same relief scale as the sim, so the brackets sit on the particles they label
+      const z = wPos.z * depth * DEPTH_RELIEF;
+      let wx = wPos.x;
+      let wy = wPos.y;
 
+      // TRACK: trackers lean toward the cursor, like the reference
+      let near = 0;
+      if (pointer && follow) {
+        const dx = pointer.x - wx;
+        const dy = pointer.y - wy;
+        const d2 = dx * dx + dy * dy;
+        near = Math.exp(-d2 / 0.09);
+        wx += dx * 0.28 * near;
+        wy += dy * 0.28 * near;
+      }
+
+      tempVec.set(wx, wy, z).project(camera);
       const sx = tempVec.x * halfW + halfW;
       const sy = -tempVec.y * halfH + halfH;
 
       result.push({
         id: i + 1,
-        worldX: wPos.x,
-        worldY: wPos.y,
-        worldZ: wPos.z,
+        worldX: wx,
+        worldY: wy,
+        worldZ: z,
         screenX: sx,
         screenY: sy,
+        near,
       });
     }
 

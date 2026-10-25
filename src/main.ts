@@ -111,6 +111,15 @@ class App {
     window.addEventListener('pointermove', (e) => {
       this.engine.setPointer(e.clientX, e.clientY);
     });
+
+    // Click on the stage: shockwave burst from the cursor (SPLASH sets its force)
+    stage.addEventListener('pointerdown', (e) => {
+      this.engine.triggerSplash(e.clientX, e.clientY);
+    });
+
+    document.documentElement.addEventListener('pointerleave', () => {
+      this.engine.setPointerInside(false);
+    });
   }
 
   private bindResize(): void {
@@ -132,7 +141,7 @@ class App {
     // Update 2D tracker HUD (only if an image is loaded)
     if (this.images.length > 0) {
       const trackers = this.engine.getTrackerPoints();
-      this.hud.render(trackers, this.params.track && this.params.marks, this.params.links);
+      this.hud.render(trackers, this.params.marks, this.params.links, this.engine.getPointerScreen());
     } else {
       this.hud.render([], false, false);
     }

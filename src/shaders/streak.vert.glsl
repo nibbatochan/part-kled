@@ -1,10 +1,12 @@
 // src/shaders/streak.vert.glsl
+// (LIFECYCLE_GLSL is prepended in ParticleRenderer.ts)
 uniform sampler2D tPos;
 uniform sampler2D tVel;
 uniform sampler2D tColor;
 uniform float uStreakLength;
 uniform vec2  uLine;
 uniform float uDrift;
+uniform float uGather;
 uniform vec3  uLightColor;
 uniform float uLightOn;
 uniform float uScan;
@@ -16,85 +18,74 @@ attribute float isTail; // 0.0 for head, 1.0 for tail
 varying vec4 vColor;
 varying float vAlpha;
 
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+void kill() {
+  gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  vAlpha = 0.0;
+  vColor = vec4(0.0);
 }
 
 void main() {
-  float seed = hash(ref);
-
-  // CRITICAL: Not all particles do the tailing!
-  // ~78% of particles stay firmly on the image without tailing.
-  // Only the ~22% streaming particles that move from left to right do the tailing.
-  if (seed >= 0.22) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    return;
-  }
-
   vec4 posData = texture2D(tPos, ref);
   vec3 pos = posData.xyz;
   float age = posData.w;
 
   vec4 velData = texture2D(tVel, ref);
   vec3 vel = velData.xyz;
+  float seed = velData.w;
   float speed = length(vel);
 
-  // If particle is resting at home, slow, or has dissolved, skip trail
-  if (age < 0.005 || speed < 0.1) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  // Only particles that are actually streaming leave a trail. The body stays crisp.
+  float phase = streamPhase(age, seed, uDrift, uGather);
+  if (age < 0.0 || phase < 0.002 || speed < 0.04) {
+    kill();
     return;
   }
 
-  float maxLife = (1.0 + uDrift * 2.2) * (0.6 + 0.8 * fract(seed * 43.19));
-  float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
-  float fade = smoothstep(1.0, 0.05, lifeRatio);
-
+  float fade = streamFade(phase);
   if (fade < 0.01) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    kill();
     return;
   }
 
   vec4 col = texture2D(tColor, ref);
   if (col.a < 0.02) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    kill();
     return;
   }
 
-  // Saturated color boost on streaks
+  // Saturated, brightened colour on streaks
   float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
-  col.rgb = mix(vec3(lum), col.rgb, 1.40);
-  col.rgb = pow(max(col.rgb, vec3(0.0)), vec3(0.90)) * 1.20;
+  col.rgb = mix(vec3(lum), col.rgb, 1.35);
+  col.rgb = pow(max(col.rgb, vec3(0.0)), vec3(0.9)) * 1.25;
 
-  // Dynamic extrusion along negative velocity vector
+  // Extrude backwards along the real velocity: silky velocity streaks
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
-  vec3 dir = (speed > 0.15) ? normalize(vel) : vec3(lineDir, 0.0);
-  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.5 + 0.8 * fract(seed * 29.3)) * (1.0 - 0.4 * lifeRatio);
+  vec3 dir = normalize(vec3(vel.xy, 0.0) + vec3(lineDir * 1e-3, 0.0));
+  float len = uStreakLength * (0.35 + 0.9 * fract(seed * 29.3)) * smoothstep(0.04, 0.35, speed);
+  len *= (0.45 + 0.55 * lum) * (1.0 - 0.5 * phase);
 
   vec3 finalPos = pos;
   if (isTail > 0.5) {
-    // Tail trails behind the moving particle
-    finalPos = pos - dir * trailLen;
+    finalPos = pos - dir * len;
     vAlpha = 0.0;
   } else {
-    // Head anchored at the moving particle
-    vAlpha = 0.85 * fade;
+    vAlpha = 0.9 * fade;
   }
 
-  // Scan illumination: concentric wavy light ripples expanding from center
+  // SCAN lights the streaks inside the band
   if (uScanActive > 0.5) {
-    float rCenter = length(pos.xy);
-    float waveFront = uScan * 1.8;
-    float distFromWave = abs(rCenter - waveFront);
-    if (distFromWave < 0.18) {
-      float wavePattern = sin(rCenter * 24.0 - uScan * 18.0);
-      float scanGlow = (1.0 - distFromWave / 0.18) * (0.5 + 0.5 * wavePattern);
-      vec3 lightTint = (uLightOn > 0.5 ? uLightColor : vec3(1.0, 0.95, 0.88));
-      col.rgb += lightTint * (scanGlow * (0.5 + 2.2 * lum));
-    }
+    vec2 sd = normalize(uLine + vec2(1e-4, 0.0));
+    float u = dot(pos.xy, sd);
+    float c = mix(-0.85, 0.85, uScan);
+    float bd = (u - c) / 0.05;
+    float g = exp(-bd * bd);
+    vec3 tint = (uLightOn > 0.5 ? uLightColor : vec3(1.0, 0.95, 0.88));
+    col.rgb += tint * g * (0.3 + 0.9 * lum);
+    vAlpha = min(1.0, vAlpha * (1.0 + 0.5 * g));
   }
 
   if (uLightOn > 0.5) {
-    col.rgb = mix(col.rgb, uLightColor, clamp(lum * 0.35, 0.0, 0.5));
+    col.rgb = mix(col.rgb, uLightColor, clamp(lum * 0.4, 0.0, 0.55));
   }
 
   vColor = col;

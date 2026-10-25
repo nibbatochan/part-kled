@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js';
 import simPositionShader from '../shaders/sim_position.glsl';
 import simVelocityShader from '../shaders/sim_velocity.glsl';
+import { LIFECYCLE_GLSL } from '../shaders/lifecycle';
 import type { Params } from './params';
 
 export class Simulation {
@@ -41,8 +42,8 @@ export class Simulation {
 
     this.initTextureValues(dtPosition, dtVelocity);
 
-    this.posVariable = this.gpuCompute.addVariable('tPos', simPositionShader, dtPosition);
-    this.velVariable = this.gpuCompute.addVariable('tVel', simVelocityShader, dtVelocity);
+    this.posVariable = this.gpuCompute.addVariable('tPos', LIFECYCLE_GLSL + simPositionShader, dtPosition);
+    this.velVariable = this.gpuCompute.addVariable('tVel', LIFECYCLE_GLSL + simVelocityShader, dtVelocity);
 
     this.gpuCompute.setVariableDependencies(this.posVariable, [this.posVariable, this.velVariable]);
     this.gpuCompute.setVariableDependencies(this.velVariable, [this.posVariable, this.velVariable]);
@@ -51,8 +52,10 @@ export class Simulation {
     const pu = this.posVariable.material.uniforms;
     pu['uDt'] = { value: 0.016 };
     pu['uDrift'] = { value: 0.8 };
-    pu['uGather'] = { value: 0.8 };
-    pu['uLine'] = { value: new THREE.Vector2(0.4, 0.3) };
+    pu['uGather'] = { value: 0.5 };
+    pu['uDepth'] = { value: 0.5 };
+    pu['uMorph'] = { value: 0.0 };
+    pu['uLine'] = { value: new THREE.Vector2(1.0, 0.0) };
 
     // Velocity uniforms
     const vu = this.velVariable.material.uniforms;
@@ -65,11 +68,13 @@ export class Simulation {
     vu['uMelt'] = { value: 0.0 };
     vu['uScan'] = { value: 0.0 };
     vu['uScanActive'] = { value: 0.0 };
+    vu['uSplash'] = { value: 0.5 };
 
     vu['uPointer'] = { value: new THREE.Vector3(999, 999, 0) };
     vu['uPointerVel'] = { value: new THREE.Vector3(0, 0, 0) };
-    vu['uRadius'] = { value: 0.22 };
-    vu['uLine'] = { value: new THREE.Vector2(0.4, 0.3) };
+    vu['uPointerOn'] = { value: 0.0 };
+    vu['uBurst'] = { value: new THREE.Vector4(0, 0, 0, 0) };
+    vu['uLine'] = { value: new THREE.Vector2(1.0, 0.0) };
 
     // Placeholder textures
     const emptyTex = new THREE.DataTexture(new Float32Array(width * height * 4), width, height, THREE.RGBAFormat, THREE.FloatType);
@@ -83,6 +88,7 @@ export class Simulation {
     vu['tHomeNext'] = this.tHomeNextUniform;
     vu['tFlow'] = this.tFlowUniform;
     this.posVariable.material.uniforms['tHome'] = this.tHomeUniform;
+    this.posVariable.material.uniforms['tHomeNext'] = this.tHomeNextUniform;
 
     const error = this.gpuCompute.init();
     if (error !== null) {
@@ -102,7 +108,7 @@ export class Simulation {
       posArr[idx + 0] = (Math.random() - 0.5) * 1.5;
       posArr[idx + 1] = (Math.random() - 0.5) * 1.5;
       posArr[idx + 2] = (Math.random() - 0.5) * 0.5;
-      posArr[idx + 3] = 0.0; // age
+      posArr[idx + 3] = Math.random() * 3.0; // age, desynchronised so streamers do not launch in unison
 
       velArr[idx + 0] = 0.0;
       velArr[idx + 1] = 0.0;
@@ -127,7 +133,9 @@ export class Simulation {
     pointer: THREE.Vector3,
     pointerVel: THREE.Vector3,
     morphProgress: number,
-    scanProgress: number
+    scanProgress: number,
+    pointerOn: boolean = false,
+    burst: THREE.Vector4 = new THREE.Vector4(0, 0, 0, 0)
   ): void {
     // Clamp dt to 1/30 to prevent simulation explosion
     const safeDt = Math.min(1.0 / 30.0, dt);
@@ -140,6 +148,8 @@ export class Simulation {
     this.posVariable.material.uniforms['uDrift'].value = params.drift;
     this.posVariable.material.uniforms['uGather'].value = params.gather;
     this.posVariable.material.uniforms['uLine'].value.set(lineX, lineY);
+    this.posVariable.material.uniforms['uDepth'].value = params.depth;
+    this.posVariable.material.uniforms['uMorph'].value = morphProgress;
 
     const vu = this.velVariable.material.uniforms;
     vu['uTime'].value = time;
@@ -152,8 +162,11 @@ export class Simulation {
     vu['uScan'].value = scanProgress;
     vu['uScanActive'].value = params.scan ? 1.0 : 0.0;
 
+    vu['uSplash'].value = params.splash;
     vu['uPointer'].value.copy(pointer);
     vu['uPointerVel'].value.copy(pointerVel);
+    vu['uPointerOn'].value = pointerOn ? 1.0 : 0.0;
+    vu['uBurst'].value.copy(burst);
     vu['uLine'].value.set(lineX, lineY);
 
     this.gpuCompute.compute();

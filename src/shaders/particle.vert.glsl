@@ -1,4 +1,5 @@
 // src/shaders/particle.vert.glsl
+// (LIFECYCLE_GLSL is prepended in ParticleRenderer.ts)
 uniform sampler2D tPos;
 uniform sampler2D tVel;
 uniform sampler2D tColor;
@@ -8,11 +9,16 @@ uniform float uSize;
 uniform float uDpr;
 uniform float uMorph;
 uniform float uDrift;
+uniform float uGather;
 uniform vec3  uLightColor;
 uniform float uLightOn;
 uniform float uScan;
 uniform float uScanActive;
 uniform vec2  uLine;
+uniform vec3  uPointer;
+uniform float uPointerOn;
+uniform float uSplash;
+uniform float uTime;
 
 attribute vec2 ref;
 
@@ -32,17 +38,11 @@ void main() {
   float speed = length(vel);
   vSpeed = speed;
 
-  // Thanos snap dissolution:
-  // Disintegrating particles shrink and fade out as they drift
-  float maxLife = (1.0 + uDrift * 2.2) * (0.6 + 0.8 * fract(seed * 43.19));
-  float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
-
-  float fade = 1.0;
-  float sizeMod = 1.0;
-  if (age > 0.001) {
-    fade = smoothstep(1.0, 0.05, lifeRatio);
-    sizeMod = 1.0 - 0.45 * lifeRatio;
-  }
+  // Streaming particles fade and shrink toward the end of their life, then respawn at home
+  float phase = streamPhase(age, seed, uDrift, uGather);
+  float launched = step(0.0001, phase);
+  float fade = mix(1.0, streamFade(phase), launched);
+  float sizeMod = 1.0 - 0.4 * phase;
   vFade = fade;
 
   // Color blending across morph
@@ -50,24 +50,35 @@ void main() {
   vec4 colB = texture2D(tColorNext, ref);
   vec4 baseCol = mix(colA, colB, clamp(uMorph, 0.0, 1.0));
 
-  // Speed highlight: fast particles glow in light color
+  vec3 tint = (uLightOn > 0.5) ? uLightColor : vec3(1.0, 0.96, 0.90);
+
+  // Moving particles pick up the light colour (pale, hot vapour off the subject)
   if (uLightOn > 0.5) {
-    baseCol.rgb += uLightColor * clamp(speed * 0.9, 0.0, 1.8);
+    baseCol.rgb += uLightColor * clamp(speed * 0.8, 0.0, 0.9) * 0.55;
   }
 
-  // Scan glow: concentric wavy ripples expanding from center
+  // Depth shading: nearer relief reads brighter, farther relief sinks into the dark
+  baseCol.rgb *= 1.0 + clamp(pos.z, -0.4, 0.5) * 0.9;
+
+  // Cursor: particles under the pointer flare into a bright cloud
+  vec2 dc = pos.xy - uPointer.xy;
+  float cr2 = dot(dc, dc);
+  float radius = 0.17 + 0.16 * uSplash;
+  float cursorGlow = uPointerOn * exp(-cr2 / (radius * radius));
+  baseCol.rgb += tint * cursorGlow * 0.45;
+
+  // SCAN: a thin band sweeping along LINE. Only particles inside the band light up.
   vScanGlow = 0.0;
   if (uScanActive > 0.5) {
-    float rCenter = length(pos.xy);
-    float waveFront = uScan * 1.8;
-    float distFromWave = abs(rCenter - waveFront);
-    if (distFromWave < 0.18) {
-      float wavePattern = sin(rCenter * 24.0 - uScan * 18.0);
-      vScanGlow = (1.0 - distFromWave / 0.18) * (0.5 + 0.5 * wavePattern);
-      float lum = dot(baseCol.rgb, vec3(0.299, 0.587, 0.114));
-      vec3 lightTint = (uLightOn > 0.5 ? uLightColor : vec3(1.0, 0.96, 0.90));
-      baseCol.rgb += lightTint * (vScanGlow * (0.6 + 2.5 * lum));
-    }
+    vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
+    float u = dot(pos.xy, lineDir);
+    float c = mix(-0.85, 0.85, uScan);
+    float bd = (u - c) / 0.05;
+    float g = exp(-bd * bd);
+    g *= 1.0 + 1.2 * cursorGlow;
+    vScanGlow = g;
+    float lum = dot(baseCol.rgb, vec3(0.299, 0.587, 0.114));
+    baseCol.rgb += tint * g * (0.25 + 0.8 * lum);
   }
 
   vColor = baseCol;
@@ -75,6 +86,6 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mvPosition;
 
-  // Ultra-fine, crisp stipple dot size with noticeable 3D depth
-  gl_PointSize = max(0.5, uSize * uDpr * (1.0 + pos.z * 0.7) * sizeMod);
+  float sizeBoost = 1.0 + vScanGlow * 0.5 + cursorGlow * 0.35;
+  gl_PointSize = max(1.0, uSize * uDpr * (1.0 + pos.z * 0.6) * sizeMod * sizeBoost);
 }

@@ -20,7 +20,7 @@ export function r2Sequence1D(i: number): number {
 export function r2Jitter(i: number): { jx: number; jy: number } {
   const u = (0.5 + i * A1) % 1.0;
   const v = (0.5 + i * A2) % 1.0;
-  return { jx: (u - 0.5) * 0.9, jy: (v - 0.5) * 0.9 };
+  return { jx: u - 0.5, jy: v - 0.5 };
 }
 
 /** Binary search for lower bound in cumulative distribution array */
@@ -39,9 +39,89 @@ export function lowerBound(cdf: Float32Array, val: number): number {
 }
 
 /**
- * Builds importance weights for sampling:
- * mask * (0.35 + 0.65 * saliency)
- * where saliency = normalized gradient + saturation
+ * Cut out a flat background. Estimates the backdrop colour from the image border and flood-fills
+ * inward from the edges through pixels that match it. Returns a 0/1 mask (1 = subject), or null
+ * when the border is not a flat colour (a busy photo) or the fill would swallow the picture.
+ */
+export function removeFlatBackground(
+  rgba: Uint8ClampedArray | Uint8Array,
+  w: number,
+  h: number
+): Uint8Array | null {
+  const n = w * h;
+
+  // Mean and spread of the border pixels
+  let mr = 0, mg = 0, mb = 0, count = 0;
+  const sampleBorder = (x: number, y: number, fn: (r: number, g: number, b: number) => void) => {
+    const i = (y * w + x) * 4;
+    fn(rgba[i], rgba[i + 1], rgba[i + 2]);
+  };
+  const border: Array<[number, number]> = [];
+  for (let x = 0; x < w; x += 2) { border.push([x, 0], [x, h - 1]); }
+  for (let y = 0; y < h; y += 2) { border.push([0, y], [w - 1, y]); }
+  for (const [x, y] of border) {
+    sampleBorder(x, y, (r, g, b) => { mr += r; mg += g; mb += b; count++; });
+  }
+  mr /= count; mg /= count; mb /= count;
+
+  let spread = 0;
+  for (const [x, y] of border) {
+    sampleBorder(x, y, (r, g, b) => {
+      spread += Math.hypot(r - mr, g - mg, b - mb);
+    });
+  }
+  spread /= count;
+  if (spread > 22) return null; // border is not a flat colour
+
+  const tol = 46 + spread * 2; // in 0..441 RGB distance
+  const isBg = (i: number) =>
+    Math.hypot(rgba[i * 4] - mr, rgba[i * 4 + 1] - mg, rgba[i * 4 + 2] - mb) < tol;
+
+  const mask = new Uint8Array(n).fill(1);
+  const stack: number[] = [];
+  const push = (x: number, y: number) => {
+    const i = y * w + x;
+    if (mask[i] === 1 && isBg(i)) {
+      mask[i] = 0;
+      stack.push(i);
+    }
+  };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+
+  while (stack.length) {
+    const i = stack.pop()!;
+    const x = i % w;
+    const y = (i / w) | 0;
+    if (x > 0) push(x - 1, y);
+    if (x < w - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < h - 1) push(x, y + 1);
+  }
+
+  let kept = 0;
+  for (let i = 0; i < n; i++) kept += mask[i];
+  if (kept < n * 0.01 || kept > n * 0.995) return null; // nothing cut, or everything cut
+
+  // Grow the cut back by one pixel so anti-aliased fringe is not left as a halo of background
+  const out = mask.slice();
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (mask[i] === 1 && (mask[i - 1] === 0 || mask[i + 1] === 0 || mask[i - w] === 0 || mask[i + w] === 0)) {
+        if (isBg(i) || Math.hypot(rgba[i * 4] - mr, rgba[i * 4 + 1] - mg, rgba[i * 4 + 2] - mb) < tol * 1.6) {
+          out[i] = 0;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Builds importance weights for sampling. Particles are spent where the picture has something
+ * to show, so the static image keeps its line work and tonal detail:
+ *   mask * (floor + edge strength + luminance + saturation)
  */
 export function computeImportanceWeights(
   rgba: Uint8ClampedArray | Uint8Array,
@@ -51,7 +131,8 @@ export function computeImportanceWeights(
 ): { weights: Float32Array; mask: Float32Array; activeCount: number } {
   const n = w * h;
   const mask = new Float32Array(n);
-  const saliency = new Float32Array(n);
+  const lum = new Float32Array(n);
+  const sat = new Float32Array(n);
   const weights = new Float32Array(n);
   let activeCount = 0;
 
@@ -63,47 +144,42 @@ export function computeImportanceWeights(
     }
   }
 
-  // 1. Compute mask and color saturation
+  const cut = hasExplicitAlpha ? null : removeFlatBackground(rgba, w, h);
+
+  // 1. Mask, luminance and saturation
+  for (let i = 0; i < n; i++) {
+    const r = rgba[i * 4] / 255;
+    const g = rgba[i * 4 + 1] / 255;
+    const b = rgba[i * 4 + 2] / 255;
+    const a = rgba[i * 4 + 3] / 255;
+
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    sat[i] = maxC === 0 ? 0 : (maxC - minC) / maxC;
+    lum[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+
+    // Faint alpha is cut-out fringe or grain, not subject: do not spend particles on it
+    if (hasExplicitAlpha) mask[i] = a > 0.15 ? a : 0.0;
+    else mask[i] = cut ? cut[i] : 1.0;
+
+    if (mask[i] > 0) activeCount++;
+  }
+
+  // 2. Weight = floor + edge strength + tone. Edges matter most: they carry the line work.
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const idx = y * w + x;
-      const r = rgba[idx * 4] / 255;
-      const g = rgba[idx * 4 + 1] / 255;
-      const b = rgba[idx * 4 + 2] / 255;
-      const a = rgba[idx * 4 + 3] / 255;
-
-      const maxC = Math.max(r, g, b);
-      const minC = Math.min(r, g, b);
-      const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
-
-      if (hasExplicitAlpha) {
-        mask[idx] = a > 0.05 ? 1.0 : 0.0;
-      } else {
-        mask[idx] = 1.0;
-      }
-
-      if (mask[idx] > 0) activeCount++;
-      saliency[idx] = sat * 0.4;
-    }
-  }
-
-  // 2. Add gradient magnitude to saliency
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const idx = y * w + x;
       if (mask[idx] <= 0) continue;
 
-      const lumL = (rgba[(idx - 1) * 4] + rgba[(idx - 1) * 4 + 1] + rgba[(idx - 1) * 4 + 2]) / (3 * 255);
-      const lumR = (rgba[(idx + 1) * 4] + rgba[(idx + 1) * 4 + 1] + rgba[(idx + 1) * 4 + 2]) / (3 * 255);
-      const lumT = (rgba[(idx - w) * 4] + rgba[(idx - w) * 4 + 1] + rgba[(idx - w) * 4 + 2]) / (3 * 255);
-      const lumB = (rgba[(idx + w) * 4] + rgba[(idx + w) * 4 + 1] + rgba[(idx + w) * 4 + 2]) / (3 * 255);
+      let edge = 0;
+      if (x > 0 && x < w - 1 && y > 0 && y < h - 1) {
+        const gradX = lum[idx + 1] - lum[idx - 1];
+        const gradY = lum[idx + w] - lum[idx - w];
+        edge = Math.min(1.0, Math.hypot(gradX, gradY) * 3.0);
+      }
 
-      const gradX = lumR - lumL;
-      const gradY = lumB - lumT;
-      const gradMag = Math.min(1.0, Math.hypot(gradX, gradY) * 2.0);
-
-      saliency[idx] = Math.min(1.0, saliency[idx] + gradMag * 0.5);
-      weights[idx] = mask[idx] * (0.55 + 0.45 * saliency[idx]);
+      const tone = Math.pow(lum[idx], 1.2);
+      weights[idx] = mask[idx] * (0.05 + 0.95 * edge + 0.55 * tone + 0.3 * sat[idx]);
     }
   }
 
@@ -147,8 +223,8 @@ export function sampleImageParticles(
 
   const aspect = w / h;
 
-  // Ultra high-density 512x512 = 262,144 particles (photographic stipple reproduction, ultra-fine dust)
-  const texWidth = 512;
+  // 1024 x 512 = 524,288 particles: fine enough that line work and skin tone read as a picture
+  const texWidth = 1024;
   const texHeight = 512;
   const N = texWidth * texHeight;
 

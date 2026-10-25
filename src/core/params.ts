@@ -28,14 +28,14 @@ export interface Params {
 }
 
 export const defaults: Params = {
-  drift: 0.8,
-  splash: 0.6,
-  gather: 0.8,
-  depth: 0.8,
+  drift: 0.75,
+  splash: 0.5,
+  gather: 0.5,
+  depth: 0.5,
 
   draw: false,
   track: true,
-  links: false,
+  links: true,
   scan: false,
   trails: true,
   marks: true,
@@ -47,9 +47,9 @@ export const defaults: Params = {
   light: 'cream',
   lightOn: true,
 
-  line: { angle: 0.05, length: 0.85 }, // default streak angle pointing towards the right
+  line: { angle: 0.14, length: 0.9 }, // direction the particles drift, as drawn in the LINE box
   lineMode: 'streak',
-  pointCount: 262144,
+  pointCount: 524288,
   quality: 'auto',
 };
 
@@ -100,9 +100,12 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
   }
 }
 
+// v2: defaults and simulation changed, so older saved settings would look wrong
+const STORAGE_KEY = 'particle_depth_studio_params_v2';
+
 export function saveToStorage(params: Params): void {
   try {
-    localStorage.setItem('particle_depth_studio_params', serializeParams(params));
+    localStorage.setItem(STORAGE_KEY, serializeParams(params));
   } catch (e) {
     console.warn('LocalStorage save failed:', e);
   }
@@ -110,7 +113,7 @@ export function saveToStorage(params: Params): void {
 
 export function loadFromStorage(): Params {
   try {
-    const raw = localStorage.getItem('particle_depth_studio_params');
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return parseParams(raw);
   } catch (e) {
     console.warn('LocalStorage load failed:', e);

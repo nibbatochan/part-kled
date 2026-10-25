@@ -1,9 +1,25 @@
 // src/shaders/sim_position.glsl
+// (LIFECYCLE_GLSL is prepended in Simulation.ts)
 uniform sampler2D tHome;
+uniform sampler2D tHomeNext;
 uniform float uDt;
 uniform float uDrift;
 uniform float uGather;
+uniform float uDepth;
+uniform float uMorph;
 uniform vec2  uLine;
+
+// Fraction of particles that peel off, weighted to the downwind side of the subject.
+// The windward side stays solid and detailed, the leeward side dissolves into the stream.
+float streamProb(vec2 home, vec2 lineDir, float drift, float gather) {
+  vec2 perp = vec2(-lineDir.y, lineDir.x);
+  float u = dot(home, lineDir);
+  float ripple = 0.07 * sin(dot(home, perp) * 11.0 + 1.3) + 0.05 * sin(u * 17.0 + 3.1);
+  float lee = smoothstep(-0.18, 0.55, u + ripple);
+  lee *= lee;
+  float body = mix(0.04, 0.55, drift) * (1.0 - 0.60 * gather * gather);
+  return clamp(lee * body + 0.02 * drift, 0.0, 1.0);
+}
 
 void main() {
   vec2 uv = gl_FragCoord.xy / resolution.xy;
@@ -15,32 +31,27 @@ void main() {
   vec3 v = vs.xyz;
   float seed = vs.w;
 
-  vec3 home = texture2D(tHome, uv).xyz;
+  // Home position, matching the velocity pass (morph + depth relief)
+  float morphPhase = clamp(uMorph + (seed - 0.5) * 0.4, 0.0, 1.0);
+  vec3 home = mix(texture2D(tHome, uv).xyz, texture2D(tHomeNext, uv).xyz, smoothstep(0.0, 1.0, morphPhase));
+  home.z *= uDepth * 0.55;
+
+  vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
+  bool streamer = seed < streamProb(home.xy, lineDir, uDrift, uGather);
 
   vec3 newP = p + v * uDt;
-  float newAge = age + uDt;
+  float newAge = age;
 
-  // Spatially-guided peeling probability:
-  // Drift controls how many particles peel off (high drift = massive stream of particles)
-  // Gather firmly restrains and anchors particles back to home
-  vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
-  float windProj = dot(home.xy, lineDir);
-  float peelProb = smoothstep(-0.05 + 0.15 * (1.0 - uDrift), 0.35, windProj) * (uDrift * 0.82) * (1.2 - uGather * 0.75);
-
-  if (seed < peelProb) {
-    // Thanos snap dissolution:
-    // Floating particles drift far in the set direction, shrink, and fade out into nothingness
-    float maxLife = (1.0 + uDrift * 2.2) * (1.3 - uGather * 0.6) * (0.6 + 0.8 * fract(seed * 43.19));
-    float distFromHome = length(newP.xy - home.xy);
-    float maxDist = (0.6 + uDrift * 2.2) * (1.4 - uGather * 0.7) * (0.6 + 0.8 * fract(seed * 17.3));
-
-    if (newAge > maxLife || distFromHome > maxDist) {
+  if (!streamer) {
+    newAge = -1.0;
+  } else {
+    newAge = (age < 0.0) ? 0.0 : age + uDt;
+    float cycle = restTime(seed) + lifeTime(seed, uDrift, uGather);
+    if (newAge > cycle || abs(newP.x) > 2.6 || abs(newP.y) > 2.0) {
+      // Respawn at home and rest again with a fresh timer
       newP = home;
       newAge = 0.0;
     }
-  } else {
-    // Core body particles stay at home
-    newAge = 0.0;
   }
 
   gl_FragColor = vec4(newP, newAge);

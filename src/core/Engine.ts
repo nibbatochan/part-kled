@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { CameraController } from './Camera';
 import { FlowField } from './FlowField';
-import { ParticleRenderer, type TrackerPoint } from './ParticleRenderer';
+import { ParticleRenderer, type RenderContext, type TrackerPoint } from './ParticleRenderer';
 import { type SamplePointData } from './Sampler';
 import { Simulation } from './Simulation';
 import { defaults, type Params } from './params';
@@ -31,6 +31,11 @@ export class Engine {
   private pointerVelWorld = new THREE.Vector3(0, 0, 0);
   private lastPointerWorld = new THREE.Vector3(999, 999, 0);
   private lastPointerTime = 0;
+  private pointerInside = false;
+
+  // Click shockwave: world-space origin, seconds since the click, amplitude
+  private burst = new THREE.Vector4(0, 0, 0, 0);
+  private burstActive = false;
 
   // Morph state
   private isMorphing = false;
@@ -45,7 +50,7 @@ export class Engine {
   constructor(canvas: HTMLCanvasElement, pointCount: number = 65536) {
     this.canvas = canvas;
     this.pointCount = pointCount;
-    this.texWidth = 256;
+    this.texWidth = 1024;
     this.texHeight = Math.ceil(pointCount / this.texWidth);
 
     this.renderer = new ParticleRenderer(canvas, this.pointCount, this.texWidth, this.texHeight);
@@ -83,7 +88,7 @@ export class Engine {
 
     this.hasActiveImage = true;
     this.renderer.setHasActiveImage(true);
-    this.renderer.setTrackerFeaturePoints(currentData.home, currentData.count);
+    this.renderer.setTrackerFeaturePoints(currentData.home, currentData.count, currentData.color);
 
     // 1. Current Home & Color
     this.tHomeCurrent = new THREE.DataTexture(
@@ -146,26 +151,45 @@ export class Engine {
     this.params = { ...params };
   }
 
+  /** Cursor position on the z = 0 plane under the given client coordinates, or null if it misses. */
+  private clientToWorld(clientX: number, clientY: number): THREE.Vector3 | null {
+    const rect = this.canvas.getBoundingClientRect();
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1);
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.cameraCtrl.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const hit = new THREE.Vector3();
+    return raycaster.ray.intersectPlane(plane, hit) ? hit : null;
+  }
+
+  public setPointerInside(inside: boolean): void {
+    this.pointerInside = inside;
+    if (!inside) this.lastPointerWorld.set(999, 999, 0);
+  }
+
   public setPointer(clientX: number, clientY: number): void {
     const rect = this.canvas.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1);
 
     this.cameraCtrl.setPointer(ndcX, ndcY);
+    this.pointerInside = Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
 
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.cameraCtrl.camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const hit = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, hit);
+    const hit = this.clientToWorld(clientX, clientY);
 
     if (hit) {
       const now = performance.now() / 1000;
-      const dt = Math.max(0.001, now - this.lastPointerTime);
+      const dt = Math.max(0.004, now - this.lastPointerTime);
       this.lastPointerTime = now;
 
       if (this.lastPointerWorld.x < 900) {
-        this.pointerVelWorld.subVectors(hit, this.lastPointerWorld).divideScalar(dt);
+        const inst = new THREE.Vector3().subVectors(hit, this.lastPointerWorld).divideScalar(dt);
+        // Smooth and clamp so a single jumpy event cannot catapult the particles
+        this.pointerVelWorld.lerp(inst, 0.5);
+        const mag = this.pointerVelWorld.length();
+        if (mag > 6) this.pointerVelWorld.multiplyScalar(6 / mag);
       }
       this.lastPointerWorld.copy(hit);
       this.pointerWorld.copy(hit);
@@ -180,12 +204,15 @@ export class Engine {
     }
   }
 
-  public triggerSplash(): void {
-    this.pointerVelWorld.set(
-      (Math.random() - 0.5) * 8.0,
-      (Math.random() - 0.5) * 8.0,
-      4.0
-    );
+  /** Click burst: an expanding shockwave from the cursor (or from the centre when called bare). */
+  public triggerSplash(clientX?: number, clientY?: number): void {
+    let origin: THREE.Vector3 | null = null;
+    if (clientX !== undefined && clientY !== undefined) {
+      origin = this.clientToWorld(clientX, clientY);
+    }
+    const o = origin ?? (this.pointerWorld.x < 900 ? this.pointerWorld : new THREE.Vector3(0, 0, 0));
+    this.burst.set(o.x, o.y, 0, 1);
+    this.burstActive = true;
   }
 
   public update(dt: number, time: number): void {
@@ -211,19 +238,38 @@ export class Engine {
 
     this.flowField.update(dt);
 
-    const effectivePointer = new THREE.Vector3(999, 999, 0);
-    this.sim.update(
-      dt,
-      time,
-      this.params,
-      effectivePointer,
-      this.pointerVelWorld,
-      this.morphProgress,
-      this.scanProgress
-    );
+    // Cursor reaches the sim while TRACK is on. Clicks always splash.
+    const pointerOn = this.params.track && this.pointerInside && this.pointerWorld.x < 900;
+    const effectivePointer = pointerOn ? this.pointerWorld : new THREE.Vector3(999, 999, 0);
 
-    this.pointerVelWorld.multiplyScalar(0.85);
+    if (this.burstActive) {
+      this.burst.z += dt;
+      this.burst.w = Math.max(0, 1 - this.burst.z / 1.1);
+      if (this.burst.w <= 0) this.burstActive = false;
+    } else {
+      this.burst.w = 0;
+    }
 
+    // Until an image is loaded the home textures are empty: running the sim would collapse every
+    // particle onto the origin and the first frames would be an explosion. Hold it still instead.
+    if (this.hasActiveImage) {
+      this.sim.update(
+        dt,
+        time,
+        this.params,
+        effectivePointer,
+        this.pointerVelWorld,
+        this.morphProgress,
+        this.scanProgress,
+        pointerOn,
+        this.burst
+      );
+    }
+
+    // The cursor stops sending events when it rests: bleed its velocity away
+    this.pointerVelWorld.multiplyScalar(Math.exp(-6 * dt));
+
+    const ctx: RenderContext = { pointer: effectivePointer, pointerOn, time };
     this.renderer.render(
       this.cameraCtrl.camera,
       this.sim.getPosTexture(),
@@ -232,13 +278,29 @@ export class Engine {
       this.tColorNext,
       this.params,
       this.morphProgress,
-      this.scanProgress
+      this.scanProgress,
+      ctx
     );
   }
 
   public getTrackerPoints(): TrackerPoint[] {
     const count = this.params.trackers === 'dense' ? 40 : 12;
-    return this.renderer.getTrackerPoints(this.cameraCtrl.camera, count);
+    const pointer = this.pointerInside && this.pointerWorld.x < 900 ? this.pointerWorld : undefined;
+    return this.renderer.getTrackerPoints(
+      this.cameraCtrl.camera,
+      count,
+      this.params.depth,
+      pointer,
+      this.params.track
+    );
+  }
+
+  /** Cursor position in screen pixels, for HUD overlays (null when it is off the stage). */
+  public getPointerScreen(): { x: number; y: number } | null {
+    if (!this.pointerInside || this.pointerWorld.x >= 900) return null;
+    const p = this.pointerWorld.clone().project(this.cameraCtrl.camera);
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: (p.x * 0.5 + 0.5) * rect.width, y: (-p.y * 0.5 + 0.5) * rect.height };
   }
 
   public resize(width: number, height: number): void {
