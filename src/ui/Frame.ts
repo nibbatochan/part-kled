@@ -10,7 +10,7 @@ export class Frame {
     this.svgEl = svg;
     this.readoutEl = readout;
     this.buildSvg();
-    window.addEventListener('resize', () => this.buildSvg());
+    new ResizeObserver(() => this.buildSvg()).observe(svg.parentElement as HTMLElement);
   }
 
   public setReadout(current: number, total: number, hash: string): void {
@@ -19,45 +19,47 @@ export class Frame {
   }
 
   private buildSvg(): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const margin = 28;
-    const stroke = 'rgba(244, 244, 242, 0.14)';
-    const strokeFaint = 'rgba(244, 244, 242, 0.06)';
+    const box = (this.svgEl.parentElement as HTMLElement | null)?.getBoundingClientRect();
+    const w = box?.width ?? window.innerWidth;
+    const h = box?.height ?? window.innerHeight;
+    const m = 14; // inset of the frame marks from the stage edge
+    const stroke = 'rgba(233, 236, 238, 0.45)';
+    const strokeFaint = 'rgba(233, 236, 238, 0.14)';
+    const accent = '#c8ff4d';
 
     let svgHtml = '';
 
-    // Corner crosshairs (top-left, top-right, bottom-left, bottom-right)
-    const arm = 14;
+    // Corner brackets
+    const arm = 18;
     const corners = [
-      { x: margin, y: margin, dx: 1, dy: 1 },
-      { x: w - margin, y: margin, dx: -1, dy: 1 },
-      { x: margin, y: h - margin, dx: 1, dy: -1 },
-      { x: w - margin, y: h - margin, dx: -1, dy: -1 },
+      { x: m, y: m, dx: 1, dy: 1 },
+      { x: w - m, y: m, dx: -1, dy: 1 },
+      { x: m, y: h - m, dx: 1, dy: -1 },
+      { x: w - m, y: h - m, dx: -1, dy: -1 },
     ];
-
-    corners.forEach(c => {
-      svgHtml += `<path d="M${c.x},${c.y - c.dy * 4} v${c.dy * (arm + 4)} M${c.x - c.dx * 4},${c.y} h${c.dx * (arm + 4)}" stroke="${stroke}" stroke-width="1" fill="none" />`;
+    corners.forEach((c) => {
+      svgHtml += `<path d="M${c.x},${c.y + c.dy * arm} V${c.y} H${c.x + c.dx * arm}" stroke="${stroke}" stroke-width="1" fill="none" />`;
     });
+    // A single accent square at the top-left bracket
+    svgHtml += `<rect x="${m - 2}" y="${m - 2}" width="5" height="5" fill="${accent}" />`;
 
-    // Top horizontal tick ruler
-    const tickSpacing = 8;
-    const topStartY = margin - 6;
-    for (let x = margin + 40; x <= w - margin - 40; x += tickSpacing) {
-      const isMajor = (x - margin - 40) % (tickSpacing * 5) === 0;
-      const len = isMajor ? 5 : 2.5;
-      svgHtml += `<line x1="${x}" y1="${topStartY}" x2="${x}" y2="${topStartY + len}" stroke="${strokeFaint}" stroke-width="1" />`;
+    // Edge rulers: a tick every 8px, heavier every 40px
+    const step = 8;
+    for (let x = m + 40; x <= w - m - 40; x += step) {
+      const major = (x - m - 40) % (step * 5) === 0;
+      const len = major ? 6 : 3;
+      svgHtml += `<line x1="${x}" y1="${m}" x2="${x}" y2="${m + len}" stroke="${strokeFaint}" stroke-width="1" />`;
+      svgHtml += `<line x1="${x}" y1="${h - m}" x2="${x}" y2="${h - m - len}" stroke="${strokeFaint}" stroke-width="1" />`;
+    }
+    for (let y = m + 40; y <= h - m - 40; y += step) {
+      const major = (y - m - 40) % (step * 5) === 0;
+      const len = major ? 6 : 3;
+      svgHtml += `<line x1="${m}" y1="${y}" x2="${m + len}" y2="${y}" stroke="${strokeFaint}" stroke-width="1" />`;
+      svgHtml += `<line x1="${w - m}" y1="${y}" x2="${w - m - len}" y2="${y}" stroke="${strokeFaint}" stroke-width="1" />`;
     }
 
-    // Left and right vertical tick rulers
-    for (let y = margin + 40; y <= h - margin - 40; y += tickSpacing) {
-      const isMajor = (y - margin - 40) % (tickSpacing * 5) === 0;
-      const len = isMajor ? 5 : 2.5;
-      // Left
-      svgHtml += `<line x1="${margin - 6}" y1="${y}" x2="${margin - 6 + len}" y2="${y}" stroke="${strokeFaint}" stroke-width="1" />`;
-      // Right
-      svgHtml += `<line x1="${w - margin + 6}" y1="${y}" x2="${w - margin + 6 - len}" y2="${y}" stroke="${strokeFaint}" stroke-width="1" />`;
-    }
+    // Centre cross
+    svgHtml += `<path d="M${w / 2 - 6},${h / 2} h12 M${w / 2},${h / 2 - 6} v12" stroke="${strokeFaint}" stroke-width="1" fill="none" />`;
 
     this.svgEl.innerHTML = svgHtml;
   }

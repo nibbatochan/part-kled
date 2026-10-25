@@ -48,7 +48,7 @@ export class LineWidget {
       '<line class="guide-line" x1="0" y1="22" x2="372" y2="22" />' +
       '<polygon class="guide-head" points="372,8 398,22 372,36" />' +
       '</svg></div>';
-    document.getElementById('app')?.appendChild(this.guide);
+    (document.getElementById('stage-wrap') ?? document.getElementById('app'))?.appendChild(this.guide);
     this.guideArrow = this.guide.querySelector<HTMLElement>('.drift-guide-arrow')!;
 
     this.bindEvents();

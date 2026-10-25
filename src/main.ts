@@ -31,7 +31,7 @@ class App {
   private lastTime: number = performance.now();
 
   constructor() {
-    this.params = loadFromStorage();
+    this.params = { ...loadFromStorage(), background: 'dark' }; // no light mode any more
 
     const stageCanvas = document.getElementById('stage') as HTMLCanvasElement;
     if (!stageCanvas) throw new Error('Stage canvas missing');
@@ -120,11 +120,13 @@ class App {
   }
 
   private bindResize(): void {
-    window.addEventListener('resize', () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      this.engine.resize(w, h);
-    });
+    // The canvas fills the stage (left side), not the window, so follow the stage's own size
+    const wrap = document.getElementById('stage-wrap');
+    if (!wrap) return;
+    new ResizeObserver(() => {
+      const r = wrap.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) this.engine.resize(r.width, r.height);
+    }).observe(wrap);
   }
 
   private loop(currentTime: number): void {

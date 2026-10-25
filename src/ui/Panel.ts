@@ -8,7 +8,6 @@ export class Panel {
   private params: Params;
   private lineWidget: LineWidget;
   private uiLayer: HTMLElement;
-  private idleTimeoutId: number | null = null;
   private onParamsChangeCb: (params: Params) => void;
 
   constructor(
@@ -18,7 +17,7 @@ export class Panel {
     onToggleLight: () => void,
     onOpenAdd: () => void
   ) {
-    this.params = { ...initialParams };
+    this.params = { ...initialParams, background: 'dark' }; // light/dark toggle removed: always dark
     this.onParamsChangeCb = onParamsChange;
 
     const layer = document.getElementById('ui-layer');
@@ -39,9 +38,7 @@ export class Panel {
     this.bindModes();
     this.bindSwatches();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
-    this.bindIdleFade();
     this.bindFullscreen();
-    this.bindCredits();
 
     this.syncUiToParams();
   }
@@ -79,24 +76,22 @@ export class Panel {
       const input = document.getElementById(id) as HTMLInputElement;
       if (!input) return;
       input.value = this.params[key].toString();
+      this.updatePercent(input);
       input.addEventListener('input', () => {
         (this.params[key] as number) = parseFloat(input.value);
+        this.updatePercent(input);
         this.onParamsChangeCb(this.params);
       });
     });
   }
 
-  /** Effects tab: every [data-path] slider writes to a nested Params field, e.g. "fx.black". */
-  private bindEffects(): void {
-    const panel = document.getElementById('fx-panel');
-    const fxBtn = document.getElementById('fx-btn');
-    const closeFx = () => panel?.classList.add('hidden');
-    fxBtn?.addEventListener('click', () => panel?.classList.toggle('hidden'));
-    document.getElementById('fx-close')?.addEventListener('click', closeFx);
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && panel && !panel.classList.contains('hidden')) closeFx();
-    });
+  private updatePercent(input: HTMLInputElement): void {
+    const out = input.parentElement?.querySelector('output');
+    if (out) out.textContent = `${Math.round(parseFloat(input.value) * 100)}%`;
+  }
 
+  /** Effects section: every [data-path] slider writes to a nested Params field, e.g. "fx.black". */
+  private bindEffects(): void {
     document.getElementById('fx-reset')?.addEventListener('click', () => {
       this.params.fx = { ...defaults.fx };
       this.params.trail = { ...defaults.trail };
@@ -183,13 +178,6 @@ export class Panel {
       });
     });
 
-    // Theme (paper on-white)
-    const themeBtn = document.getElementById('theme-btn');
-    themeBtn?.addEventListener('click', () => {
-      this.params.background = this.params.background === 'dark' ? 'white' : 'dark';
-      document.body.classList.toggle('on-white', this.params.background === 'white');
-      this.onParamsChangeCb(this.params);
-    });
   }
 
   private bindSwatches(): void {
@@ -217,23 +205,6 @@ export class Panel {
     btnAdd?.addEventListener('click', onOpenAdd);
   }
 
-  private bindIdleFade(): void {
-    const resetIdle = () => {
-      this.uiLayer.classList.remove('idle-fade');
-      if (this.idleTimeoutId !== null) {
-        window.clearTimeout(this.idleTimeoutId);
-      }
-      this.idleTimeoutId = window.setTimeout(() => {
-        this.uiLayer.classList.add('idle-fade');
-      }, 3000);
-    };
-
-    window.addEventListener('pointermove', resetIdle, { passive: true });
-    window.addEventListener('pointerdown', resetIdle, { passive: true });
-    window.addEventListener('keydown', resetIdle, { passive: true });
-    resetIdle();
-  }
-
   private bindFullscreen(): void {
     const fsBtn = document.getElementById('fullscreen-btn');
     fsBtn?.addEventListener('click', () => {
@@ -245,36 +216,14 @@ export class Panel {
     });
   }
 
-  private bindCredits(): void {
-    const creditsModal = document.getElementById('credits-modal');
-    const creditsBtn = document.getElementById('credits-btn');
-    const creditsClose = document.getElementById('credits-close');
-
-    creditsBtn?.addEventListener('click', () => {
-      creditsModal?.classList.remove('hidden');
-    });
-
-    creditsClose?.addEventListener('click', () => {
-      creditsModal?.classList.add('hidden');
-    });
-
-    creditsModal?.addEventListener('click', (e) => {
-      if (e.target === creditsModal) {
-        creditsModal.classList.add('hidden');
-      }
-    });
-  }
-
   private syncUiToParams(): void {
     // Sliders
-    const slDrift = document.getElementById('sl-drift') as HTMLInputElement;
-    if (slDrift) slDrift.value = this.params.drift.toString();
-    const slSplash = document.getElementById('sl-splash') as HTMLInputElement;
-    if (slSplash) slSplash.value = this.params.splash.toString();
-    const slGather = document.getElementById('sl-gather') as HTMLInputElement;
-    if (slGather) slGather.value = this.params.gather.toString();
-    const slDepth = document.getElementById('sl-depth') as HTMLInputElement;
-    if (slDepth) slDepth.value = this.params.depth.toString();
+    (['drift', 'splash', 'gather', 'depth'] as const).forEach((key) => {
+      const el = document.getElementById(`sl-${key}`) as HTMLInputElement | null;
+      if (!el) return;
+      el.value = this.params[key].toString();
+      this.updatePercent(el);
+    });
 
     // Toggles
     const toggleKeys: (keyof Params)[] = ['draw', 'track', 'scan', 'trails'];

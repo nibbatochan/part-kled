@@ -39,29 +39,36 @@
 }
 
 :root {
-  --bg: #050506;
-  --ink: #f4f4f2;                 /* active text */
-  --ink-dim: rgba(244, 244, 242, 0.45); /* inactive labels */
-  --ink-faint: rgba(244, 244, 242, 0.18); /* hairlines, ticks, grid */
+  --bg: #050607;
+  --panel: #0a0c0e;               /* console surface */
+  --ink: #e9ecee;                 /* active text */
+  --ink-dim: rgba(233, 236, 238, 0.52); /* inactive labels */
+  --ink-faint: rgba(233, 236, 238, 0.18); /* hairlines, ticks */
+  --line: rgba(233, 236, 238, 0.20);      /* box borders */
+  --line-strong: rgba(233, 236, 238, 0.55);
+  --grid: rgba(233, 236, 238, 0.045);     /* background grid lines */
+  --accent: #c8ff4d;
   --light-cream: #f2e6c9;
   --light-ice: #bfe0ff;
   --light-orange: #ff9a3c;
   --light-red: #ff4a3d;
   --light-green: #3fe0b0;
   --light-violet: #8e6bff;
-  --font-ui: 'Manrope', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --label-size: 9.5px;
-  --label-track: 0.22em;  /* uppercase everywhere */
-  --edge: 28px;         /* distance of UI from the screen edge */
+  --font-ui: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --label-size: 10.5px;
+  --label-track: 0.12em;  /* uppercase everywhere */
+  --console-w: clamp(340px, 26vw, 440px);
+  --grid-step: 24px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --t: 220ms;
+  --t: 140ms;
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  border-radius: 0; /* the whole UI is square */
   user-select: none;
   -webkit-user-select: none;
 }

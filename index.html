@@ -9,183 +9,93 @@
   </head>
   <body>
     <div id="app">
-      <!-- 3D Canvas Stage -->
-      <canvas id="stage"></canvas>
+      <!-- Left: the stage. The canvas, its frame marks, the drop prompt and the loader all live here. -->
+      <main id="stage-wrap" class="stage-wrap">
+        <canvas id="stage"></canvas>
 
-      <!-- SVG Frame Overlay (Crosshairs, Ticks, Hash Readout) -->
-      <div id="frame-overlay" class="frame-overlay">
-        <svg id="frame-svg" class="frame-svg" width="100%" height="100%"></svg>
-        <div id="frame-readout" class="frame-readout">01 / 01 &nbsp; 3B4E83186AA6E41A83DDEE</div>
-      </div>
+        <div id="frame-overlay" class="frame-overlay">
+          <svg id="frame-svg" class="frame-svg" width="100%" height="100%"></svg>
+          <div id="frame-readout" class="frame-readout">01 / 01 &nbsp; 3B4E83186AA6E41A83DDEE</div>
+        </div>
 
+        <div id="dropzone" class="dropzone-overlay hidden">
+          <div class="dropzone-box">
+            <div class="dropzone-title">DROP UP TO FIVE PICTURES</div>
+            <div class="dropzone-sub">SPACE TURNS THE PAGE · S LIGHTS IT</div>
+            <button id="dropzone-picker-btn" class="dropzone-btn">CHOOSE PICTURES</button>
+          </div>
+        </div>
 
-      <!-- UI Shell Layer -->
-      <div id="ui-layer" class="ui-layer">
-        <!-- Top Left Header -->
-        <header class="header-top-left">
+        <div id="loading-indicator" class="loading-indicator hidden">
+          <span id="loading-text">ESTIMATING DEPTH...</span>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right: the console. Boxed sections on a grid, about a quarter of the window. -->
+      <aside id="ui-layer" class="console">
+        <header class="con-head">
           <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
-          <div class="meta-line">DEPTH MODEL · DEPTH ANYTHING V2</div>
-          <div class="meta-line" id="meta-points">524,288 POINTS</div>
-          <div class="meta-line">BY SUMANTH REDDY</div>
+          <dl class="meta">
+            <dt>MODEL</dt><dd>DEPTH ANYTHING V2</dd>
+            <dt>POINTS</dt><dd id="meta-points">524,288</dd>
+            <dt>AUTHOR</dt><dd>SUMANTH REDDY</dd>
+          </dl>
         </header>
 
-        <!-- Top Right Actions -->
-        <div class="header-top-right">
-          <button id="theme-btn" class="icon-btn" title="Toggle On White / Dark (B)" aria-label="Toggle paper theme">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
-              <circle cx="12" cy="12" r="9"/>
-              <path d="M12 3a9 9 0 0 1 0 18 4.5 4.5 0 0 1 0-9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/>
-              <circle cx="12" cy="7.5" r="1.5" fill="var(--bg)"/>
-              <circle cx="12" cy="16.5" r="1.5" fill="currentColor"/>
-            </svg>
-          </button>
-          <button id="fullscreen-btn" class="icon-btn" title="Fullscreen (F)" aria-label="Toggle Fullscreen">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
-              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
-            </svg>
-          </button>
-          <button id="fx-btn" class="text-link" aria-label="Effects">FX</button>
-          <button id="credits-btn" class="text-link" aria-label="Credits and Notices">CREDITS</button>
-        </div>
-
-        <!-- Effects panel: opens from FX at the top right, closes with its × or Escape -->
-        <div id="fx-panel" class="fx-panel hidden" role="dialog" aria-label="Effects">
-          <div class="fx-header">
-            <span class="fx-title">EFFECTS</span>
-            <button id="fx-close" class="close-btn" aria-label="Close effects">&times;</button>
-          </div>
-          <div class="fx-section">
-            <span class="seg-label">LEVELS</span>
-              <div class="slider-group fx-slider" data-path="fx.black">
-                <label for="fx-fx-black">BLACK</label>
-                <input type="range" id="fx-fx-black" data-path="fx.black" min="0" max="0.5" step="0.005" />
-                <output></output>
-              </div>
-              <div class="slider-group fx-slider" data-path="fx.white">
-                <label for="fx-fx-white">WHITE</label>
-                <input type="range" id="fx-fx-white" data-path="fx.white" min="0.5" max="1" step="0.005" />
-                <output></output>
-              </div>
-              <div class="slider-group fx-slider" data-path="fx.gamma">
-                <label for="fx-fx-gamma">GAMMA</label>
-                <input type="range" id="fx-fx-gamma" data-path="fx.gamma" min="0.4" max="2.2" step="0.01" />
-                <output></output>
-              </div>
-          </div>
-          <div class="fx-section">
-            <span class="seg-label">CURVE</span>
-              <div class="slider-group fx-slider" data-path="fx.contrast">
-                <label for="fx-fx-contrast">CONTRAST</label>
-                <input type="range" id="fx-fx-contrast" data-path="fx.contrast" min="-1" max="1" step="0.01" />
-                <output></output>
-              </div>
-          </div>
-          <div class="fx-section">
-            <span class="seg-label">COLOUR</span>
-              <div class="slider-group fx-slider" data-path="fx.hue">
-                <label for="fx-fx-hue">HUE</label>
-                <input type="range" id="fx-fx-hue" data-path="fx.hue" min="-180" max="180" step="1" />
-                <output></output>
-              </div>
-              <div class="slider-group fx-slider" data-path="fx.saturation">
-                <label for="fx-fx-saturation">SATURATION</label>
-                <input type="range" id="fx-fx-saturation" data-path="fx.saturation" min="0" max="2" step="0.01" />
-                <output></output>
-              </div>
-          </div>
-          <div class="fx-section">
-            <span class="seg-label">TRAILS</span>
-              <div class="slider-group fx-slider" data-path="trail.amount">
-                <label for="fx-trail-amount">AMOUNT</label>
-                <input type="range" id="fx-trail-amount" data-path="trail.amount" min="0" max="1" step="0.01" />
-                <output></output>
-              </div>
-              <div class="slider-group fx-slider" data-path="trail.strength">
-                <label for="fx-trail-strength">STRENGTH</label>
-                <input type="range" id="fx-trail-strength" data-path="trail.strength" min="0" max="2" step="0.01" />
-                <output></output>
-              </div>
-              <div class="slider-group fx-slider" data-path="trail.length">
-                <label for="fx-trail-length">LENGTH</label>
-                <input type="range" id="fx-trail-length" data-path="trail.length" min="0.3" max="2" step="0.01" />
-                <output></output>
-              </div>
-              <div class="slider-group fx-slider" data-path="trail.detail">
-                <label for="fx-trail-detail">DETAIL</label>
-                <input type="range" id="fx-trail-detail" data-path="trail.detail" min="0" max="1" step="0.01" />
-                <output></output>
-              </div>
-          </div>
-          <div class="fx-footer">
-            <button id="fx-reset" class="text-link" type="button">RESET</button>
-          </div>
-        </div>
-
-        <!-- Left Thumbnail Strip -->
-        <div class="strip-left" id="thumbnail-strip">
-          <div class="thumb-slot active" data-index="0">
-            <span class="slot-num">1</span>
-            <div class="slot-box" id="thumb-preview-0"></div>
-          </div>
-          <div class="thumb-slot" data-index="1">
-            <span class="slot-num">2</span>
-            <div class="slot-box" id="thumb-preview-1"></div>
-          </div>
-          <button id="add-slot-btn" class="thumb-slot add-slot" title="Add picture" aria-label="Add picture">
-            <span class="slot-plus">+</span>
-          </button>
-          <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
-        </div>
-
-        <!-- Bottom Left Controls -->
-        <div class="ctrl-bottom-left">
-          <button id="btn-next" class="btn-text-action">
-            <span class="symbol">▶</span> NEXT <span class="kbd-hint">SPACE</span>
-          </button>
-          <button id="btn-light" class="btn-text-action active">
-            <span class="symbol dot">●</span> LIGHT <span class="kbd-hint">S</span>
-          </button>
-          <button id="btn-add-pictures" class="btn-text-action">
-            ADD PICTURES
-          </button>
-        </div>
-
-        <!-- Bottom Center Sliders & Toggles -->
-        <div class="ctrl-bottom-center">
-          <div class="slider-row">
-            <div class="slider-group" data-param="drift">
-              <label for="sl-drift">DRIFT</label>
-              <input type="range" id="sl-drift" min="0" max="1" step="0.01" value="0.80" />
+        <section class="box">
+          <h2><i>01</i> SOURCE</h2>
+          <div class="strip" id="thumbnail-strip">
+            <div class="thumb-slot active" data-index="0">
+              <span class="slot-num">1</span>
+              <div class="slot-box" id="thumb-preview-0"></div>
             </div>
-            <div class="slider-group" data-param="splash">
-              <label for="sl-splash">SPLASH</label>
-              <input type="range" id="sl-splash" min="0" max="1" step="0.01" value="0.50" />
+            <div class="thumb-slot" data-index="1">
+              <span class="slot-num">2</span>
+              <div class="slot-box" id="thumb-preview-1"></div>
             </div>
-            <div class="slider-group" data-param="gather">
-              <label for="sl-gather">GATHER</label>
-              <input type="range" id="sl-gather" min="0" max="1" step="0.01" value="0.80" />
-            </div>
-            <div class="slider-group" data-param="depth">
-              <label for="sl-depth">DEPTH</label>
-              <input type="range" id="sl-depth" min="0" max="1" step="0.01" value="0.80" />
-            </div>
+            <button id="add-slot-btn" class="thumb-slot add-slot" title="Add picture" aria-label="Add picture">
+              <span class="slot-plus">+</span>
+            </button>
+            <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
           </div>
-          <div class="toggle-row">
-            <div class="toggle-group">
-              <button class="toggle-btn" data-toggle="draw">DRAW</button>
-              <button class="toggle-btn active" data-toggle="track">TRACK</button>
-              <button class="toggle-btn" data-toggle="scan">SCAN</button>
-              <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
-              <button class="toggle-btn active" data-toggle="trails">TRAILS</button>
-            </div>
+          <div class="btn-grid">
+            <button id="btn-next" class="cmd"><span class="symbol">▶</span> NEXT <span class="kbd-hint">SPACE</span></button>
+            <button id="btn-light" class="cmd active"><span class="symbol dot">●</span> LIGHT <span class="kbd-hint">S</span></button>
+            <button id="btn-add-pictures" class="cmd">+ ADD PICTURES</button>
+            <button id="fullscreen-btn" class="cmd" title="Fullscreen (F)">⛶ FULLSCREEN <span class="kbd-hint">F</span></button>
           </div>
-        </div>
+        </section>
 
-        <!-- Bottom Right Area: LINE Widget + Travel/Color Modes + Light Swatches -->
-        <div class="ctrl-bottom-right">
-          <!-- LINE Direction Widget -->
-          <div class="line-widget-container">
-            <span class="widget-label">DRIFT DIRECTION</span>
+        <section class="box">
+          <h2><i>02</i> MOTION</h2>
+          <div class="slider-group" data-param="drift">
+            <label for="sl-drift">DRIFT</label>
+            <input type="range" id="sl-drift" min="0" max="1" step="0.01" value="0.80" />
+            <output></output>
+          </div>
+          <div class="slider-group" data-param="splash">
+            <label for="sl-splash">SPLASH</label>
+            <input type="range" id="sl-splash" min="0" max="1" step="0.01" value="0.50" />
+            <output></output>
+          </div>
+          <div class="slider-group" data-param="gather">
+            <label for="sl-gather">GATHER</label>
+            <input type="range" id="sl-gather" min="0" max="1" step="0.01" value="0.80" />
+            <output></output>
+          </div>
+          <div class="slider-group" data-param="depth">
+            <label for="sl-depth">DEPTH</label>
+            <input type="range" id="sl-depth" min="0" max="1" step="0.01" value="0.80" />
+            <output></output>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2><i>03</i> DRIFT DIRECTION</h2>
+          <div class="dial-row">
             <div id="line-widget" class="line-widget-box" role="slider" tabindex="0"
                  aria-label="Drift direction" title="Drag to aim the drift. Distance from centre sets strength. Double-click to reset.">
               <svg id="line-svg" width="88" height="88" viewBox="0 0 88 88">
@@ -202,25 +112,48 @@
                 <circle class="dial-center" cx="44" cy="44" r="1.8" />
               </svg>
             </div>
-            <span id="line-readout" class="line-readout">0&deg; &middot; 90%</span>
-          </div>
-
-          <div class="modes-and-swatches">
-            <div class="meta-row">
-              <span class="meta-brand">SUMANTH REDDY</span>
+            <div class="dial-info">
+              <span class="dial-cap">ANGLE · STRENGTH</span>
+              <span id="line-readout" class="line-readout">0&deg; &middot; 90%</span>
+              <span class="dial-hint">DRAG THE DIAL. DOUBLE-CLICK RESETS.</span>
             </div>
-            <div class="mode-row">
-              <span class="mode-label">TRAVEL</span>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2><i>04</i> MODES</h2>
+          <div class="row">
+            <span class="row-label">LAYERS</span>
+            <div class="seg">
+              <button class="toggle-btn" data-toggle="draw">DRAW</button>
+              <button class="toggle-btn active" data-toggle="track">TRACK</button>
+              <button class="toggle-btn active" data-toggle="trails">TRAILS</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">SCAN</span>
+            <div class="seg">
+              <button class="toggle-btn" data-toggle="scan">ON</button>
+              <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">TRAVEL</span>
+            <div class="seg">
               <button class="mode-btn active" data-travel="swarm">SWARM</button>
               <button class="mode-btn" data-travel="melt">MELT</button>
             </div>
-            <div class="mode-row">
-              <span class="mode-label">ON WHITE</span>
+          </div>
+          <div class="row">
+            <span class="row-label">COLOUR</span>
+            <div class="seg">
               <button class="mode-btn" data-colormode="bw">B&amp;W</button>
               <button class="mode-btn active" data-colormode="true">TRUE</button>
             </div>
+          </div>
+          <div class="row">
+            <span class="row-label">LIGHT</span>
             <div class="swatches-row">
-              <span class="swatch-label">LIGHT</span>
               <button class="swatch-btn active" data-light="cream" style="--c: var(--light-cream)" title="Cream"></button>
               <button class="swatch-btn" data-light="ice" style="--c: var(--light-ice)" title="Ice Blue"></button>
               <button class="swatch-btn" data-light="orange" style="--c: var(--light-orange)" title="Orange"></button>
@@ -230,47 +163,66 @@
               <button class="swatch-btn dotted" data-light="off" title="Light Off"></button>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- Initial Dropzone Prompt Overlay (when no image is loaded yet) -->
-        <div id="dropzone" class="dropzone-overlay hidden">
-          <div class="dropzone-box">
-            <div class="dropzone-title">DROP UP TO FOUR PICTURES</div>
-            <div class="dropzone-sub">SPACE TURNS THE PAGE · S LIGHTS IT</div>
-            <button id="dropzone-picker-btn" class="dropzone-btn">CHOOSE PICTURES</button>
+        <section id="fx-panel" class="box">
+          <h2><i>05</i> EFFECTS <button id="fx-reset" class="mini" type="button">RESET</button></h2>
+          <span class="seg-label">LEVELS</span>
+          <div class="slider-group fx-slider" data-path="fx.black">
+            <label for="fx-fx-black">BLACK</label>
+            <input type="range" id="fx-fx-black" data-path="fx.black" min="0" max="0.5" step="0.005" />
+            <output></output>
           </div>
-        </div>
-
-        <!-- Loading / Progress Bar -->
-        <div id="loading-indicator" class="loading-indicator hidden">
-          <span id="loading-text">ESTIMATING DEPTH...</span>
-          <div class="progress-bar">
-            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          <div class="slider-group fx-slider" data-path="fx.white">
+            <label for="fx-fx-white">WHITE</label>
+            <input type="range" id="fx-fx-white" data-path="fx.white" min="0.5" max="1" step="0.005" />
+            <output></output>
           </div>
-        </div>
-
-        <!-- Credits Modal -->
-        <div id="credits-modal" class="credits-modal hidden">
-          <div class="credits-content">
-            <div class="credits-header">
-              <h2>PARTICLE DEPTH STUDIO</h2>
-              <button id="credits-close" class="close-btn">&times;</button>
-            </div>
-            <div class="credits-body">
-              <p>Designed & built by <strong>Sumanth Reddy</strong>.</p>
-              <p>524,288 GPU-simulated stipple points with neural depth estimation, fluid curl drift, and interactive parallax.</p>
-              <h3>THIRD PARTY LICENSES & ACKNOWLEDGEMENTS</h3>
-              <ul>
-                <li><strong>three.js</strong> — MIT License (mrdoob / three.js authors)</li>
-                <li><strong>Transformers.js</strong> — Apache-2.0 (Hugging Face)</li>
-                <li><strong>Depth Anything V2 Small</strong> — Apache-2.0 (ByteDance / Depth Anything team)</li>
-                <li><strong>Manrope</strong> — SIL Open Font License 1.1 (Michael Sharanda)</li>
-                <li><strong>JetBrains Mono</strong> — SIL Open Font License 1.1 (JetBrains)</li>
-              </ul>
-            </div>
+          <div class="slider-group fx-slider" data-path="fx.gamma">
+            <label for="fx-fx-gamma">GAMMA</label>
+            <input type="range" id="fx-fx-gamma" data-path="fx.gamma" min="0.4" max="2.2" step="0.01" />
+            <output></output>
           </div>
-        </div>
-      </div>
+          <span class="seg-label">CURVE</span>
+          <div class="slider-group fx-slider" data-path="fx.contrast">
+            <label for="fx-fx-contrast">CONTRAST</label>
+            <input type="range" id="fx-fx-contrast" data-path="fx.contrast" min="-1" max="1" step="0.01" />
+            <output></output>
+          </div>
+          <span class="seg-label">COLOUR</span>
+          <div class="slider-group fx-slider" data-path="fx.hue">
+            <label for="fx-fx-hue">HUE</label>
+            <input type="range" id="fx-fx-hue" data-path="fx.hue" min="-180" max="180" step="1" />
+            <output></output>
+          </div>
+          <div class="slider-group fx-slider" data-path="fx.saturation">
+            <label for="fx-fx-saturation">SATURATION</label>
+            <input type="range" id="fx-fx-saturation" data-path="fx.saturation" min="0" max="2" step="0.01" />
+            <output></output>
+          </div>
+          <span class="seg-label">TRAILS</span>
+          <div class="slider-group fx-slider" data-path="trail.amount">
+            <label for="fx-trail-amount">AMOUNT</label>
+            <input type="range" id="fx-trail-amount" data-path="trail.amount" min="0" max="1" step="0.01" />
+            <output></output>
+          </div>
+          <div class="slider-group fx-slider" data-path="trail.strength">
+            <label for="fx-trail-strength">STRENGTH</label>
+            <input type="range" id="fx-trail-strength" data-path="trail.strength" min="0" max="2" step="0.01" />
+            <output></output>
+          </div>
+          <div class="slider-group fx-slider" data-path="trail.length">
+            <label for="fx-trail-length">LENGTH</label>
+            <input type="range" id="fx-trail-length" data-path="trail.length" min="0.3" max="2" step="0.01" />
+            <output></output>
+          </div>
+          <div class="slider-group fx-slider" data-path="trail.detail">
+            <label for="fx-trail-detail">DETAIL</label>
+            <input type="range" id="fx-trail-detail" data-path="trail.detail" min="0" max="1" step="0.01" />
+            <output></output>
+          </div>
+        </section>
+      </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
