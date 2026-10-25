@@ -66,7 +66,9 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float reach = (0.12 + 0.38 * uDrift) * (0.45 + 1.1 * r3);
     vec2 perp = vec2(-uDir.y, uDir.x);
     pos += uDir * reach * ease;
-    pos += perp * sin(s * 5.0 + r2 * 6.2831) * 0.035 * uDrift * s * (0.5 + r3);
+    // Streamlines: the bend depends on where the particle starts, so neighbours curve together
+    float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * 0.25;
+    pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
@@ -114,25 +116,31 @@ void main() {
 `, st = `
 void main() {
   // Instanced 2-vertex lines: vertex 0 is the head, vertex 1 is the tail further back along the path
-  float alpha, streaming;
   bool tail = gl_VertexID == 1;
-  uint id = uint(gl_InstanceID) * 3u;
+  uint id = uint(gl_InstanceID) * 2u;
   float lenVar = 0.4 + rnd(id, 5u); // no two streaks the same length
-  vec2 w = place(id, aHome, luma(aMeta.rgb), tail ? -uTrailLen * lenVar : 0.0, 1.6, alpha, streaming);
+  float luminance = luma(aMeta.rgb);
+
+  // Both ends decide from the HEAD, so a line is never half-culled (a lone end would stretch it
+  // to the cull point and draw a long ray across the picture)
+  float alpha, streaming, a2, st2;
+  vec2 head = place(id, aHome, luminance, 0.0, 1.0, alpha, streaming);
   if (streaming < 0.5) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
     return;
   }
+  vec2 w = tail ? place(id, aHome, luminance, -uTrailLen * lenVar, 1.0, a2, st2) : head;
   gl_Position = toClip(w, aHome.z);
-  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.13 * uTrailGain;
+  // Head bright, tail keeps a third of it: a soft taper, like the studio streaks
+  vCol = aMeta.rgb * alpha * (tail ? 0.1 : 0.3) * uTrailGain;
 }
 `, ot = `#version 300 es
 precision mediump float;
 in vec3 vCol;
 out vec4 o;
 void main() { o = vec4(vCol, 1.0); }
-`, rt = X + it, nt = X + st, H = ot, G = {
+`, nt = X + it, rt = X + st, H = ot, G = {
   drift: 0.75,
   angle: 0.5,
   length: 0.9,
@@ -143,7 +151,7 @@ void main() { o = vec4(vCol, 1.0); }
   trailLength: 1,
   trailStrength: 1,
   brightness: 1.15
-}, V = 3, Y = 4e4;
+}, V = 2, Y = 4e4;
 function q(s, e, t) {
   const i = s.createShader(e);
   if (s.shaderSource(i, t), s.compileShader(i), !s.getShaderParameter(i, s.COMPILE_STATUS)) {
@@ -199,7 +207,7 @@ class at {
       preserveDrawingBuffer: !1
     });
     if (!i) throw new Error("WebGL2 unavailable");
-    this.gl = i, this.canvas = e, this.maxDpr = t.maxDpr ?? 1.5, this.pointProg = N(i, rt, H), this.trailProg = N(i, nt, H);
+    this.gl = i, this.canvas = e, this.maxDpr = t.maxDpr ?? 1.5, this.pointProg = N(i, nt, H), this.trailProg = N(i, rt, H);
     const o = [
       "uView",
       "uScale",
@@ -218,8 +226,8 @@ class at {
       "uTrailLen",
       "uTrailGain"
     ];
-    for (const r of o)
-      this.pointU[r] = i.getUniformLocation(this.pointProg, r), this.trailU[r] = i.getUniformLocation(this.trailProg, r);
+    for (const n of o)
+      this.pointU[n] = i.getUniformLocation(this.pointProg, n), this.trailU[n] = i.getUniformLocation(this.trailProg, n);
     this.vbo = i.createBuffer(), this.vaoPoints = i.createVertexArray(), this.vaoTrails = i.createVertexArray(), i.disable(i.DEPTH_TEST), i.disable(i.CULL_FACE), i.enable(i.BLEND), i.blendFunc(i.ONE, i.ONE_MINUS_SRC_COLOR), i.clearColor(0, 0, 0, 1);
   }
   setSample(e) {
@@ -254,8 +262,8 @@ class at {
     if (!e) return;
     const t = this.canvas.width, i = this.canvas.height, o = this.layout.fit === "cover" ? Math.max(i, t / e.aspect) : Math.min(i, t / e.aspect);
     this.scale = o;
-    const r = o * e.aspect;
-    this.offX = this.layout.alignX * Math.max(0, (t - r) / 2), this.offY = this.layout.alignY * Math.max(0, (i - o) / 2);
+    const n = o * e.aspect;
+    this.offX = this.layout.alignX * Math.max(0, (t - n) / 2), this.offY = this.layout.alignY * Math.max(0, (i - o) / 2);
   }
   /** Dots per pixel over the subject, from the current draw count and layout. */
   cover(e) {
@@ -267,10 +275,10 @@ class at {
     if (!this.sample) return;
     const o = Math.min(e, 0.05);
     this.time += o;
-    const r = 1 - Math.exp(-o * 5);
-    this.ptr.on += (this.ptr.targetOn - this.ptr.on) * r;
+    const n = 1 - Math.exp(-o * 5);
+    this.ptr.on += (this.ptr.targetOn - this.ptr.on) * n;
     const a = this.time, c = this.params.sway, v = (Math.sin(a * 0.23) * 0.6 + Math.sin(a * 0.11 + 1.3) * 0.4) * c, g = (Math.sin(a * 0.17 + 0.6) * 0.6 + Math.sin(a * 0.09) * 0.4) * c * 0.6;
-    this.look.x += (this.lookTarget.x * 1 + v - this.look.x) * r, this.look.y += (this.lookTarget.y * 1 + g - this.look.y) * r;
+    this.look.x += (this.lookTarget.x * 1 + v - this.look.x) * n, this.look.y += (this.lookTarget.y * 1 + g - this.look.y) * n;
     const m = this.params, w = Math.max(1, Math.round(this.dpr)), M = this.cover(w) >= 1.3 ? w : w * 2, l = 0.45 + 0.55 * m.length, y = Math.cos(m.angle) * l, f = Math.sin(m.angle) * l;
     t.clear(t.COLOR_BUFFER_BIT);
     const b = (p) => {
@@ -320,51 +328,51 @@ function lt(s, e) {
 }
 function ht(s, e, t) {
   const i = e * t;
-  let o = 0, r = 0, a = 0, c = 0;
-  const v = (n, d, u) => {
-    const A = (d * e + n) * 4;
+  let o = 0, n = 0, a = 0, c = 0;
+  const v = (r, d, u) => {
+    const A = (d * e + r) * 4;
     u(s[A], s[A + 1], s[A + 2]);
   }, g = [];
-  for (let n = 0; n < e; n += 2)
-    g.push([n, 0], [n, t - 1]);
-  for (let n = 0; n < t; n += 2)
-    g.push([0, n], [e - 1, n]);
-  for (const [n, d] of g)
-    v(n, d, (u, A, x) => {
-      o += u, r += A, a += x, c++;
+  for (let r = 0; r < e; r += 2)
+    g.push([r, 0], [r, t - 1]);
+  for (let r = 0; r < t; r += 2)
+    g.push([0, r], [e - 1, r]);
+  for (const [r, d] of g)
+    v(r, d, (u, A, x) => {
+      o += u, n += A, a += x, c++;
     });
-  o /= c, r /= c, a /= c;
+  o /= c, n /= c, a /= c;
   let m = 0;
-  for (const [n, d] of g)
-    v(n, d, (u, A, x) => {
-      m += Math.hypot(u - o, A - r, x - a);
+  for (const [r, d] of g)
+    v(r, d, (u, A, x) => {
+      m += Math.hypot(u - o, A - n, x - a);
     });
   if (m /= c, m > 22) return null;
-  const w = 46 + m * 2, M = (n) => Math.hypot(s[n * 4] - o, s[n * 4 + 1] - r, s[n * 4 + 2] - a) < w, l = new Uint8Array(i).fill(1), y = [], f = (n, d) => {
-    const u = d * e + n;
+  const w = 46 + m * 2, M = (r) => Math.hypot(s[r * 4] - o, s[r * 4 + 1] - n, s[r * 4 + 2] - a) < w, l = new Uint8Array(i).fill(1), y = [], f = (r, d) => {
+    const u = d * e + r;
     l[u] === 1 && M(u) && (l[u] = 0, y.push(u));
   };
-  for (let n = 0; n < e; n++)
-    f(n, 0), f(n, t - 1);
-  for (let n = 0; n < t; n++)
-    f(0, n), f(e - 1, n);
+  for (let r = 0; r < e; r++)
+    f(r, 0), f(r, t - 1);
+  for (let r = 0; r < t; r++)
+    f(0, r), f(e - 1, r);
   for (; y.length; ) {
-    const n = y.pop(), d = n % e, u = n / e | 0;
+    const r = y.pop(), d = r % e, u = r / e | 0;
     d > 0 && f(d - 1, u), d < e - 1 && f(d + 1, u), u > 0 && f(d, u - 1), u < t - 1 && f(d, u + 1);
   }
   let b = 0;
-  for (let n = 0; n < i; n++) b += l[n];
+  for (let r = 0; r < i; r++) b += l[r];
   if (b < i * 0.01 || b > i * 0.995) return null;
   const p = l.slice();
-  for (let n = 1; n < t - 1; n++)
+  for (let r = 1; r < t - 1; r++)
     for (let d = 1; d < e - 1; d++) {
-      const u = n * e + d;
-      l[u] === 1 && (l[u - 1] === 0 || l[u + 1] === 0 || l[u - e] === 0 || l[u + e] === 0) && (M(u) || Math.hypot(s[u * 4] - o, s[u * 4 + 1] - r, s[u * 4 + 2] - a) < w * 1.6) && (p[u] = 0);
+      const u = r * e + d;
+      l[u] === 1 && (l[u - 1] === 0 || l[u + 1] === 0 || l[u - e] === 0 || l[u + e] === 0) && (M(u) || Math.hypot(s[u * 4] - o, s[u * 4 + 1] - n, s[u * 4 + 2] - a) < w * 1.6) && (p[u] = 0);
     }
   return p;
 }
 function ct(s, e, t, i) {
-  const o = t * i, r = new Float32Array(o), a = new Float32Array(o), c = new Float32Array(o), v = new Float32Array(o);
+  const o = t * i, n = new Float32Array(o), a = new Float32Array(o), c = new Float32Array(o), v = new Float32Array(o);
   let g = 0, m = !1;
   for (let l = 0; l < o; l++)
     if (s[l * 4 + 3] < 240) {
@@ -373,20 +381,20 @@ function ct(s, e, t, i) {
     }
   const w = m ? null : ht(s, t, i);
   for (let l = 0; l < o; l++) {
-    const y = s[l * 4] / 255, f = s[l * 4 + 1] / 255, b = s[l * 4 + 2] / 255, p = s[l * 4 + 3] / 255, n = Math.max(y, f, b), d = Math.min(y, f, b);
-    c[l] = n === 0 ? 0 : (n - d) / n, a[l] = 0.299 * y + 0.587 * f + 0.114 * b, m ? r[l] = p > 0.15 ? p : 0 : r[l] = w ? w[l] : 1, r[l] > 0 && g++;
+    const y = s[l * 4] / 255, f = s[l * 4 + 1] / 255, b = s[l * 4 + 2] / 255, p = s[l * 4 + 3] / 255, r = Math.max(y, f, b), d = Math.min(y, f, b);
+    c[l] = r === 0 ? 0 : (r - d) / r, a[l] = 0.299 * y + 0.587 * f + 0.114 * b, m ? n[l] = p > 0.15 ? p : 0 : n[l] = w ? w[l] : 1, n[l] > 0 && g++;
   }
   for (let l = 0; l < i; l++)
     for (let y = 0; y < t; y++) {
       const f = l * t + y;
-      if (r[f] <= 0) continue;
+      if (n[f] <= 0) continue;
       let b = 0;
       if (y > 0 && y < t - 1 && l > 0 && l < i - 1) {
-        const n = a[f + 1] - a[f - 1], d = a[f + t] - a[f - t];
-        b = Math.min(1, Math.hypot(n, d) * 3);
+        const r = a[f + 1] - a[f - 1], d = a[f + t] - a[f - t];
+        b = Math.min(1, Math.hypot(r, d) * 3);
       }
       const p = Math.pow(a[f], 1.2);
-      v[f] = r[f] * (0.4 + 0.6 * b + 0.5 * p + 0.2 * c[f]);
+      v[f] = n[f] * (0.4 + 0.6 * b + 0.5 * p + 0.2 * c[f]);
     }
   let M = 0;
   for (let l = 0; l < o; l++) M += v[l];
@@ -394,7 +402,7 @@ function ct(s, e, t, i) {
     for (let l = 0; l < o; l++) v[l] = 1;
     g = o;
   }
-  return { weights: v, mask: r, activeCount: g };
+  return { weights: v, mask: n, activeCount: g };
 }
 function ut(s) {
   const e = s.length, t = new Float32Array(e);
@@ -409,7 +417,7 @@ function pt(s, e) {
   return s;
 }
 function dt(s, e, t) {
-  const i = s.width, o = s.height, r = Math.min(1, ft / Math.max(i, o)), a = Math.max(2, Math.round(i * r)), c = Math.max(2, Math.round(o * r)), v = document.createElement("canvas");
+  const i = s.width, o = s.height, n = Math.min(1, ft / Math.max(i, o)), a = Math.max(2, Math.round(i * n)), c = Math.max(2, Math.round(o * n)), v = document.createElement("canvas");
   v.width = a, v.height = c;
   const g = v.getContext("2d", { willReadFrequently: !0 });
   g.drawImage(s, 0, 0, a, c);
@@ -417,15 +425,15 @@ function dt(s, e, t) {
   if (e) {
     g.clearRect(0, 0, a, c), g.drawImage(e, 0, 0, a, c);
     const x = g.getImageData(0, 0, a, c).data;
-    for (let k = 0; k < w.length; k++) w[k] = x[k * 4] / 255;
+    for (let D = 0; D < w.length; D++) w[D] = x[D * 4] / 255;
   } else
     w.fill(0.5);
   const { weights: M, activeCount: l } = ct(m, w, a, c), y = ut(M), f = y[y.length - 1], b = f / Math.max(1, l), p = a / c;
-  let n = Math.floor(t * 0.6180339887) | 1;
-  for (; pt(n, t) !== 1; ) n += 2;
+  let r = Math.floor(t * 0.6180339887) | 1;
+  for (; pt(r, t) !== 1; ) r += 2;
   const d = new ArrayBuffer(t * 16), u = new Float32Array(d), A = new Uint8Array(d);
   for (let x = 0; x < t; x++) {
-    const j = (x * n % t + z(x, 1)) / t, R = lt(y, j * f), O = Math.max(0, Math.min(a - 1.001, R % a + z(x, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + z(x, 3))), P = O | 0, E = _ | 0, T = O - P, S = _ - E, C = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (C(P, E, D) * (1 - T) + C(P + 1, E, D) * T) * (1 - S) + (C(P, E + 1, D) * (1 - T) + C(P + 1, E + 1, D) * T) * S, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - S) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * S, Q = F(0), K = F(1), J = F(2);
+    const j = (x * r % t + z(x, 1)) / t, R = lt(y, j * f), O = Math.max(0, Math.min(a - 1.001, R % a + z(x, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + z(x, 3))), P = O | 0, E = _ | 0, T = O - P, S = _ - E, C = (k, B, $) => m[(B * a + k) * 4 + $], F = (k) => (C(P, E, k) * (1 - T) + C(P + 1, E, k) * T) * (1 - S) + (C(P, E + 1, k) * (1 - T) + C(P + 1, E + 1, k) * T) * S, L = (k, B) => w[B * a + k], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - S) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * S, Q = F(0), K = F(1), J = F(2);
     u[x * 4] = (O / a - 0.5) * p, u[x * 4 + 1] = 0.5 - _ / c, u[x * 4 + 2] = U - 0.5;
     const I = x * 16 + 12;
     A[I] = Q, A[I + 1] = K, A[I + 2] = J;
@@ -438,16 +446,16 @@ function mt(s) {
   if (!s || typeof s != "object") return {};
   const e = s.params ?? s, t = {}, i = (o) => typeof o == "number" && isFinite(o) ? o : void 0;
   for (const o of ["drift", "angle", "length", "depth", "speed", "sway", "trailLength", "trailStrength", "brightness"]) {
-    const r = i(e[o]);
-    r !== void 0 && (t[o] = r);
+    const n = i(e[o]);
+    n !== void 0 && (t[o] = n);
   }
   if (typeof e.trails == "boolean" && (t.trails = e.trails), e.line) {
-    const o = i(e.line.angle), r = i(e.line.length);
-    o !== void 0 && (t.angle = o), r !== void 0 && (t.length = r);
+    const o = i(e.line.angle), n = i(e.line.length);
+    o !== void 0 && (t.angle = o), n !== void 0 && (t.length = n);
   }
   if (e.trail) {
-    const o = i(e.trail.length), r = i(e.trail.strength);
-    o !== void 0 && (t.trailLength = o), r !== void 0 && (t.trailStrength = r);
+    const o = i(e.trail.length), n = i(e.trail.strength);
+    o !== void 0 && (t.trailLength = o), n !== void 0 && (t.trailStrength = n);
   }
   return t;
 }
@@ -495,19 +503,19 @@ class vt {
           typeof e.config == "string" ? fetch(e.config).then((g) => g.json()).catch(() => ({})) : Promise.resolve(e.config ?? {})
         ]);
         if (this.destroyed) return;
-        const r = new at(this.canvas, { maxDpr: e.maxDpr });
-        this.engine = r, r.setParams({ ...G, ...mt(o) }), r.setLayout({ fit: e.fit ?? "contain", alignX: e.alignX ?? 0, alignY: e.alignY ?? 0 });
+        const n = new at(this.canvas, { maxDpr: e.maxDpr });
+        this.engine = n, n.setParams({ ...G, ...mt(o) }), n.setLayout({ fit: e.fit ?? "contain", alignX: e.alignX ?? 0, alignY: e.alignY ?? 0 });
         const a = typeof e.pointCount == "number" ? e.pointCount : gt();
-        r.setSample(dt(t, i, a));
+        n.setSample(dt(t, i, a));
         const c = this.container.getBoundingClientRect();
-        r.resize(c.width, c.height), this.bind(), this.canvas.style.opacity = "1", this.posterEl && setTimeout(() => this.posterEl && (this.posterEl.style.opacity = "0"), 400);
+        n.resize(c.width, c.height), this.bind(), this.canvas.style.opacity = "1", this.posterEl && setTimeout(() => this.posterEl && (this.posterEl.style.opacity = "0"), 400);
         const v = (g) => {
           if (!this.destroyed) {
             if (this.raf = requestAnimationFrame(v), !this.visible || document.hidden) {
               this.last = g;
               return;
             }
-            r.frame(this.last ? (g - this.last) / 1e3 : 1 / 60), this.last = g;
+            n.frame(this.last ? (g - this.last) / 1e3 : 1 / 60), this.last = g;
           }
         };
         this.raf = requestAnimationFrame(v);
@@ -516,18 +524,18 @@ class vt {
       }
   }
   bind() {
-    const e = this.engine, t = this.options.pointer === "element" ? this.container : window, i = (r) => {
-      const a = r, c = this.canvas.getBoundingClientRect(), v = a.clientX >= c.left && a.clientX <= c.right && a.clientY >= c.top && a.clientY <= c.bottom;
+    const e = this.engine, t = this.options.pointer === "element" ? this.container : window, i = (n) => {
+      const a = n, c = this.canvas.getBoundingClientRect(), v = a.clientX >= c.left && a.clientX <= c.right && a.clientY >= c.top && a.clientY <= c.bottom;
       e.setPointer(v ? a.clientX - c.left : null, v ? a.clientY - c.top : null);
     };
     t.addEventListener("pointermove", i, { passive: !0 }), this.cleanups.push(() => t.removeEventListener("pointermove", i)), this.ro = new ResizeObserver(() => {
-      const r = this.container.getBoundingClientRect();
-      r.width > 0 && r.height > 0 && e.resize(r.width, r.height);
-    }), this.ro.observe(this.container), this.options.pauseOffscreen !== !1 && (this.io = new IntersectionObserver((r) => {
-      for (const a of r) this.visible = a.isIntersecting;
+      const n = this.container.getBoundingClientRect();
+      n.width > 0 && n.height > 0 && e.resize(n.width, n.height);
+    }), this.ro.observe(this.container), this.options.pauseOffscreen !== !1 && (this.io = new IntersectionObserver((n) => {
+      for (const a of n) this.visible = a.isIntersecting;
     }), this.io.observe(this.container));
-    const o = (r) => {
-      r.preventDefault(), cancelAnimationFrame(this.raf), this.posterEl && (this.posterEl.style.opacity = "1");
+    const o = (n) => {
+      n.preventDefault(), cancelAnimationFrame(this.raf), this.posterEl && (this.posterEl.style.opacity = "1");
     };
     this.canvas.addEventListener("webglcontextlost", o), this.cleanups.push(() => this.canvas.removeEventListener("webglcontextlost", o));
   }

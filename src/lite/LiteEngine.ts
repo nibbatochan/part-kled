@@ -36,7 +36,7 @@ export interface LiteLayout {
   alignY: number;
 }
 
-const TRAIL_STRIDE = 3;
+const TRAIL_STRIDE = 2;
 const MIN_DRAWN = 40000;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {

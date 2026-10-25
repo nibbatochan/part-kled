@@ -68,7 +68,9 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float reach = (0.12 + 0.38 * uDrift) * (0.45 + 1.1 * r3);
     vec2 perp = vec2(-uDir.y, uDir.x);
     pos += uDir * reach * ease;
-    pos += perp * sin(s * 5.0 + r2 * 6.2831) * 0.035 * uDrift * s * (0.5 + r3);
+    // Streamlines: the bend depends on where the particle starts, so neighbours curve together
+    float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * 0.25;
+    pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
@@ -120,18 +122,24 @@ void main() {
 const TRAILS = `
 void main() {
   // Instanced 2-vertex lines: vertex 0 is the head, vertex 1 is the tail further back along the path
-  float alpha, streaming;
   bool tail = gl_VertexID == 1;
-  uint id = uint(gl_InstanceID) * 3u;
+  uint id = uint(gl_InstanceID) * 2u;
   float lenVar = 0.4 + rnd(id, 5u); // no two streaks the same length
-  vec2 w = place(id, aHome, luma(aMeta.rgb), tail ? -uTrailLen * lenVar : 0.0, 1.6, alpha, streaming);
+  float luminance = luma(aMeta.rgb);
+
+  // Both ends decide from the HEAD, so a line is never half-culled (a lone end would stretch it
+  // to the cull point and draw a long ray across the picture)
+  float alpha, streaming, a2, st2;
+  vec2 head = place(id, aHome, luminance, 0.0, 1.0, alpha, streaming);
   if (streaming < 0.5) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
     return;
   }
+  vec2 w = tail ? place(id, aHome, luminance, -uTrailLen * lenVar, 1.0, a2, st2) : head;
   gl_Position = toClip(w, aHome.z);
-  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.13 * uTrailGain;
+  // Head bright, tail keeps a third of it: a soft taper, like the studio streaks
+  vCol = aMeta.rgb * alpha * (tail ? 0.1 : 0.3) * uTrailGain;
 }
 `;
 
