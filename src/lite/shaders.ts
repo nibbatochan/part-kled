@@ -64,7 +64,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
 
-    float reach = (0.18 + 0.62 * uDrift) * (0.45 + 1.1 * r3);
+    float reach = (0.12 + 0.38 * uDrift) * (0.45 + 1.1 * r3);
     vec2 perp = vec2(-uDir.y, uDir.x);
     pos += uDir * reach * ease;
     pos += perp * sin(s * 5.0 + r2 * 6.2831) * 0.035 * uDrift * s * (0.5 + r3);
@@ -82,13 +82,20 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float f = uPtrOn * smoothstep(0.14, 0.0, dl);
   pos += dq / max(dl, 1e-4) * f * f * 0.03;
 
-  // Depth parallax
-  pos += uLook * home.z * 0.10 * uDepth;
   return pos;
 }
 
-vec4 toClip(vec2 world) {
-  vec2 px = world * uScale + uOffset;
+// Tilt the whole picture like a card in 3D: depth pushes near parts toward the viewer, so a turn
+// of the head shows real parallax, and the picture foreshortens a little as it turns.
+vec4 toClip(vec2 world, float z) {
+  vec3 p = vec3(world, z * 0.55 * uDepth);
+  float yaw = uLook.x * 0.30;
+  float pitch = -uLook.y * 0.20;
+  float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
+  vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
+  q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);
+  float persp = 1.0 / (1.0 - q.z * 0.5);
+  vec2 px = q.xy * persp * uScale + uOffset;
   return vec4(px / (uView * 0.5), 0.0, 1.0);
 }
 `;
@@ -97,7 +104,7 @@ const POINTS = `
 void main() {
   float alpha, streaming;
   vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, 1.0, alpha, streaming);
-  gl_Position = toClip(w);
+  gl_Position = toClip(w, aHome.z);
   gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
@@ -120,7 +127,7 @@ void main() {
     vCol = vec3(0.0);
     return;
   }
-  gl_Position = toClip(w);
+  gl_Position = toClip(w, aHome.z);
   vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.13 * uTrailGain;
 }
 `;

@@ -1,7 +1,7 @@
 var tt = Object.defineProperty;
 var et = (s, e, t) => e in s ? tt(s, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : s[e] = t;
 var h = (s, e, t) => et(s, typeof e != "symbol" ? e + "" : e, t);
-const G = `#version 300 es
+const X = `#version 300 es
 precision highp float;
 precision highp int;
 
@@ -62,7 +62,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
 
-    float reach = (0.18 + 0.62 * uDrift) * (0.45 + 1.1 * r3);
+    float reach = (0.12 + 0.38 * uDrift) * (0.45 + 1.1 * r3);
     vec2 perp = vec2(-uDir.y, uDir.x);
     pos += uDir * reach * ease;
     pos += perp * sin(s * 5.0 + r2 * 6.2831) * 0.035 * uDrift * s * (0.5 + r3);
@@ -80,20 +80,27 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float f = uPtrOn * smoothstep(0.14, 0.0, dl);
   pos += dq / max(dl, 1e-4) * f * f * 0.03;
 
-  // Depth parallax
-  pos += uLook * home.z * 0.10 * uDepth;
   return pos;
 }
 
-vec4 toClip(vec2 world) {
-  vec2 px = world * uScale + uOffset;
+// Tilt the whole picture like a card in 3D: depth pushes near parts toward the viewer, so a turn
+// of the head shows real parallax, and the picture foreshortens a little as it turns.
+vec4 toClip(vec2 world, float z) {
+  vec3 p = vec3(world, z * 0.55 * uDepth);
+  float yaw = uLook.x * 0.30;
+  float pitch = -uLook.y * 0.20;
+  float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
+  vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
+  q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);
+  float persp = 1.0 / (1.0 - q.z * 0.5);
+  vec2 px = q.xy * persp * uScale + uOffset;
   return vec4(px / (uView * 0.5), 0.0, 1.0);
 }
 `, it = `
 void main() {
   float alpha, streaming;
   vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, 1.0, alpha, streaming);
-  gl_Position = toClip(w);
+  gl_Position = toClip(w, aHome.z);
   gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
@@ -114,7 +121,7 @@ void main() {
     vCol = vec3(0.0);
     return;
   }
-  gl_Position = toClip(w);
+  gl_Position = toClip(w, aHome.z);
   vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.13 * uTrailGain;
 }
 `, ot = `#version 300 es
@@ -122,19 +129,20 @@ precision mediump float;
 in vec3 vCol;
 out vec4 o;
 void main() { o = vec4(vCol, 1.0); }
-`, nt = G + it, rt = G + st, Y = ot, j = {
+`, nt = X + it, rt = X + st, H = ot, G = {
   drift: 0.75,
-  angle: 0.2,
+  angle: 0.5,
   length: 0.9,
-  depth: 0.5,
+  depth: 0.8,
   speed: 1,
   sway: 0.6,
-  trails: !0,
+  trails: !1,
+  // long streaks read as noise on a portrait; opt in with trails: true
   trailLength: 1,
   trailStrength: 1,
-  brightness: 1
-}, V = 3, N = 4e4;
-function W(s, e, t) {
+  brightness: 1.15
+}, V = 3, Y = 4e4;
+function q(s, e, t) {
   const i = s.createShader(e);
   if (s.shaderSource(i, t), s.compileShader(i), !s.getShaderParameter(i, s.COMPILE_STATUS)) {
     const o = s.getShaderInfoLog(i);
@@ -142,15 +150,15 @@ function W(s, e, t) {
   }
   return i;
 }
-function X(s, e, t) {
+function N(s, e, t) {
   const i = s.createProgram();
-  if (s.attachShader(i, W(s, s.VERTEX_SHADER, e)), s.attachShader(i, W(s, s.FRAGMENT_SHADER, t)), s.linkProgram(i), !s.getProgramParameter(i, s.LINK_STATUS)) throw new Error("lite link: " + s.getProgramInfoLog(i));
+  if (s.attachShader(i, q(s, s.VERTEX_SHADER, e)), s.attachShader(i, q(s, s.FRAGMENT_SHADER, t)), s.linkProgram(i), !s.getProgramParameter(i, s.LINK_STATUS)) throw new Error("lite link: " + s.getProgramInfoLog(i));
   return i;
 }
 class at {
   constructor(e, t = {}) {
     h(this, "gl");
-    h(this, "params", { ...j });
+    h(this, "params", { ...G });
     h(this, "layout", { fit: "contain", alignX: 0, alignY: 0 });
     h(this, "canvas");
     h(this, "pointProg");
@@ -189,7 +197,7 @@ class at {
       preserveDrawingBuffer: !1
     });
     if (!i) throw new Error("WebGL2 unavailable");
-    this.gl = i, this.canvas = e, this.maxDpr = t.maxDpr ?? 1.5, this.pointProg = X(i, nt, Y), this.trailProg = X(i, rt, Y);
+    this.gl = i, this.canvas = e, this.maxDpr = t.maxDpr ?? 1.5, this.pointProg = N(i, nt, H), this.trailProg = N(i, rt, H);
     const o = [
       "uView",
       "uScale",
@@ -260,11 +268,11 @@ class at {
     const n = 1 - Math.exp(-o * 5);
     this.ptr.on += (this.ptr.targetOn - this.ptr.on) * n;
     const a = this.time, c = this.params.sway, v = (Math.sin(a * 0.23) * 0.6 + Math.sin(a * 0.11 + 1.3) * 0.4) * c, g = (Math.sin(a * 0.17 + 0.6) * 0.6 + Math.sin(a * 0.09) * 0.4) * c * 0.6;
-    this.look.x += (this.lookTarget.x * 0.6 + v - this.look.x) * n, this.look.y += (this.lookTarget.y * 0.6 + g - this.look.y) * n;
-    const m = this.params, w = Math.max(1, Math.round(this.dpr)), M = this.cover(w) >= 1.3 ? w : w * 2, l = 0.45 + 0.55 * m.length, x = Math.cos(m.angle) * l, f = Math.sin(m.angle) * l;
+    this.look.x += (this.lookTarget.x * 1 + v - this.look.x) * n, this.look.y += (this.lookTarget.y * 1 + g - this.look.y) * n;
+    const m = this.params, w = Math.max(1, Math.round(this.dpr)), M = this.cover(w) >= 1.3 ? w : w * 2, l = 0.45 + 0.55 * m.length, y = Math.cos(m.angle) * l, f = Math.sin(m.angle) * l;
     t.clear(t.COLOR_BUFFER_BIT);
     const b = (p) => {
-      t.uniform2f(p.uView, this.canvas.width, this.canvas.height), t.uniform1f(p.uScale, this.scale), t.uniform2f(p.uOffset, this.offX, this.offY), t.uniform1f(p.uTime, a), t.uniform1f(p.uDrift, m.drift), t.uniform1f(p.uDepth, m.depth), t.uniform1f(p.uSpeed, m.speed), t.uniform2f(p.uDir, x, f), t.uniform2f(p.uLook, this.look.x, this.look.y), t.uniform2f(p.uPtr, this.ptr.x, this.ptr.y), t.uniform1f(p.uPtrOn, this.ptr.on), t.uniform1f(p.uCover, this.cover(M)), t.uniform1f(p.uPointPx, M), t.uniform1f(p.uBright, m.brightness), t.uniform1f(p.uTrailLen, 0.17 * m.trailLength), t.uniform1f(p.uTrailGain, m.trailStrength);
+      t.uniform2f(p.uView, this.canvas.width, this.canvas.height), t.uniform1f(p.uScale, this.scale), t.uniform2f(p.uOffset, this.offX, this.offY), t.uniform1f(p.uTime, a), t.uniform1f(p.uDrift, m.drift), t.uniform1f(p.uDepth, m.depth), t.uniform1f(p.uSpeed, m.speed), t.uniform2f(p.uDir, y, f), t.uniform2f(p.uLook, this.look.x, this.look.y), t.uniform2f(p.uPtr, this.ptr.x, this.ptr.y), t.uniform1f(p.uPtrOn, this.ptr.on), t.uniform1f(p.uCover, this.cover(M)), t.uniform1f(p.uPointPx, M), t.uniform1f(p.uBright, m.brightness), t.uniform1f(p.uTrailLen, 0.17 * m.trailLength), t.uniform1f(p.uTrailGain, m.trailStrength);
     };
     t.useProgram(this.pointProg), b(this.pointU), t.bindVertexArray(this.vaoPoints), t.drawArrays(t.POINTS, 0, this.drawn), m.trails && this.trailsAllowed && m.drift > 0.02 && (t.useProgram(this.trailProg), b(this.trailU), t.bindVertexArray(this.vaoTrails), t.drawArraysInstanced(t.LINES, 0, 2, Math.floor(this.drawn / V))), t.bindVertexArray(null), this.adapt(e * 1e3);
   }
@@ -281,8 +289,8 @@ class at {
         this.level = 2, this.applySize(), this.onQuality?.({ drawn: this.drawn, dpr: this.dpr, trails: this.trailsAllowed });
         return;
       } else {
-        if (this.drawn <= N) return;
-        this.drawn = Math.max(N, Math.floor(this.drawn * 0.75));
+        if (this.drawn <= Y) return;
+        this.drawn = Math.max(Y, Math.floor(this.drawn * 0.75));
       }
       this.level++, this.onQuality?.({ drawn: this.drawn, dpr: this.dpr, trails: this.trailsAllowed });
     }
@@ -296,7 +304,7 @@ class at {
     e.deleteBuffer(this.vbo), e.deleteVertexArray(this.vaoPoints), e.deleteVertexArray(this.vaoTrails), e.deleteProgram(this.pointProg), e.deleteProgram(this.trailProg), e.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
-function H(s, e) {
+function z(s, e) {
   let t = (Math.imul(s + 1, 2654435761) ^ Math.imul(e + 1, 2246822507)) >>> 0;
   return t = Math.imul(t ^ t >>> 16, 2246822507) >>> 0, t = Math.imul(t ^ t >>> 13, 3266489909) >>> 0, t = (t ^ t >>> 16) >>> 0, t / 4294967296;
 }
@@ -320,26 +328,26 @@ function ht(s, e, t) {
   for (let r = 0; r < t; r += 2)
     g.push([0, r], [e - 1, r]);
   for (const [r, d] of g)
-    v(r, d, (u, A, y) => {
-      o += u, n += A, a += y, c++;
+    v(r, d, (u, A, x) => {
+      o += u, n += A, a += x, c++;
     });
   o /= c, n /= c, a /= c;
   let m = 0;
   for (const [r, d] of g)
-    v(r, d, (u, A, y) => {
-      m += Math.hypot(u - o, A - n, y - a);
+    v(r, d, (u, A, x) => {
+      m += Math.hypot(u - o, A - n, x - a);
     });
   if (m /= c, m > 22) return null;
-  const w = 46 + m * 2, M = (r) => Math.hypot(s[r * 4] - o, s[r * 4 + 1] - n, s[r * 4 + 2] - a) < w, l = new Uint8Array(i).fill(1), x = [], f = (r, d) => {
+  const w = 46 + m * 2, M = (r) => Math.hypot(s[r * 4] - o, s[r * 4 + 1] - n, s[r * 4 + 2] - a) < w, l = new Uint8Array(i).fill(1), y = [], f = (r, d) => {
     const u = d * e + r;
-    l[u] === 1 && M(u) && (l[u] = 0, x.push(u));
+    l[u] === 1 && M(u) && (l[u] = 0, y.push(u));
   };
   for (let r = 0; r < e; r++)
     f(r, 0), f(r, t - 1);
   for (let r = 0; r < t; r++)
     f(0, r), f(e - 1, r);
-  for (; x.length; ) {
-    const r = x.pop(), d = r % e, u = r / e | 0;
+  for (; y.length; ) {
+    const r = y.pop(), d = r % e, u = r / e | 0;
     d > 0 && f(d - 1, u), d < e - 1 && f(d + 1, u), u > 0 && f(d, u - 1), u < t - 1 && f(d, u + 1);
   }
   let b = 0;
@@ -363,15 +371,15 @@ function ct(s, e, t, i) {
     }
   const w = m ? null : ht(s, t, i);
   for (let l = 0; l < o; l++) {
-    const x = s[l * 4] / 255, f = s[l * 4 + 1] / 255, b = s[l * 4 + 2] / 255, p = s[l * 4 + 3] / 255, r = Math.max(x, f, b), d = Math.min(x, f, b);
-    c[l] = r === 0 ? 0 : (r - d) / r, a[l] = 0.299 * x + 0.587 * f + 0.114 * b, m ? n[l] = p > 0.15 ? p : 0 : n[l] = w ? w[l] : 1, n[l] > 0 && g++;
+    const y = s[l * 4] / 255, f = s[l * 4 + 1] / 255, b = s[l * 4 + 2] / 255, p = s[l * 4 + 3] / 255, r = Math.max(y, f, b), d = Math.min(y, f, b);
+    c[l] = r === 0 ? 0 : (r - d) / r, a[l] = 0.299 * y + 0.587 * f + 0.114 * b, m ? n[l] = p > 0.15 ? p : 0 : n[l] = w ? w[l] : 1, n[l] > 0 && g++;
   }
   for (let l = 0; l < i; l++)
-    for (let x = 0; x < t; x++) {
-      const f = l * t + x;
+    for (let y = 0; y < t; y++) {
+      const f = l * t + y;
       if (n[f] <= 0) continue;
       let b = 0;
-      if (x > 0 && x < t - 1 && l > 0 && l < i - 1) {
+      if (y > 0 && y < t - 1 && l > 0 && l < i - 1) {
         const r = a[f + 1] - a[f - 1], d = a[f + t] - a[f - t];
         b = Math.min(1, Math.hypot(r, d) * 3);
       }
@@ -406,18 +414,18 @@ function dt(s, e, t) {
   const m = g.getImageData(0, 0, a, c).data, w = new Float32Array(a * c);
   if (e) {
     g.clearRect(0, 0, a, c), g.drawImage(e, 0, 0, a, c);
-    const y = g.getImageData(0, 0, a, c).data;
-    for (let S = 0; S < w.length; S++) w[S] = y[S * 4] / 255;
+    const x = g.getImageData(0, 0, a, c).data;
+    for (let k = 0; k < w.length; k++) w[k] = x[k * 4] / 255;
   } else
     w.fill(0.5);
-  const { weights: M, activeCount: l } = ct(m, w, a, c), x = ut(M), f = x[x.length - 1], b = f / Math.max(1, l), p = a / c;
+  const { weights: M, activeCount: l } = ct(m, w, a, c), y = ut(M), f = y[y.length - 1], b = f / Math.max(1, l), p = a / c;
   let r = Math.floor(t * 0.6180339887) | 1;
   for (; pt(r, t) !== 1; ) r += 2;
   const d = new ArrayBuffer(t * 16), u = new Float32Array(d), A = new Uint8Array(d);
-  for (let y = 0; y < t; y++) {
-    const q = (y * r % t + H(y, 1)) / t, R = lt(x, q * f), O = Math.max(0, Math.min(a - 1.001, R % a + H(y, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + H(y, 3))), P = O | 0, E = _ | 0, T = O - P, k = _ - E, C = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (C(P, E, D) * (1 - T) + C(P + 1, E, D) * T) * (1 - k) + (C(P, E + 1, D) * (1 - T) + C(P + 1, E + 1, D) * T) * k, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - k) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * k, Q = F(0), K = F(1), J = F(2);
-    u[y * 4] = (O / a - 0.5) * p, u[y * 4 + 1] = 0.5 - _ / c, u[y * 4 + 2] = U - 0.5;
-    const I = y * 16 + 12;
+  for (let x = 0; x < t; x++) {
+    const j = (x * r % t + z(x, 1)) / t, R = lt(y, j * f), O = Math.max(0, Math.min(a - 1.001, R % a + z(x, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + z(x, 3))), P = O | 0, E = _ | 0, T = O - P, S = _ - E, C = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (C(P, E, D) * (1 - T) + C(P + 1, E, D) * T) * (1 - S) + (C(P, E + 1, D) * (1 - T) + C(P + 1, E + 1, D) * T) * S, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - S) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * S, Q = F(0), K = F(1), J = F(2);
+    u[x * 4] = (O / a - 0.5) * p, u[x * 4 + 1] = 0.5 - _ / c, u[x * 4 + 2] = U - 0.5;
+    const I = x * 16 + 12;
     A[I] = Q, A[I + 1] = K, A[I + 2] = J;
     const Z = Math.min(5, Math.max(0.2, b / Math.max(1e-4, M[R])));
     A[I + 3] = Math.round(Z / 5 * 255);
@@ -445,7 +453,7 @@ function gt() {
   const s = navigator.hardwareConcurrency || 4, e = navigator.deviceMemory || 4;
   return window.innerWidth < 768 || s <= 4 || e <= 4 ? 2e5 : s >= 8 && e >= 8 && window.innerWidth >= 1280 ? 45e4 : 3e5;
 }
-function z(s) {
+function W(s) {
   return new Promise((e, t) => {
     const i = new Image();
     i.crossOrigin = "anonymous", i.decoding = "async", i.onload = () => e(i), i.onerror = () => t(new Error("image failed: " + s)), i.src = s;
@@ -480,13 +488,13 @@ class vt {
     if (!this.destroyed)
       try {
         const e = this.options, [t, i, o] = await Promise.all([
-          z(e.image),
-          e.depth ? z(e.depth).catch(() => null) : Promise.resolve(null),
+          W(e.image),
+          e.depth ? W(e.depth).catch(() => null) : Promise.resolve(null),
           typeof e.config == "string" ? fetch(e.config).then((g) => g.json()).catch(() => ({})) : Promise.resolve(e.config ?? {})
         ]);
         if (this.destroyed) return;
         const n = new at(this.canvas, { maxDpr: e.maxDpr });
-        this.engine = n, n.setParams({ ...j, ...mt(o) }), n.setLayout({ fit: e.fit ?? "contain", alignX: e.alignX ?? 0, alignY: e.alignY ?? 0 });
+        this.engine = n, n.setParams({ ...G, ...mt(o) }), n.setLayout({ fit: e.fit ?? "contain", alignX: e.alignX ?? 0, alignY: e.alignY ?? 0 });
         const a = typeof e.pointCount == "number" ? e.pointCount : gt();
         n.setSample(dt(t, i, a));
         const c = this.container.getBoundingClientRect();
@@ -533,10 +541,10 @@ class vt {
     this.destroyed = !0, cancelAnimationFrame(this.raf), this.ro?.disconnect(), this.io?.disconnect(), this.cleanups.forEach((e) => e()), this.engine?.dispose(), this.canvas.remove(), this.posterEl?.remove();
   }
 }
-function xt(s, e) {
+function yt(s, e) {
   return new vt(s, e);
 }
-class yt extends HTMLElement {
+class xt extends HTMLElement {
   constructor() {
     super(...arguments);
     h(this, "hero");
@@ -546,7 +554,7 @@ class yt extends HTMLElement {
     if (!t) return;
     this.style.position = "relative", this.style.display = "block", this.style.width = this.style.width || "100%", this.style.height = this.style.height || "100%";
     const i = (o) => this.hasAttribute(o) ? Number(this.getAttribute(o)) : void 0;
-    this.hero = xt(this, {
+    this.hero = yt(this, {
       image: t,
       depth: this.getAttribute("depth") || void 0,
       config: this.getAttribute("config") || void 0,
@@ -563,10 +571,10 @@ class yt extends HTMLElement {
     this.hero?.destroy(), this.hero = void 0;
   }
 }
-typeof customElements < "u" && !customElements.get("particle-hero") && customElements.define("particle-hero", yt);
+typeof customElements < "u" && !customElements.get("particle-hero") && customElements.define("particle-hero", xt);
 export {
   vt as HeroLite,
   gt as autoCount,
-  xt as createHero,
+  yt as createHero,
   mt as toLiteParams
 };

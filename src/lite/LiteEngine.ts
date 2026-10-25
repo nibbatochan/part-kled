@@ -18,15 +18,15 @@ export interface LiteParams {
 
 export const liteDefaults: LiteParams = {
   drift: 0.75,
-  angle: 0.2,
+  angle: 0.5,
   length: 0.9,
-  depth: 0.5,
+  depth: 0.8,
   speed: 1,
   sway: 0.6,
-  trails: true,
+  trails: false, // long streaks read as noise on a portrait; opt in with trails: true
   trailLength: 1,
   trailStrength: 1,
-  brightness: 1,
+  brightness: 1.15,
 };
 
 export interface LiteLayout {
@@ -237,8 +237,8 @@ export class LiteEngine {
     const sw = this.params.sway;
     const idleX = (Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.11 + 1.3) * 0.4) * sw;
     const idleY = (Math.sin(t * 0.17 + 0.6) * 0.6 + Math.sin(t * 0.09) * 0.4) * sw * 0.6;
-    this.look.x += (this.lookTarget.x * 0.6 + idleX - this.look.x) * k;
-    this.look.y += (this.lookTarget.y * 0.6 + idleY - this.look.y) * k;
+    this.look.x += (this.lookTarget.x * 1.0 + idleX - this.look.x) * k;
+    this.look.y += (this.lookTarget.y * 1.0 + idleY - this.look.y) * k;
 
     const p = this.params;
     // Whole pixels only: the rasteriser rounds point sizes, and the brightness maths must see the real size
