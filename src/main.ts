@@ -1,47 +1,72 @@
 // src/main.ts
 import { defaults, loadFromStorage, saveToStorage, type Params } from './core/params';
+import { Engine } from './core/Engine';
+import { sampleImageParticles, type SamplePointData } from './core/Sampler';
+import { DepthEstimator } from './depth/DepthEstimator';
 import { Dropzone } from './ui/Dropzone';
 import { Frame } from './ui/Frame';
+import { Hud } from './ui/Hud';
 import { Panel } from './ui/Panel';
 import { Thumbs } from './ui/Thumbs';
-import { computeImageHash } from './utils/hash';
 import { processImageFile, type ProcessedImage } from './utils/image';
 import { setupKeyboardShortcuts } from './utils/keys';
 
+interface CachedSample {
+  image: ProcessedImage;
+  depth: Float32Array;
+  sampleData: SamplePointData;
+}
+
 class App {
   private params: Params;
-  private frame: Frame;
-  private thumbs: Thumbs;
-  private dropzone: Dropzone;
-  private panel: Panel;
+  private engine!: Engine;
+  private hud!: Hud;
+  private frame!: Frame;
+  private thumbs!: Thumbs;
+  private dropzone!: Dropzone;
+  private panel!: Panel;
+  private depthEstimator = new DepthEstimator();
+
   private images: ProcessedImage[] = [];
+  private sampleCache: Map<string, CachedSample> = new Map();
   private activeIndex: number = 0;
+  private lastTime: number = performance.now();
 
   constructor() {
     this.params = loadFromStorage();
 
-    // 1. Frame overlay (crosshairs, ticks, hash readout)
+    const stageCanvas = document.getElementById('stage') as HTMLCanvasElement;
+    if (!stageCanvas) throw new Error('Stage canvas missing');
+
+    // 1. Initialize Engine & Hud
+    this.engine = new Engine(stageCanvas, this.params.pointCount);
+    this.engine.setParams(this.params);
+
+    this.hud = new Hud('hud-canvas');
+
+    // 2. Initialize Frame overlay
     this.frame = new Frame('#frame-svg', '#frame-readout');
 
-    // 2. Thumbnail strip
+    // 3. Initialize Thumbs
     this.thumbs = new Thumbs(
       '#thumbnail-strip',
-      (index) => this.setActiveImage(index),
+      (idx) => this.switchImage(idx),
       () => this.dropzone.openPicker()
     );
 
-    // 3. Dropzone
+    // 4. Initialize Dropzone
     this.dropzone = new Dropzone(
       '#dropzone',
       '#file-input',
       (files) => this.handleFiles(files)
     );
 
-    // 4. Panel UI
+    // 5. Initialize Panel UI
     this.panel = new Panel(
       this.params,
       (newParams) => {
         this.params = newParams;
+        this.engine.setParams(this.params);
         saveToStorage(this.params);
       },
       () => this.nextImage(),
@@ -49,7 +74,7 @@ class App {
       () => this.dropzone.openPicker()
     );
 
-    // 5. Keyboard shortcuts
+    // 6. Keyboard shortcuts
     setupKeyboardShortcuts({
       onNext: () => this.nextImage(),
       onToggleLight: () => this.panel.toggleLight(),
@@ -61,64 +86,194 @@ class App {
         }
       },
       onToggleUi: () => this.panel.toggleUiVisibility(),
-      onSelectSlot: (idx) => this.setActiveImage(idx),
+      onSelectSlot: (idx) => this.switchImage(idx),
     });
 
+    this.bindPointer();
+    this.bindResize();
+
+    // Start render loop
+    requestAnimationFrame((t) => this.loop(t));
+
+    // Load initial sample images
     this.initDefaultSamples();
+  }
+
+  private bindPointer(): void {
+    const stage = document.getElementById('stage');
+    if (!stage) return;
+
+    window.addEventListener('pointermove', (e) => {
+      this.engine.setPointer(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.ui-layer') || target.tagName === 'BUTTON' || target.tagName === 'INPUT') {
+        return;
+      }
+      this.engine.triggerSplash();
+    });
+  }
+
+  private bindResize(): void {
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      this.engine.resize(w, h);
+      this.hud.resize(w, h);
+    });
+  }
+
+  private loop(currentTime: number): void {
+    const dt = Math.min(0.05, (currentTime - this.lastTime) / 1000);
+    this.lastTime = currentTime;
+
+    // Update 3D simulation and render
+    this.engine.update(dt, currentTime / 1000);
+
+    // Update 2D tracker HUD
+    const trackers = this.engine.getTrackerPoints();
+    this.hud.render(trackers, this.params.marks, this.params.links);
+
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  private setProgress(show: boolean, text: string = '', pct: number = 0): void {
+    const ind = document.getElementById('loading-indicator');
+    const txt = document.getElementById('loading-text');
+    const bar = document.getElementById('progress-fill');
+    if (!ind || !txt || !bar) return;
+
+    ind.classList.toggle('hidden', !show);
+    txt.textContent = text;
+    bar.style.width = `${Math.round(pct * 100)}%`;
+  }
+
+  private async getSampleDataForImage(img: ProcessedImage): Promise<CachedSample> {
+    if (this.sampleCache.has(img.id)) {
+      return this.sampleCache.get(img.id)!;
+    }
+
+    this.setProgress(true, 'ESTIMATING DEPTH...', 0.3);
+
+    // Check if pre-baked depth map exists for sample
+    let depthArr: Float32Array | null = null;
+    const baseName = img.name.replace(/\.[^.]+$/, '');
+    if (baseName.startsWith('sample-')) {
+      try {
+        const bakedRes = await fetch(`/samples/${baseName}-depth.png`);
+        if (bakedRes.ok) {
+          const blob = await bakedRes.blob();
+          const imgEl = new Image();
+          const url = URL.createObjectURL(blob);
+          await new Promise<void>((r) => { imgEl.onload = () => r(); imgEl.src = url; });
+          URL.revokeObjectURL(url);
+
+          const c = document.createElement('canvas');
+          c.width = img.width;
+          c.height = img.height;
+          const ctx = c.getContext('2d')!;
+          ctx.drawImage(imgEl, 0, 0, img.width, img.height);
+          const dData = ctx.getImageData(0, 0, img.width, img.height).data;
+          depthArr = new Float32Array(img.width * img.height);
+          for (let i = 0; i < depthArr.length; i++) {
+            depthArr[i] = dData[i * 4] / 255.0;
+          }
+        }
+      } catch (e) {
+        console.warn('Baked depth fetch error, running estimator:', e);
+      }
+    }
+
+    if (!depthArr) {
+      const depthResult = await this.depthEstimator.estimateDepth(img.canvas, (p, text) => {
+        this.setProgress(true, text, p);
+      });
+      depthArr = depthResult.depth;
+    }
+
+    this.setProgress(true, 'SAMPLING 524,288 POINTS...', 0.9);
+    const sampleData = sampleImageParticles(img.canvas, depthArr, this.params.pointCount);
+
+    const cached: CachedSample = {
+      image: img,
+      depth: depthArr,
+      sampleData,
+    };
+    this.sampleCache.set(img.id, cached);
+    this.setProgress(false);
+    return cached;
   }
 
   private async initDefaultSamples(): Promise<void> {
     try {
-      // Load sample-1.png and sample-2.png
-      const sampleFiles = ['/samples/sample-1.png', '/samples/sample-2.png'];
+      const paths = ['/samples/sample-1.png', '/samples/sample-2.png'];
       const loaded: ProcessedImage[] = [];
 
-      for (const path of sampleFiles) {
-        const res = await fetch(path);
+      for (const p of paths) {
+        const res = await fetch(p);
         if (!res.ok) continue;
         const blob = await res.blob();
-        const file = new File([blob], path.split('/').pop() || 'sample.png', { type: blob.type || 'image/png' });
-        const processed = await processImageFile(file);
-        loaded.push(processed);
+        const f = new File([blob], p.split('/').pop() || 'sample.png', { type: 'image/png' });
+        const proc = await processImageFile(f);
+        loaded.push(proc);
       }
 
       if (loaded.length > 0) {
         this.images = loaded;
         this.thumbs.setImages(this.images, 0);
-        this.setActiveImage(0);
+
+        const currentCached = await this.getSampleDataForImage(this.images[0]);
+        let nextCached = currentCached;
+        if (this.images.length > 1) {
+          nextCached = await this.getSampleDataForImage(this.images[1]);
+        }
+        this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
+        this.frame.setReadout(1, this.images.length, this.images[0].hash);
       } else {
         this.dropzone.showOverlay(true);
       }
     } catch (err) {
-      console.warn('Failed to load default samples:', err);
+      console.warn('Init sample error:', err);
       this.dropzone.showOverlay(true);
     }
   }
 
-  private async handleFiles(files: File[]): Promise<void> {
-    this.dropzone.showOverlay(false);
-    for (const file of files) {
-      if (this.images.length >= 4) break;
-      const processed = await processImageFile(file);
-      this.images.push(processed);
-    }
-
-    this.thumbs.setImages(this.images, this.images.length - 1);
-    this.setActiveImage(this.images.length - 1);
-  }
-
-  private setActiveImage(index: number): void {
-    if (index < 0 || index >= this.images.length) return;
+  private async switchImage(index: number): Promise<void> {
+    if (index < 0 || index >= this.images.length || index === this.activeIndex) return;
+    const prevIdx = this.activeIndex;
     this.activeIndex = index;
-    const current = this.images[index];
-    this.frame.setReadout(index + 1, this.images.length, current.hash);
+
+    const currentImg = this.images[prevIdx];
+    const nextImg = this.images[index];
+
+    const currentCached = await this.getSampleDataForImage(currentImg);
+    const nextCached = await this.getSampleDataForImage(nextImg);
+
+    this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
+    this.frame.setReadout(index + 1, this.images.length, nextImg.hash);
     this.thumbs.setActiveIndex(index);
+
+    this.engine.startMorph();
   }
 
   private nextImage(): void {
     if (this.images.length <= 1) return;
     const nextIdx = (this.activeIndex + 1) % this.images.length;
-    this.setActiveImage(nextIdx);
+    this.switchImage(nextIdx);
+  }
+
+  private async handleFiles(files: File[]): Promise<void> {
+    this.dropzone.showOverlay(false);
+    for (const f of files) {
+      if (this.images.length >= 4) break;
+      const proc = await processImageFile(f);
+      this.images.push(proc);
+    }
+
+    this.thumbs.setImages(this.images, this.images.length - 1);
+    this.switchImage(this.images.length - 1);
   }
 }
 
