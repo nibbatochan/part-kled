@@ -1,41 +1,41 @@
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Geist';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/manrope-latin-400-normal.woff2') format('woff2');
+  src: url('/fonts/geist-latin-400-normal.woff2') format('woff2');
 }
 
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Geist';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('/fonts/manrope-latin-500-normal.woff2') format('woff2');
+  src: url('/fonts/geist-latin-500-normal.woff2') format('woff2');
 }
 
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Geist';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('/fonts/manrope-latin-600-normal.woff2') format('woff2');
+  src: url('/fonts/geist-latin-600-normal.woff2') format('woff2');
 }
 
 @font-face {
-  font-family: 'JetBrains Mono';
+  font-family: 'Geist Mono';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+  src: url('/fonts/geist-mono-latin-400-normal.woff2') format('woff2');
 }
 
 @font-face {
-  font-family: 'JetBrains Mono';
+  font-family: 'Geist Mono';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+  src: url('/fonts/geist-mono-latin-500-normal.woff2') format('woff2');
 }
 
 :root {
@@ -49,13 +49,19 @@
   --light-red: #ff4a3d;
   --light-green: #3fe0b0;
   --light-violet: #8e6bff;
-  --font-ui: 'Manrope', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-ui: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
   --label-size: 9.5px;
   --label-track: 0.22em;  /* uppercase everywhere */
   --edge: 28px;         /* distance of UI from the screen edge */
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --t: 220ms;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);  /* heavy, settles softly */
+  --t: 420ms;
+  --glass: rgba(14, 14, 16, 0.55);   /* bezel shell */
+  --core: rgba(22, 22, 25, 0.78);    /* bezel core */
+  --hair: rgba(255, 255, 255, 0.10); /* hairline */
+  --hi: rgba(255, 255, 255, 0.12);   /* inner highlight */
+  --r-shell: 28px;
+  --r-core: 22px;
 }
 
 *, *::before, *::after {

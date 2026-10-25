@@ -52,5 +52,5 @@ npx tsc --noEmit       # typecheck only (tsconfig includes src, tests, vite.conf
 
 ## Git
 
-- Branch: `master` is current. Default base for PRs is `main`.
+- Branches (local only, no remote): `master-studio` is the full studio, the master version. `web-studio` is the lighter hero/web version with the refined glass UI and Geist fonts. Default base for PRs is `main`.
 - Commit messages follow Conventional Commits (`feat:`, `fix:`), as in recent history.

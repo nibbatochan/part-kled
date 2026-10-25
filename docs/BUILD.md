@@ -150,7 +150,7 @@ const depth = await pipeline('depth-estimation', 'onnx-community/depth-anything-
 const { depth: map } = await depth(imageUrlOrBitmap); // map = a grayscale image, near = bright
 ```
 
-**Fonts.** Manrope for UI text and a monospace for tracker labels (JetBrains Mono or IBM Plex Mono), both free under the SIL Open Font License. Self-host them; do not link Google Fonts at runtime, so the hero loads fast and offline-safe.
+**Fonts.** Geist for UI text and Geist Mono for readouts (web-studio; master-studio still uses Manrope + JetBrains Mono), both free under the SIL Open Font License. Self-host them; do not link Google Fonts at runtime, so the hero loads fast and offline-safe.
 
 ## 5. Project structure
 
@@ -162,7 +162,7 @@ particle-depth-studio/
   hero.html                  demo page that shows the hero embed
   vite.config.ts             app build + library build (hero)
   public/
-    fonts/                   self-hosted Manrope, mono font
+    fonts/                   self-hosted Geist, Geist Mono
     samples/                 3 sample photos + baked depth PNGs
   src/
     main.ts                  studio entry: UI + engine
@@ -217,8 +217,8 @@ The look is near-black, hairline, uppercase, wide-tracked and tiny; the image is
   --ink-faint: rgba(244,244,242,.18); /* hairlines, ticks, grid */
   --light-cream: #f2e6c9;  --light-ice: #bfe0ff;  --light-orange: #ff9a3c;
   --light-red: #ff4a3d;    --light-green: #3fe0b0; --light-violet: #8e6bff;
-  --font-ui: 'Manrope', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-ui: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
   --label-size: 9.5px;  --label-track: .22em;  /* uppercase everywhere */
   --edge: 28px;         /* distance of UI from the screen edge */
   --ease: cubic-bezier(.2,.7,.2,1);  --t: 220ms;
@@ -548,7 +548,7 @@ The quality bar is the reference screenshots: crisp, stippled, high-contrast par
 | Transformers.js | Apache-2.0 | Keep the notice. |
 | Depth Anything V2 **Small** | Apache-2.0 | Keep the notice. The Base, Large and Giant models carry different, non-commercial terms; check before swapping any of them in. |
 | FastDepth | MIT | Keep the notice if used. |
-| Manrope, JetBrains Mono | SIL OFL 1.1 | Keep the licence file with the fonts. |
+| Geist, Geist Mono | SIL OFL 1.1 | Keep the licence file with the fonts. |
 
 - Add a `CREDITS` link in the studio that opens a panel listing these notices, as the reference does.
 - The reference site asks that work made with its tool credit its author. This build is an independent implementation of the same kind of idea: do not copy the reference's code, images, name, logo or DAO mark, and check the reference's own terms if you want to go closer than the behaviour and layout described here. The credit line in your app is `BY SUMANTH REDDY`.
