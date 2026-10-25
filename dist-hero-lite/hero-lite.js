@@ -40,7 +40,7 @@ float rnd(uint id, uint salt) {
 // World position and opacity of one particle; sOff pulls it back along its own path (trail tails).
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
-vec2 place(uint id, vec3 home, float light, float sOff, out float alpha, out float streaming) {
+vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out float alpha, out float streaming) {
   float r0 = rnd(id, 1u);
   float r1 = rnd(id, 2u);
   float r2 = rnd(id, 3u);
@@ -48,7 +48,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, out float alpha, out flo
 
   // Bright parts of the picture shed more particles: light weighting
   float lw = 0.2 + 1.6 * light * light;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5, 0.0, 0.5);
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul, 0.0, 0.95);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -92,7 +92,7 @@ vec4 toClip(vec2 world) {
 `, it = `
 void main() {
   float alpha, streaming;
-  vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, alpha, streaming);
+  vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, 1.0, alpha, streaming);
   gl_Position = toClip(w);
   gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
@@ -106,14 +106,16 @@ void main() {
   // Instanced 2-vertex lines: vertex 0 is the head, vertex 1 is the tail further back along the path
   float alpha, streaming;
   bool tail = gl_VertexID == 1;
-  vec2 w = place(uint(gl_InstanceID) * 3u, aHome, luma(aMeta.rgb), tail ? -uTrailLen : 0.0, alpha, streaming);
+  uint id = uint(gl_InstanceID) * 3u;
+  float lenVar = 0.4 + rnd(id, 5u); // no two streaks the same length
+  vec2 w = place(id, aHome, luma(aMeta.rgb), tail ? -uTrailLen * lenVar : 0.0, 1.6, alpha, streaming);
   if (streaming < 0.5) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
     return;
   }
   gl_Position = toClip(w);
-  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.12 * uTrailGain;
+  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.13 * uTrailGain;
 }
 `, ot = `#version 300 es
 precision mediump float;
@@ -262,7 +264,7 @@ class at {
     const m = this.params, w = Math.max(1, Math.round(this.dpr)), M = this.cover(w) >= 1.3 ? w : w * 2, l = 0.45 + 0.55 * m.length, x = Math.cos(m.angle) * l, f = Math.sin(m.angle) * l;
     t.clear(t.COLOR_BUFFER_BIT);
     const b = (p) => {
-      t.uniform2f(p.uView, this.canvas.width, this.canvas.height), t.uniform1f(p.uScale, this.scale), t.uniform2f(p.uOffset, this.offX, this.offY), t.uniform1f(p.uTime, a), t.uniform1f(p.uDrift, m.drift), t.uniform1f(p.uDepth, m.depth), t.uniform1f(p.uSpeed, m.speed), t.uniform2f(p.uDir, x, f), t.uniform2f(p.uLook, this.look.x, this.look.y), t.uniform2f(p.uPtr, this.ptr.x, this.ptr.y), t.uniform1f(p.uPtrOn, this.ptr.on), t.uniform1f(p.uCover, this.cover(M)), t.uniform1f(p.uPointPx, M), t.uniform1f(p.uBright, m.brightness), t.uniform1f(p.uTrailLen, 0.08 * m.trailLength), t.uniform1f(p.uTrailGain, m.trailStrength);
+      t.uniform2f(p.uView, this.canvas.width, this.canvas.height), t.uniform1f(p.uScale, this.scale), t.uniform2f(p.uOffset, this.offX, this.offY), t.uniform1f(p.uTime, a), t.uniform1f(p.uDrift, m.drift), t.uniform1f(p.uDepth, m.depth), t.uniform1f(p.uSpeed, m.speed), t.uniform2f(p.uDir, x, f), t.uniform2f(p.uLook, this.look.x, this.look.y), t.uniform2f(p.uPtr, this.ptr.x, this.ptr.y), t.uniform1f(p.uPtrOn, this.ptr.on), t.uniform1f(p.uCover, this.cover(M)), t.uniform1f(p.uPointPx, M), t.uniform1f(p.uBright, m.brightness), t.uniform1f(p.uTrailLen, 0.17 * m.trailLength), t.uniform1f(p.uTrailGain, m.trailStrength);
     };
     t.useProgram(this.pointProg), b(this.pointU), t.bindVertexArray(this.vaoPoints), t.drawArrays(t.POINTS, 0, this.drawn), m.trails && this.trailsAllowed && m.drift > 0.02 && (t.useProgram(this.trailProg), b(this.trailU), t.bindVertexArray(this.vaoTrails), t.drawArraysInstanced(t.LINES, 0, 2, Math.floor(this.drawn / V))), t.bindVertexArray(null), this.adapt(e * 1e3);
   }
@@ -413,7 +415,7 @@ function dt(s, e, t) {
   for (; pt(r, t) !== 1; ) r += 2;
   const d = new ArrayBuffer(t * 16), u = new Float32Array(d), A = new Uint8Array(d);
   for (let y = 0; y < t; y++) {
-    const q = (y * r % t + H(y, 1)) / t, R = lt(x, q * f), O = Math.max(0, Math.min(a - 1.001, R % a + H(y, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + H(y, 3))), P = O | 0, E = _ | 0, T = O - P, C = _ - E, k = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (k(P, E, D) * (1 - T) + k(P + 1, E, D) * T) * (1 - C) + (k(P, E + 1, D) * (1 - T) + k(P + 1, E + 1, D) * T) * C, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - C) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * C, Q = F(0), K = F(1), J = F(2);
+    const q = (y * r % t + H(y, 1)) / t, R = lt(x, q * f), O = Math.max(0, Math.min(a - 1.001, R % a + H(y, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + H(y, 3))), P = O | 0, E = _ | 0, T = O - P, k = _ - E, C = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (C(P, E, D) * (1 - T) + C(P + 1, E, D) * T) * (1 - k) + (C(P, E + 1, D) * (1 - T) + C(P + 1, E + 1, D) * T) * k, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - k) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * k, Q = F(0), K = F(1), J = F(2);
     u[y * 4] = (O / a - 0.5) * p, u[y * 4 + 1] = 0.5 - _ / c, u[y * 4 + 2] = U - 0.5;
     const I = y * 16 + 12;
     A[I] = Q, A[I + 1] = K, A[I + 2] = J;

@@ -265,7 +265,7 @@ export class LiteEngine {
       gl.uniform1f(U.uCover, this.cover(pointPx));
       gl.uniform1f(U.uPointPx, pointPx);
       gl.uniform1f(U.uBright, p.brightness);
-      gl.uniform1f(U.uTrailLen, 0.08 * p.trailLength);
+      gl.uniform1f(U.uTrailLen, 0.17 * p.trailLength);
       gl.uniform1f(U.uTrailGain, p.trailStrength);
     };
 

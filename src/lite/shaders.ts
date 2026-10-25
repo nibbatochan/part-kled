@@ -42,7 +42,7 @@ float rnd(uint id, uint salt) {
 // World position and opacity of one particle; sOff pulls it back along its own path (trail tails).
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
-vec2 place(uint id, vec3 home, float light, float sOff, out float alpha, out float streaming) {
+vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out float alpha, out float streaming) {
   float r0 = rnd(id, 1u);
   float r1 = rnd(id, 2u);
   float r2 = rnd(id, 3u);
@@ -50,7 +50,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, out float alpha, out flo
 
   // Bright parts of the picture shed more particles: light weighting
   float lw = 0.2 + 1.6 * light * light;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5, 0.0, 0.5);
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul, 0.0, 0.95);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -96,7 +96,7 @@ vec4 toClip(vec2 world) {
 const POINTS = `
 void main() {
   float alpha, streaming;
-  vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, alpha, streaming);
+  vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, 1.0, alpha, streaming);
   gl_Position = toClip(w);
   gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
@@ -112,14 +112,16 @@ void main() {
   // Instanced 2-vertex lines: vertex 0 is the head, vertex 1 is the tail further back along the path
   float alpha, streaming;
   bool tail = gl_VertexID == 1;
-  vec2 w = place(uint(gl_InstanceID) * 3u, aHome, luma(aMeta.rgb), tail ? -uTrailLen : 0.0, alpha, streaming);
+  uint id = uint(gl_InstanceID) * 3u;
+  float lenVar = 0.4 + rnd(id, 5u); // no two streaks the same length
+  vec2 w = place(id, aHome, luma(aMeta.rgb), tail ? -uTrailLen * lenVar : 0.0, 1.6, alpha, streaming);
   if (streaming < 0.5) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
     return;
   }
   gl_Position = toClip(w);
-  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.12 * uTrailGain;
+  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.13 * uTrailGain;
 }
 `;
 
