@@ -21,6 +21,16 @@ float hash(vec2 p) {
 }
 
 void main() {
+  float seed = hash(ref);
+
+  // CRITICAL: Not all particles do the tailing!
+  // ~78% of particles stay firmly on the image without tailing.
+  // Only the ~22% streaming particles that move from left to right do the tailing.
+  if (seed >= 0.22) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
   vec3 pos = texture2D(tPos, ref).xyz;
   vec4 col = texture2D(tColor, ref);
 
@@ -29,23 +39,22 @@ void main() {
     return;
   }
 
-  float seed = hash(ref);
   float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
 
   // Streaming direction set by LINE widget (e.g. towards the right)
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
 
   // Trail length controlled by DRIFT slider and LINE widget
-  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.4 + 1.2 * seed);
+  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.4 + 1.2 * fract(seed * 29.3));
 
   vec3 finalPos = pos;
   if (isTail > 0.5) {
-    // Tail streams outward in the set LINE direction
-    finalPos.xy = pos.xy + lineDir * trailLen;
-    finalPos.z += (seed - 0.5) * 0.02;
+    // Tail trails behind the moving particle (backwards along line direction)
+    finalPos.xy = pos.xy - lineDir * trailLen;
+    finalPos.z += (fract(seed * 71.1) - 0.5) * 0.02;
     vAlpha = 0.0;
   } else {
-    // Head anchored at particle
+    // Head anchored at the moving particle
     vAlpha = 0.85;
   }
 

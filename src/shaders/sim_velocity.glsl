@@ -125,17 +125,56 @@ void main() {
   home.z *= (uDepth * 2.2);
 
   // Force accumulation
-  // GATHER: spring force returning particles to their home position (dimmed by 50%)
-  vec3 F = (home - p) * (0.5 * mix(0.5, 9.0, uGather * uGather));
+  vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
+  float lineLen = length(uLine);
+  vec3 F = vec3(0.0);
 
-  // DRIFT: fluid curl noise
-  vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.12));
-  F += noiseF * (uDrift * 1.4);
+  // SEPARATION OF STREAMING VS ANCHORED PARTICLES:
+  // Not all particles do the tailing! Only ~22% detach and move from left to right.
+  // The rest (~78%) stay firmly anchored to their pixel on the image.
+  bool isStreamer = (seed < 0.22);
+
+  if (!isStreamer) {
+    // CORE ANCHOR: holds the image, gather scale dimmed by 50%
+    float gatherStrength = 0.5 * mix(0.5, 9.0, uGather * uGather);
+    F = (home - p) * gatherStrength;
+
+    // Subtle natural stipple breathing
+    vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.08));
+    F += noiseF * (uDrift * 0.25);
+  } else {
+    // STREAMER: originates from the pixel (home) and moves across space to the right
+    float distAlongStream = dot(p.xy - home.xy, lineDir);
+    float maxReach = (0.35 + uDrift * 1.6) * (0.6 + 0.8 * fract(seed * 31.7));
+
+    if (distAlongStream > maxReach || distAlongStream < -0.15) {
+      // Reached end of trail or wandered backwards: loop back towards origin pixel
+      F = (home - p) * 10.0;
+    } else {
+      // Stream forward along set LINE direction (left to right)
+      float streamForce = (1.2 + uDrift * 3.5) * (0.7 + 0.6 * fract(seed * 19.3));
+      F.xy += lineDir * streamForce;
+
+      // Soft perpendicular spring to keep stream path coherent
+      vec2 perp = vec2(-lineDir.y, lineDir.x);
+      float perpDist = dot(p.xy - home.xy, perp);
+      F.xy -= perp * (perpDist * 3.5);
+
+      // Travel mode variations
+      if (uMelt > 0.5) {
+        // MELT: drips downward while streaming
+        F.y -= 1.8 * (1.0 - uGather * 0.5);
+      } else {
+        // SWARM: flowing curl turbulence
+        vec3 curl = curlNoise(p * 2.0 + vec3(uTime * 0.15, seed * 10.0, 0.0));
+        F += curl * (uDrift * 0.8);
+      }
+    }
+  }
 
   // LINE direction & DRAW strokes
   vec2 flowSample = texture2D(tFlow, clamp(p.xy * 0.5 + 0.5, 0.0, 1.0)).xy;
-  vec2 streakDir = (flowSample + uLine) * (0.35 + uDrift * 0.8);
-  F.xy += streakDir;
+  F.xy += flowSample * 1.5;
 
   // TRACK & SPLASH: pointer repulsion and kinetic burst
   vec3 d = p - uPointer;
@@ -145,11 +184,13 @@ void main() {
   F += normalize(d + vec3(1e-4, 1e-4, 0.05)) * k * (2.0 + uSplash * 14.0 * pointerSpeed);
 
   // TRAVEL: MELT sags downward
-  F.y -= uMelt * 1.5 * (1.0 - uGather * 0.85);
+  if (uMelt > 0.5 && !isStreamer) {
+    F.y -= 0.6 * (1.0 - uGather * 0.85);
+  }
 
   // SCAN: sweep impulse along line direction
   if (uScanActive > 0.5) {
-    vec2 scanDir = normalize(uLine + vec2(1e-4, 0.0));
+    vec2 scanDir = lineDir;
     float proj = dot(p.xy, scanDir) * 0.5 + 0.5;
     float distToScan = abs(proj - uScan);
     if (distToScan < 0.04) {
