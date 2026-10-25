@@ -97,7 +97,7 @@ export class ParticleRenderer {
         tVel: { value: null },
         tColor: { value: null },
         tColorNext: { value: null },
-        uSize: { value: 2.2 },
+        uSize: { value: 1.4 },
         uDpr: { value: Math.min(2.0, window.devicePixelRatio || 1.0) },
         uMorph: { value: 0.0 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
@@ -120,7 +120,7 @@ export class ParticleRenderer {
   }
 
   private initStreaks(): void {
-    const streakCount = Math.floor(this.particleCount / 4);
+    const streakCount = Math.floor(this.particleCount / 2);
     const vertCount = streakCount * 2;
 
     const geometry = new THREE.BufferGeometry();
@@ -129,7 +129,7 @@ export class ParticleRenderer {
     const dummyPositions = new Float32Array(vertCount * 3);
 
     for (let i = 0; i < streakCount; i++) {
-      const pIdx = i * 4;
+      const pIdx = i * 2;
       const u = (pIdx % this.texWidth + 0.5) / this.texWidth;
       const v = (Math.floor(pIdx / this.texWidth) + 0.5) / this.texHeight;
 
@@ -156,8 +156,12 @@ export class ParticleRenderer {
         tVel: { value: null },
         tColor: { value: null },
         uStreakLength: { value: 1.0 },
+        uLine: { value: new THREE.Vector2(0.85, 0.05) },
+        uDrift: { value: 0.8 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
+        uScan: { value: 0.0 },
+        uScanActive: { value: 0.0 },
         uNegative: { value: 0.0 },
         uOnWhite: { value: 0.0 },
       },
@@ -270,7 +274,12 @@ export class ParticleRenderer {
       su['tPos'].value = posTexture;
       su['tVel'].value = velTexture;
       su['tColor'].value = colorTexture;
-      su['uStreakLength'].value = params.line.length * 1.5;
+      su['uLine'].value.set(lineX, lineY);
+      su['uDrift'].value = params.drift;
+      // Drift controls the trail's lengths toward the set direction
+      su['uStreakLength'].value = (0.2 + params.drift * 2.2) * params.line.length;
+      su['uScan'].value = scanProgress;
+      su['uScanActive'].value = params.scan ? 1.0 : 0.0;
       su['uLightColor'].value.copy(lightVec);
       su['uLightOn'].value = params.lightOn ? 1.0 : 0.0;
       su['uNegative'].value = isNegative ? 1.0 : 0.0;

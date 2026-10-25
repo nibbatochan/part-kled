@@ -47,9 +47,9 @@ export const defaults: Params = {
   light: 'cream',
   lightOn: true,
 
-  line: { angle: 0.58, length: 0.8 }, // default streak angle pointing towards top-right
+  line: { angle: 0.05, length: 0.85 }, // default streak angle pointing towards the right
   lineMode: 'streak',
-  pointCount: 32768,
+  pointCount: 131072,
   quality: 'auto',
 };
 

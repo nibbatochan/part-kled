@@ -4,16 +4,14 @@ uniform float uOnWhite;
 
 varying vec4 vColor;
 varying float vAlpha;
-varying float vSpeed;
 
 void main() {
-  // Skip slow particles
-  if (vSpeed < 0.05) discard;
+  if (vAlpha < 0.01) discard;
 
   vec3 rgb = vColor.rgb;
   if (uNegative > 0.5) rgb = 1.0 - rgb;
   if (uOnWhite > 0.5) rgb = 1.0 - rgb;
 
-  float a = vAlpha * clamp(vSpeed * 1.5, 0.0, 0.7);
-  gl_FragColor = vec4(rgb, a);
+  // Soft glowing streaks blending with underlying particles
+  gl_FragColor = vec4(rgb, vAlpha * vColor.a * 0.42);
 }

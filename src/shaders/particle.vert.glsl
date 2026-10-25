@@ -37,15 +37,17 @@ void main() {
     baseCol.rgb += uLightColor * clamp(speed * 0.9, 0.0, 1.8);
   }
 
-  // Scan glow
+  // Scan glow: wave along line direction illuminating based on image light
   vScanGlow = 0.0;
   if (uScanActive > 0.5) {
     vec2 scanDir = normalize(uLine + vec2(1e-4, 0.0));
-    float proj = dot(pos.xy, scanDir) * 0.5 + 0.5;
+    float proj = dot(pos.xy, scanDir) * 0.6 + 0.5;
     float dist = abs(proj - uScan);
-    if (dist < 0.035) {
-      vScanGlow = (1.0 - dist / 0.035);
-      baseCol.rgb += (uLightOn > 0.5 ? uLightColor : vec3(1.0)) * (vScanGlow * 1.5);
+    if (dist < 0.05) {
+      vScanGlow = (1.0 - dist / 0.05);
+      float lum = dot(baseCol.rgb, vec3(0.299, 0.587, 0.114));
+      vec3 lightTint = (uLightOn > 0.5 ? uLightColor : vec3(1.0, 0.96, 0.9));
+      baseCol.rgb += lightTint * (vScanGlow * (0.5 + 1.8 * lum));
     }
   }
 
@@ -54,6 +56,6 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mvPosition;
 
-  // Crisp stipple dot size: 1.5 to 3.0 CSS pixels (scaled by DPR)
-  gl_PointSize = max(1.0, uSize * uDpr * (1.0 + pos.z * 0.35));
+  // Ultra-fine, crisp stipple dot size
+  gl_PointSize = max(1.0, uSize * uDpr * (1.0 + pos.z * 0.3));
 }

@@ -125,8 +125,8 @@ void main() {
   home.z *= (uDepth * 2.2);
 
   // Force accumulation
-  // GATHER: spring force returning particles to their home position
-  vec3 F = (home - p) * mix(0.5, 9.0, uGather * uGather);
+  // GATHER: spring force returning particles to their home position (dimmed by 50%)
+  vec3 F = (home - p) * (0.5 * mix(0.5, 9.0, uGather * uGather));
 
   // DRIFT: fluid curl noise
   vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.12));
