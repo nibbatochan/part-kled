@@ -5,6 +5,7 @@ uniform float uOnWhite;
 varying vec4 vColor;
 varying float vSpeed;
 varying float vScanGlow;
+varying float vFade;
 
 // 4x4 Bayer dither matrix
 const float bayerMatrix[16] = float[16](
@@ -20,7 +21,7 @@ void main() {
   float dist = length(coord);
   if (dist > 0.5) discard;
 
-  float alpha = smoothstep(0.5, 0.15, dist);
+  float alpha = smoothstep(0.5, 0.15, dist) * vFade;
 
   vec3 rgb = vColor.rgb;
 
@@ -39,7 +40,7 @@ void main() {
   float dither = (bayerMatrix[y * 4 + x] - 0.5) * (1.0 / 255.0);
   rgb += dither;
 
-  if (vColor.a < 0.05) discard;
+  if (vColor.a < 0.05 || alpha < 0.015) discard;
 
   gl_FragColor = vec4(rgb, alpha * vColor.a);
 }

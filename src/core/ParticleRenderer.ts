@@ -102,6 +102,7 @@ export class ParticleRenderer {
         uMorph: { value: 0.0 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
+        uDrift: { value: 0.8 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uLine: { value: new THREE.Vector2(0.4, 0.3) },
@@ -160,6 +161,7 @@ export class ParticleRenderer {
         uDrift: { value: 0.8 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
+        uDrift: { value: 0.8 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uNegative: { value: 0.0 },
@@ -258,6 +260,7 @@ export class ParticleRenderer {
     pu['uMorph'].value = morphProgress;
     pu['uLightColor'].value.copy(lightVec);
     pu['uLightOn'].value = params.lightOn ? 1.0 : 0.0;
+    pu['uDrift'].value = params.drift;
     pu['uScan'].value = scanProgress;
     pu['uScanActive'].value = params.scan ? 1.0 : 0.0;
     pu['uNegative'].value = isNegative ? 1.0 : 0.0;

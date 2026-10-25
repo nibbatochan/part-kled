@@ -129,46 +129,37 @@ void main() {
   float lineLen = length(uLine);
   vec3 F = vec3(0.0);
 
-  // SEPARATION OF STREAMING VS ANCHORED PARTICLES:
-  // Not all particles do the tailing! Only ~22% detach and move from left to right.
-  // The rest (~78%) stay firmly anchored to their pixel on the image.
-  bool isStreamer = (seed < 0.22);
+  // THANOS SNAP DISSOLUTION DYNAMICS:
+  // Drift controls how many particles peel off and dissolve into the air!
+  // When DRIFT is high, more particles detach, float above/around, and disappear.
+  float peelThreshold = 0.08 + uDrift * 0.38;
+  bool isDriftingAsh = (seed < peelThreshold);
 
-  if (!isStreamer) {
-    // CORE ANCHOR: holds the image, gather scale dimmed by 50%
+  if (!isDriftingAsh) {
+    // CORE BODY: holds the image, gather scale dimmed by 50%
     float gatherStrength = 0.5 * mix(0.5, 9.0, uGather * uGather);
     F = (home - p) * gatherStrength;
 
     // Subtle natural stipple breathing
     vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.08));
-    F += noiseF * (uDrift * 0.25);
+    F += noiseF * (uDrift * 0.2);
   } else {
-    // STREAMER: originates from the pixel (home) and moves across space to the right
-    float distAlongStream = dot(p.xy - home.xy, lineDir);
-    float maxReach = (0.35 + uDrift * 1.6) * (0.6 + 0.8 * fract(seed * 31.7));
+    // THANOS ASH/EMBER: peels off from origin pixel and floats in the wind!
+    // Wind direction along set LINE widget
+    float ashSpeed = (0.8 + uDrift * 2.8) * (0.6 + 0.8 * fract(seed * 23.7));
+    F.xy += lineDir * ashSpeed;
 
-    if (distAlongStream > maxReach || distAlongStream < -0.15) {
-      // Reached end of trail or wandered backwards: loop back towards origin pixel
-      F = (home - p) * 10.0;
-    } else {
-      // Stream forward along set LINE direction (left to right)
-      float streamForce = (1.2 + uDrift * 3.5) * (0.7 + 0.6 * fract(seed * 19.3));
-      F.xy += lineDir * streamForce;
+    // Buoyant upward flutter of dust/embers rising in the breeze
+    F.y += (0.15 + uDrift * 0.5) * (0.4 + 0.6 * fract(seed * 53.1));
 
-      // Soft perpendicular spring to keep stream path coherent
-      vec2 perp = vec2(-lineDir.y, lineDir.x);
-      float perpDist = dot(p.xy - home.xy, perp);
-      F.xy -= perp * (perpDist * 3.5);
+    // Fluid curl turbulence carrying the embers
+    vec3 curl = curlNoise(p * 2.2 + vec3(uTime * 0.18, seed * 10.0, 0.0));
+    F += curl * (uDrift * 1.4);
 
-      // Travel mode variations
-      if (uMelt > 0.5) {
-        // MELT: drips downward while streaming
-        F.y -= 1.8 * (1.0 - uGather * 0.5);
-      } else {
-        // SWARM: flowing curl turbulence
-        vec3 curl = curlNoise(p * 2.0 + vec3(uTime * 0.15, seed * 10.0, 0.0));
-        F += curl * (uDrift * 0.8);
-      }
+    // Travel modes
+    if (uMelt > 0.5) {
+      // MELT: drips downward heavily
+      F.y -= 2.4 * (1.0 - uGather * 0.5);
     }
   }
 
@@ -182,11 +173,6 @@ void main() {
   float k = smoothstep(uRadius, 0.0, r);
   float pointerSpeed = length(uPointerVel);
   F += normalize(d + vec3(1e-4, 1e-4, 0.05)) * k * (2.0 + uSplash * 14.0 * pointerSpeed);
-
-  // TRAVEL: MELT sags downward
-  if (uMelt > 0.5 && !isStreamer) {
-    F.y -= 0.6 * (1.0 - uGather * 0.85);
-  }
 
   // SCAN: sweep impulse along line direction
   if (uScanActive > 0.5) {

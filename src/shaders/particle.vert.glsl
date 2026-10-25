@@ -7,6 +7,7 @@ uniform sampler2D tColorNext;
 uniform float uSize;
 uniform float uDpr;
 uniform float uMorph;
+uniform float uDrift;
 uniform vec3  uLightColor;
 uniform float uLightOn;
 uniform float uScan;
@@ -18,14 +19,31 @@ attribute vec2 ref;
 varying vec4 vColor;
 varying float vSpeed;
 varying float vScanGlow;
+varying float vFade;
 
 void main() {
   vec4 posData = texture2D(tPos, ref);
   vec3 pos = posData.xyz;
+  float age = posData.w;
 
-  vec3 vel = texture2D(tVel, ref).xyz;
+  vec4 velData = texture2D(tVel, ref);
+  vec3 vel = velData.xyz;
+  float seed = velData.w;
   float speed = length(vel);
   vSpeed = speed;
+
+  // Thanos snap dissolution:
+  // Disintegrating particles shrink and fade out as they drift
+  float maxLife = (0.7 + uDrift * 1.8) * (0.6 + 0.8 * fract(seed * 43.19));
+  float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
+
+  float fade = 1.0;
+  float sizeMod = 1.0;
+  if (age > 0.001) {
+    fade = 1.0 - smoothstep(0.12, 0.95, lifeRatio);
+    sizeMod = 1.0 - 0.5 * lifeRatio;
+  }
+  vFade = fade;
 
   // Color blending across morph
   vec4 colA = texture2D(tColor, ref);
@@ -56,6 +74,6 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mvPosition;
 
-  // Ultra-fine, crisp stipple dot size
-  gl_PointSize = max(1.0, uSize * uDpr * (1.0 + pos.z * 0.3));
+  // Ultra-fine, crisp stipple dot size (shrinks as ash dissolves)
+  gl_PointSize = max(0.5, uSize * uDpr * (1.0 + pos.z * 0.3) * sizeMod);
 }

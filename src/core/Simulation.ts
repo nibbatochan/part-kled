@@ -48,7 +48,10 @@ export class Simulation {
     this.gpuCompute.setVariableDependencies(this.velVariable, [this.posVariable, this.velVariable]);
 
     // Position uniforms
-    this.posVariable.material.uniforms['uDt'] = { value: 0.016 };
+    const pu = this.posVariable.material.uniforms;
+    pu['uDt'] = { value: 0.016 };
+    pu['uDrift'] = { value: 0.8 };
+    pu['uLine'] = { value: new THREE.Vector2(0.4, 0.3) };
 
     // Velocity uniforms
     const vu = this.velVariable.material.uniforms;
@@ -79,6 +82,7 @@ export class Simulation {
     vu['tHome'] = this.tHomeUniform;
     vu['tHomeNext'] = this.tHomeNextUniform;
     vu['tFlow'] = this.tFlowUniform;
+    this.posVariable.material.uniforms['tHome'] = this.tHomeUniform;
 
     const error = this.gpuCompute.init();
     if (error !== null) {
@@ -128,7 +132,13 @@ export class Simulation {
     // Clamp dt to 1/30 to prevent simulation explosion
     const safeDt = Math.min(1.0 / 30.0, dt);
 
+    // Convert line angle & length to vector
+    const lineX = Math.cos(params.line.angle) * params.line.length;
+    const lineY = Math.sin(params.line.angle) * params.line.length;
+
     this.posVariable.material.uniforms['uDt'].value = safeDt;
+    this.posVariable.material.uniforms['uDrift'].value = params.drift;
+    this.posVariable.material.uniforms['uLine'].value.set(lineX, lineY);
 
     const vu = this.velVariable.material.uniforms;
     vu['uTime'].value = time;
@@ -144,10 +154,6 @@ export class Simulation {
 
     vu['uPointer'].value.copy(pointer);
     vu['uPointerVel'].value.copy(pointerVel);
-
-    // Convert line angle & length to vector
-    const lineX = Math.cos(params.line.angle) * params.line.length;
-    const lineY = Math.sin(params.line.angle) * params.line.length;
     vu['uLine'].value.set(lineX, lineY);
 
     this.gpuCompute.compute();

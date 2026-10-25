@@ -31,9 +31,21 @@ void main() {
     return;
   }
 
-  vec3 pos = texture2D(tPos, ref).xyz;
-  vec4 col = texture2D(tColor, ref);
+  vec4 posData = texture2D(tPos, ref);
+  vec3 pos = posData.xyz;
+  float age = posData.w;
 
+  // If particle is resting at home or has dissolved, skip trail
+  float maxLife = (0.7 + uDrift * 1.8) * (0.6 + 0.8 * fract(seed * 43.19));
+  float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
+  float fade = (age > 0.001) ? (1.0 - smoothstep(0.15, 0.95, lifeRatio)) : 0.0;
+
+  if (fade < 0.01) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
+  vec4 col = texture2D(tColor, ref);
   if (col.a < 0.02) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     return;
@@ -44,8 +56,8 @@ void main() {
   // Streaming direction set by LINE widget (e.g. towards the right)
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
 
-  // Trail length controlled by DRIFT slider and LINE widget
-  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.4 + 1.2 * fract(seed * 29.3));
+  // Trail length dissolves with the ash
+  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.4 + 1.2 * fract(seed * 29.3)) * (1.0 - lifeRatio);
 
   vec3 finalPos = pos;
   if (isTail > 0.5) {
@@ -55,7 +67,7 @@ void main() {
     vAlpha = 0.0;
   } else {
     // Head anchored at the moving particle
-    vAlpha = 0.85;
+    vAlpha = 0.85 * fade;
   }
 
   // Scan illumination: wave travels along line direction, lighting up based on image light
