@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>PARTICLE DEPTH STUDIO — BY SUMANTH REDDY</title>
+    <link rel="stylesheet" href="/src/ui/tokens.css" />
+    <link rel="stylesheet" href="/src/ui/panel.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- 3D Canvas Stage -->
+      <canvas id="stage"></canvas>
+
+      <!-- SVG Frame Overlay (Crosshairs, Ticks, Hash Readout) -->
+      <div id="frame-overlay" class="frame-overlay">
+        <svg id="frame-svg" class="frame-svg" width="100%" height="100%"></svg>
+        <div id="frame-readout" class="frame-readout">01 / 01 &nbsp; 3B4E83186AA6E41A83DDEE</div>
+      </div>
+
+      <!-- Tracker Canvas / 2D Overlay for brackets and links -->
+      <canvas id="hud-canvas" class="hud-canvas"></canvas>
+
+      <!-- UI Shell Layer -->
+      <div id="ui-layer" class="ui-layer">
+        <!-- Top Left Header -->
+        <header class="header-top-left">
+          <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
+          <div class="meta-line">DEPTH MODEL · DEPTH ANYTHING V2</div>
+          <div class="meta-line" id="meta-points">524,288 POINTS</div>
+          <div class="meta-line">BY SUMANTH REDDY</div>
+        </header>
+
+        <!-- Top Right Actions -->
+        <div class="header-top-right">
+          <button id="theme-btn" class="icon-btn" title="Toggle On White / Dark (B)" aria-label="Toggle paper theme">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 3a9 9 0 0 1 0 18 4.5 4.5 0 0 1 0-9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/>
+              <circle cx="12" cy="7.5" r="1.5" fill="var(--bg)"/>
+              <circle cx="12" cy="16.5" r="1.5" fill="currentColor"/>
+            </svg>
+          </button>
+          <button id="fullscreen-btn" class="icon-btn" title="Fullscreen (F)" aria-label="Toggle Fullscreen">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+            </svg>
+          </button>
+          <button id="credits-btn" class="text-link" aria-label="Credits and Notices">CREDITS</button>
+        </div>
+
+        <!-- Left Thumbnail Strip -->
+        <div class="strip-left" id="thumbnail-strip">
+          <div class="thumb-slot active" data-index="0">
+            <span class="slot-num">1</span>
+            <div class="slot-box" id="thumb-preview-0"></div>
+          </div>
+          <div class="thumb-slot" data-index="1">
+            <span class="slot-num">2</span>
+            <div class="slot-box" id="thumb-preview-1"></div>
+          </div>
+          <button id="add-slot-btn" class="thumb-slot add-slot" title="Add picture" aria-label="Add picture">
+            <span class="slot-plus">+</span>
+          </button>
+          <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
+        </div>
+
+        <!-- Bottom Left Controls -->
+        <div class="ctrl-bottom-left">
+          <button id="btn-next" class="btn-text-action">
+            <span class="symbol">▶</span> NEXT <span class="kbd-hint">SPACE</span>
+          </button>
+          <button id="btn-light" class="btn-text-action active">
+            <span class="symbol dot">●</span> LIGHT <span class="kbd-hint">S</span>
+          </button>
+          <button id="btn-add-pictures" class="btn-text-action">
+            ADD PICTURES
+          </button>
+        </div>
+
+        <!-- Bottom Center Sliders & Toggles -->
+        <div class="ctrl-bottom-center">
+          <div class="slider-row">
+            <div class="slider-group" data-param="drift">
+              <label for="sl-drift">DRIFT</label>
+              <input type="range" id="sl-drift" min="0" max="1" step="0.01" value="0.80" />
+            </div>
+            <div class="slider-group" data-param="splash">
+              <label for="sl-splash">SPLASH</label>
+              <input type="range" id="sl-splash" min="0" max="1" step="0.01" value="0.60" />
+            </div>
+            <div class="slider-group" data-param="gather">
+              <label for="sl-gather">GATHER</label>
+              <input type="range" id="sl-gather" min="0" max="1" step="0.01" value="0.80" />
+            </div>
+            <div class="slider-group" data-param="depth">
+              <label for="sl-depth">DEPTH</label>
+              <input type="range" id="sl-depth" min="0" max="1" step="0.01" value="0.80" />
+            </div>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-group">
+              <button class="toggle-btn" data-toggle="draw">DRAW</button>
+              <button class="toggle-btn active" data-toggle="track">TRACK</button>
+              <button class="toggle-btn" data-toggle="links">LINKS</button>
+              <button class="toggle-btn" data-toggle="scan">SCAN</button>
+              <button class="toggle-btn active" data-toggle="trails">TRAILS</button>
+              <button class="toggle-btn active" data-toggle="marks">MARKS</button>
+            </div>
+            <div class="seg-group" data-seg="trackers">
+              <span class="seg-label">TRACKERS</span>
+              <button class="seg-btn active" data-value="sparse">SPARSE</button>
+              <button class="seg-btn" data-value="dense">DENSE</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Right Area: LINE Widget + Travel/Color Modes + Light Swatches -->
+        <div class="ctrl-bottom-right">
+          <!-- LINE Direction Widget -->
+          <div class="line-widget-container">
+            <span class="widget-label">LINE</span>
+            <div id="line-widget" class="line-widget-box">
+              <svg id="line-svg" width="36" height="36" viewBox="0 0 36 36">
+                <line id="line-vector" x1="10" y1="30" x2="26" y2="6" stroke="var(--ink)" stroke-width="1.2" />
+                <circle id="line-handle-start" cx="10" cy="30" r="2.2" fill="var(--ink)" />
+                <circle id="line-handle-end" cx="26" cy="6" r="2.2" fill="var(--ink)" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="modes-and-swatches">
+            <div class="meta-row">
+              <span class="meta-brand">SUMANTH REDDY</span>
+            </div>
+            <div class="mode-row">
+              <span class="mode-label">TRAVEL</span>
+              <button class="mode-btn active" data-travel="swarm">SWARM</button>
+              <button class="mode-btn" data-travel="melt">MELT</button>
+            </div>
+            <div class="mode-row">
+              <span class="mode-label">ON WHITE</span>
+              <button class="mode-btn" data-colormode="negative">NEGATIVE</button>
+              <button class="mode-btn active" data-colormode="true">TRUE</button>
+            </div>
+            <div class="swatches-row">
+              <span class="swatch-label">LIGHT</span>
+              <button class="swatch-btn active" data-light="cream" style="--c: var(--light-cream)" title="Cream"></button>
+              <button class="swatch-btn" data-light="ice" style="--c: var(--light-ice)" title="Ice Blue"></button>
+              <button class="swatch-btn" data-light="orange" style="--c: var(--light-orange)" title="Orange"></button>
+              <button class="swatch-btn" data-light="red" style="--c: var(--light-red)" title="Red"></button>
+              <button class="swatch-btn" data-light="green" style="--c: var(--light-green)" title="Green"></button>
+              <button class="swatch-btn" data-light="violet" style="--c: var(--light-violet)" title="Violet"></button>
+              <button class="swatch-btn dotted" data-light="off" title="Light Off"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Initial Dropzone Prompt Overlay (when no image is loaded yet) -->
+        <div id="dropzone" class="dropzone-overlay hidden">
+          <div class="dropzone-box">
+            <div class="dropzone-title">DROP UP TO FOUR PICTURES</div>
+            <div class="dropzone-sub">SPACE TURNS THE PAGE · S LIGHTS IT</div>
+            <button id="dropzone-picker-btn" class="dropzone-btn">CHOOSE PICTURES</button>
+          </div>
+        </div>
+
+        <!-- Loading / Progress Bar -->
+        <div id="loading-indicator" class="loading-indicator hidden">
+          <span id="loading-text">ESTIMATING DEPTH...</span>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Credits Modal -->
+        <div id="credits-modal" class="credits-modal hidden">
+          <div class="credits-content">
+            <div class="credits-header">
+              <h2>PARTICLE DEPTH STUDIO</h2>
+              <button id="credits-close" class="close-btn">&times;</button>
+            </div>
+            <div class="credits-body">
+              <p>Designed & built by <strong>Sumanth Reddy</strong>.</p>
+              <p>524,288 GPU-simulated stipple points with neural depth estimation, fluid curl drift, and interactive parallax.</p>
+              <h3>THIRD PARTY LICENSES & ACKNOWLEDGEMENTS</h3>
+              <ul>
+                <li><strong>three.js</strong> — MIT License (mrdoob / three.js authors)</li>
+                <li><strong>Transformers.js</strong> — Apache-2.0 (Hugging Face)</li>
+                <li><strong>Depth Anything V2 Small</strong> — Apache-2.0 (ByteDance / Depth Anything team)</li>
+                <li><strong>Manrope</strong> — SIL Open Font License 1.1 (Michael Sharanda)</li>
+                <li><strong>JetBrains Mono</strong> — SIL Open Font License 1.1 (JetBrains)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

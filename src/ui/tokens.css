@@ -1,0 +1,79 @@
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/manrope-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/manrope-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/manrope-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+}
+
+:root {
+  --bg: #050506;
+  --ink: #f4f4f2;                 /* active text */
+  --ink-dim: rgba(244, 244, 242, 0.45); /* inactive labels */
+  --ink-faint: rgba(244, 244, 242, 0.18); /* hairlines, ticks, grid */
+  --light-cream: #f2e6c9;
+  --light-ice: #bfe0ff;
+  --light-orange: #ff9a3c;
+  --light-red: #ff4a3d;
+  --light-green: #3fe0b0;
+  --light-violet: #8e6bff;
+  --font-ui: 'Manrope', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --label-size: 9.5px;
+  --label-track: 0.22em;  /* uppercase everywhere */
+  --edge: 28px;         /* distance of UI from the screen edge */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t: 220ms;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: var(--label-track);
+  font-size: var(--label-size);
+}
