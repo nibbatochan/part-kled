@@ -49,7 +49,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float r3 = rnd(id, 4u);
 
   // Bright parts of the picture shed more particles: light weighting
-  float lw = 0.2 + 1.6 * light * light;
+  float lc = min(light, 0.7); // the brightest specks (eyes) do not get to shed more
+  float lw = 0.2 + 1.6 * lc * lc;
   float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul, 0.0, 0.95);
   bool streamer = r0 < share;
 
@@ -70,6 +71,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     pos += perp * sin(s * 5.0 + r2 * 6.2831) * 0.035 * uDrift * s * (0.5 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
+    // Streaks fade out before they leave the picture's neighbourhood
+    alpha *= 1.0 - smoothstep(0.14, 0.30, length(uDir * reach * ease));
     streaming = step(0.001, s);
   }
 
@@ -88,9 +91,9 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 // Tilt the whole picture like a card in 3D: depth pushes near parts toward the viewer, so a turn
 // of the head shows real parallax, and the picture foreshortens a little as it turns.
 vec4 toClip(vec2 world, float z) {
-  vec3 p = vec3(world, z * 0.55 * uDepth);
-  float yaw = uLook.x * 0.30;
-  float pitch = -uLook.y * 0.20;
+  vec3 p = vec3(world, z * 0.30 * uDepth);
+  float yaw = uLook.x * 0.07;
+  float pitch = -uLook.y * 0.045;
   float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
   vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
   q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);

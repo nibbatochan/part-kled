@@ -20,10 +20,10 @@ export const liteDefaults: LiteParams = {
   drift: 0.75,
   angle: 0.5,
   length: 0.9,
-  depth: 0.8,
+  depth: 0.5,
   speed: 1,
   sway: 0.6,
-  trails: false, // long streaks read as noise on a portrait; opt in with trails: true
+  trails: true,
   trailLength: 1,
   trailStrength: 1,
   brightness: 1.15,
@@ -265,7 +265,7 @@ export class LiteEngine {
       gl.uniform1f(U.uCover, this.cover(pointPx));
       gl.uniform1f(U.uPointPx, pointPx);
       gl.uniform1f(U.uBright, p.brightness);
-      gl.uniform1f(U.uTrailLen, 0.17 * p.trailLength);
+      gl.uniform1f(U.uTrailLen, 0.12 * p.trailLength);
       gl.uniform1f(U.uTrailGain, p.trailStrength);
     };
 
