@@ -242,7 +242,8 @@ export class LiteEngine {
 
     const p = this.params;
     // Whole pixels only: the rasteriser rounds point sizes, and the brightness maths must see the real size
-    const pointPx = Math.max(2, Math.round(1.5 * this.dpr));
+    const base = Math.max(1, Math.round(this.dpr));
+    const pointPx = this.cover(base) >= 1.3 ? base : base * 2;
     const dirLen = 0.45 + 0.55 * p.length;
     const dx = Math.cos(p.angle) * dirLen;
     const dy = Math.sin(p.angle) * dirLen;
@@ -264,7 +265,7 @@ export class LiteEngine {
       gl.uniform1f(U.uCover, this.cover(pointPx));
       gl.uniform1f(U.uPointPx, pointPx);
       gl.uniform1f(U.uBright, p.brightness);
-      gl.uniform1f(U.uTrailLen, 0.10 * p.trailLength);
+      gl.uniform1f(U.uTrailLen, 0.08 * p.trailLength);
       gl.uniform1f(U.uTrailGain, p.trailStrength);
     };
 

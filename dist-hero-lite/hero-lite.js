@@ -48,7 +48,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, out float alpha, out flo
 
   // Bright parts of the picture shed more particles: light weighting
   float lw = 0.2 + 1.6 * light * light;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.45, 0.0, 0.6);
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5, 0.0, 0.5);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -94,12 +94,12 @@ void main() {
   float alpha, streaming;
   vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, alpha, streaming);
   gl_Position = toClip(w);
-  gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx * 0.7) : uPointPx;
+  gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
   vec3 c = clamp(aMeta.rgb * uBright, 0.0, 1.0);
   vec3 o = 1.0 - pow(1.0 - c, vec3(aMeta.a * 5.0 / max(uCover, 0.25)));
-  vCol = o * alpha * (streaming > 0.5 ? 0.8 : 1.0);
+  vCol = o * alpha * (streaming > 0.5 ? 0.7 : 1.0);
 }
 `, st = `
 void main() {
@@ -113,7 +113,7 @@ void main() {
     return;
   }
   gl_Position = toClip(w);
-  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.2 * uTrailGain;
+  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.12 * uTrailGain;
 }
 `, ot = `#version 300 es
 precision mediump float;
@@ -259,12 +259,12 @@ class at {
     this.ptr.on += (this.ptr.targetOn - this.ptr.on) * n;
     const a = this.time, c = this.params.sway, v = (Math.sin(a * 0.23) * 0.6 + Math.sin(a * 0.11 + 1.3) * 0.4) * c, g = (Math.sin(a * 0.17 + 0.6) * 0.6 + Math.sin(a * 0.09) * 0.4) * c * 0.6;
     this.look.x += (this.lookTarget.x * 0.6 + v - this.look.x) * n, this.look.y += (this.lookTarget.y * 0.6 + g - this.look.y) * n;
-    const m = this.params, w = Math.max(2, Math.round(1.5 * this.dpr)), A = 0.45 + 0.55 * m.length, l = Math.cos(m.angle) * A, x = Math.sin(m.angle) * A;
+    const m = this.params, w = Math.max(1, Math.round(this.dpr)), M = this.cover(w) >= 1.3 ? w : w * 2, l = 0.45 + 0.55 * m.length, x = Math.cos(m.angle) * l, f = Math.sin(m.angle) * l;
     t.clear(t.COLOR_BUFFER_BIT);
-    const p = (f) => {
-      t.uniform2f(f.uView, this.canvas.width, this.canvas.height), t.uniform1f(f.uScale, this.scale), t.uniform2f(f.uOffset, this.offX, this.offY), t.uniform1f(f.uTime, a), t.uniform1f(f.uDrift, m.drift), t.uniform1f(f.uDepth, m.depth), t.uniform1f(f.uSpeed, m.speed), t.uniform2f(f.uDir, l, x), t.uniform2f(f.uLook, this.look.x, this.look.y), t.uniform2f(f.uPtr, this.ptr.x, this.ptr.y), t.uniform1f(f.uPtrOn, this.ptr.on), t.uniform1f(f.uCover, this.cover(w)), t.uniform1f(f.uPointPx, w), t.uniform1f(f.uBright, m.brightness), t.uniform1f(f.uTrailLen, 0.1 * m.trailLength), t.uniform1f(f.uTrailGain, m.trailStrength);
+    const b = (p) => {
+      t.uniform2f(p.uView, this.canvas.width, this.canvas.height), t.uniform1f(p.uScale, this.scale), t.uniform2f(p.uOffset, this.offX, this.offY), t.uniform1f(p.uTime, a), t.uniform1f(p.uDrift, m.drift), t.uniform1f(p.uDepth, m.depth), t.uniform1f(p.uSpeed, m.speed), t.uniform2f(p.uDir, x, f), t.uniform2f(p.uLook, this.look.x, this.look.y), t.uniform2f(p.uPtr, this.ptr.x, this.ptr.y), t.uniform1f(p.uPtrOn, this.ptr.on), t.uniform1f(p.uCover, this.cover(M)), t.uniform1f(p.uPointPx, M), t.uniform1f(p.uBright, m.brightness), t.uniform1f(p.uTrailLen, 0.08 * m.trailLength), t.uniform1f(p.uTrailGain, m.trailStrength);
     };
-    t.useProgram(this.pointProg), p(this.pointU), t.bindVertexArray(this.vaoPoints), t.drawArrays(t.POINTS, 0, this.drawn), m.trails && this.trailsAllowed && m.drift > 0.02 && (t.useProgram(this.trailProg), p(this.trailU), t.bindVertexArray(this.vaoTrails), t.drawArraysInstanced(t.LINES, 0, 2, Math.floor(this.drawn / V))), t.bindVertexArray(null), this.adapt(e * 1e3);
+    t.useProgram(this.pointProg), b(this.pointU), t.bindVertexArray(this.vaoPoints), t.drawArrays(t.POINTS, 0, this.drawn), m.trails && this.trailsAllowed && m.drift > 0.02 && (t.useProgram(this.trailProg), b(this.trailU), t.bindVertexArray(this.vaoTrails), t.drawArraysInstanced(t.LINES, 0, 2, Math.floor(this.drawn / V))), t.bindVertexArray(null), this.adapt(e * 1e3);
   }
   /**
    * Quality ladder, one step down whenever frames stay slow:
@@ -310,46 +310,46 @@ function ht(s, e, t) {
   const i = e * t;
   let o = 0, n = 0, a = 0, c = 0;
   const v = (r, d, u) => {
-    const b = (d * e + r) * 4;
-    u(s[b], s[b + 1], s[b + 2]);
+    const A = (d * e + r) * 4;
+    u(s[A], s[A + 1], s[A + 2]);
   }, g = [];
   for (let r = 0; r < e; r += 2)
     g.push([r, 0], [r, t - 1]);
   for (let r = 0; r < t; r += 2)
     g.push([0, r], [e - 1, r]);
   for (const [r, d] of g)
-    v(r, d, (u, b, y) => {
-      o += u, n += b, a += y, c++;
+    v(r, d, (u, A, y) => {
+      o += u, n += A, a += y, c++;
     });
   o /= c, n /= c, a /= c;
   let m = 0;
   for (const [r, d] of g)
-    v(r, d, (u, b, y) => {
-      m += Math.hypot(u - o, b - n, y - a);
+    v(r, d, (u, A, y) => {
+      m += Math.hypot(u - o, A - n, y - a);
     });
   if (m /= c, m > 22) return null;
-  const w = 46 + m * 2, A = (r) => Math.hypot(s[r * 4] - o, s[r * 4 + 1] - n, s[r * 4 + 2] - a) < w, l = new Uint8Array(i).fill(1), x = [], p = (r, d) => {
+  const w = 46 + m * 2, M = (r) => Math.hypot(s[r * 4] - o, s[r * 4 + 1] - n, s[r * 4 + 2] - a) < w, l = new Uint8Array(i).fill(1), x = [], f = (r, d) => {
     const u = d * e + r;
-    l[u] === 1 && A(u) && (l[u] = 0, x.push(u));
+    l[u] === 1 && M(u) && (l[u] = 0, x.push(u));
   };
   for (let r = 0; r < e; r++)
-    p(r, 0), p(r, t - 1);
+    f(r, 0), f(r, t - 1);
   for (let r = 0; r < t; r++)
-    p(0, r), p(e - 1, r);
+    f(0, r), f(e - 1, r);
   for (; x.length; ) {
     const r = x.pop(), d = r % e, u = r / e | 0;
-    d > 0 && p(d - 1, u), d < e - 1 && p(d + 1, u), u > 0 && p(d, u - 1), u < t - 1 && p(d, u + 1);
+    d > 0 && f(d - 1, u), d < e - 1 && f(d + 1, u), u > 0 && f(d, u - 1), u < t - 1 && f(d, u + 1);
   }
-  let f = 0;
-  for (let r = 0; r < i; r++) f += l[r];
-  if (f < i * 0.01 || f > i * 0.995) return null;
-  const M = l.slice();
+  let b = 0;
+  for (let r = 0; r < i; r++) b += l[r];
+  if (b < i * 0.01 || b > i * 0.995) return null;
+  const p = l.slice();
   for (let r = 1; r < t - 1; r++)
     for (let d = 1; d < e - 1; d++) {
       const u = r * e + d;
-      l[u] === 1 && (l[u - 1] === 0 || l[u + 1] === 0 || l[u - e] === 0 || l[u + e] === 0) && (A(u) || Math.hypot(s[u * 4] - o, s[u * 4 + 1] - n, s[u * 4 + 2] - a) < w * 1.6) && (M[u] = 0);
+      l[u] === 1 && (l[u - 1] === 0 || l[u + 1] === 0 || l[u - e] === 0 || l[u + e] === 0) && (M(u) || Math.hypot(s[u * 4] - o, s[u * 4 + 1] - n, s[u * 4 + 2] - a) < w * 1.6) && (p[u] = 0);
     }
-  return M;
+  return p;
 }
 function ct(s, e, t, i) {
   const o = t * i, n = new Float32Array(o), a = new Float32Array(o), c = new Float32Array(o), v = new Float32Array(o);
@@ -361,24 +361,24 @@ function ct(s, e, t, i) {
     }
   const w = m ? null : ht(s, t, i);
   for (let l = 0; l < o; l++) {
-    const x = s[l * 4] / 255, p = s[l * 4 + 1] / 255, f = s[l * 4 + 2] / 255, M = s[l * 4 + 3] / 255, r = Math.max(x, p, f), d = Math.min(x, p, f);
-    c[l] = r === 0 ? 0 : (r - d) / r, a[l] = 0.299 * x + 0.587 * p + 0.114 * f, m ? n[l] = M > 0.15 ? M : 0 : n[l] = w ? w[l] : 1, n[l] > 0 && g++;
+    const x = s[l * 4] / 255, f = s[l * 4 + 1] / 255, b = s[l * 4 + 2] / 255, p = s[l * 4 + 3] / 255, r = Math.max(x, f, b), d = Math.min(x, f, b);
+    c[l] = r === 0 ? 0 : (r - d) / r, a[l] = 0.299 * x + 0.587 * f + 0.114 * b, m ? n[l] = p > 0.15 ? p : 0 : n[l] = w ? w[l] : 1, n[l] > 0 && g++;
   }
   for (let l = 0; l < i; l++)
     for (let x = 0; x < t; x++) {
-      const p = l * t + x;
-      if (n[p] <= 0) continue;
-      let f = 0;
+      const f = l * t + x;
+      if (n[f] <= 0) continue;
+      let b = 0;
       if (x > 0 && x < t - 1 && l > 0 && l < i - 1) {
-        const r = a[p + 1] - a[p - 1], d = a[p + t] - a[p - t];
-        f = Math.min(1, Math.hypot(r, d) * 3);
+        const r = a[f + 1] - a[f - 1], d = a[f + t] - a[f - t];
+        b = Math.min(1, Math.hypot(r, d) * 3);
       }
-      const M = Math.pow(a[p], 1.2);
-      v[p] = n[p] * (0.4 + 0.6 * f + 0.5 * M + 0.2 * c[p]);
+      const p = Math.pow(a[f], 1.2);
+      v[f] = n[f] * (0.4 + 0.6 * b + 0.5 * p + 0.2 * c[f]);
     }
-  let A = 0;
-  for (let l = 0; l < o; l++) A += v[l];
-  if (A <= 1e-4) {
+  let M = 0;
+  for (let l = 0; l < o; l++) M += v[l];
+  if (M <= 1e-4) {
     for (let l = 0; l < o; l++) v[l] = 1;
     g = o;
   }
@@ -408,19 +408,19 @@ function dt(s, e, t) {
     for (let S = 0; S < w.length; S++) w[S] = y[S * 4] / 255;
   } else
     w.fill(0.5);
-  const { weights: A, activeCount: l } = ct(m, w, a, c), x = ut(A), p = x[x.length - 1], f = p / Math.max(1, l), M = a / c;
+  const { weights: M, activeCount: l } = ct(m, w, a, c), x = ut(M), f = x[x.length - 1], b = f / Math.max(1, l), p = a / c;
   let r = Math.floor(t * 0.6180339887) | 1;
   for (; pt(r, t) !== 1; ) r += 2;
-  const d = new ArrayBuffer(t * 16), u = new Float32Array(d), b = new Uint8Array(d);
+  const d = new ArrayBuffer(t * 16), u = new Float32Array(d), A = new Uint8Array(d);
   for (let y = 0; y < t; y++) {
-    const q = (y * r % t + H(y, 1)) / t, R = lt(x, q * p), O = Math.max(0, Math.min(a - 1.001, R % a + H(y, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + H(y, 3))), P = O | 0, E = _ | 0, T = O - P, C = _ - E, k = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (k(P, E, D) * (1 - T) + k(P + 1, E, D) * T) * (1 - C) + (k(P, E + 1, D) * (1 - T) + k(P + 1, E + 1, D) * T) * C, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - C) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * C, Q = F(0), K = F(1), J = F(2);
-    u[y * 4] = (O / a - 0.5) * M, u[y * 4 + 1] = 0.5 - _ / c, u[y * 4 + 2] = U - 0.5;
+    const q = (y * r % t + H(y, 1)) / t, R = lt(x, q * f), O = Math.max(0, Math.min(a - 1.001, R % a + H(y, 2))), _ = Math.max(0, Math.min(c - 1.001, Math.floor(R / a) + H(y, 3))), P = O | 0, E = _ | 0, T = O - P, C = _ - E, k = (D, B, $) => m[(B * a + D) * 4 + $], F = (D) => (k(P, E, D) * (1 - T) + k(P + 1, E, D) * T) * (1 - C) + (k(P, E + 1, D) * (1 - T) + k(P + 1, E + 1, D) * T) * C, L = (D, B) => w[B * a + D], U = (L(P, E) * (1 - T) + L(P + 1, E) * T) * (1 - C) + (L(P, E + 1) * (1 - T) + L(P + 1, E + 1) * T) * C, Q = F(0), K = F(1), J = F(2);
+    u[y * 4] = (O / a - 0.5) * p, u[y * 4 + 1] = 0.5 - _ / c, u[y * 4 + 2] = U - 0.5;
     const I = y * 16 + 12;
-    b[I] = Q, b[I + 1] = K, b[I + 2] = J;
-    const Z = Math.min(5, Math.max(0.2, f / Math.max(1e-4, A[R])));
-    b[I + 3] = Math.round(Z / 5 * 255);
+    A[I] = Q, A[I + 1] = K, A[I + 2] = J;
+    const Z = Math.min(5, Math.max(0.2, b / Math.max(1e-4, M[R])));
+    A[I + 3] = Math.round(Z / 5 * 255);
   }
-  return { buffer: d, count: t, aspect: M, subjectFraction: Math.max(0.05, l / (a * c)) };
+  return { buffer: d, count: t, aspect: p, subjectFraction: Math.max(0.05, l / (a * c)) };
 }
 function mt(s) {
   if (!s || typeof s != "object") return {};
@@ -441,7 +441,7 @@ function mt(s) {
 }
 function gt() {
   const s = navigator.hardwareConcurrency || 4, e = navigator.deviceMemory || 4;
-  return window.innerWidth < 768 || s <= 4 || e <= 4 ? 12e4 : s >= 8 && e >= 8 && window.innerWidth >= 1280 ? 26e4 : 2e5;
+  return window.innerWidth < 768 || s <= 4 || e <= 4 ? 2e5 : s >= 8 && e >= 8 && window.innerWidth >= 1280 ? 45e4 : 3e5;
 }
 function z(s) {
   return new Promise((e, t) => {

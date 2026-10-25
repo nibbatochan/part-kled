@@ -50,7 +50,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, out float alpha, out flo
 
   // Bright parts of the picture shed more particles: light weighting
   float lw = 0.2 + 1.6 * light * light;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.45, 0.0, 0.6);
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5, 0.0, 0.5);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -98,12 +98,12 @@ void main() {
   float alpha, streaming;
   vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, alpha, streaming);
   gl_Position = toClip(w);
-  gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx * 0.7) : uPointPx;
+  gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
   vec3 c = clamp(aMeta.rgb * uBright, 0.0, 1.0);
   vec3 o = 1.0 - pow(1.0 - c, vec3(aMeta.a * 5.0 / max(uCover, 0.25)));
-  vCol = o * alpha * (streaming > 0.5 ? 0.8 : 1.0);
+  vCol = o * alpha * (streaming > 0.5 ? 0.7 : 1.0);
 }
 `;
 
@@ -119,7 +119,7 @@ void main() {
     return;
   }
   gl_Position = toClip(w);
-  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.2 * uTrailGain;
+  vCol = tail ? vec3(0.0) : aMeta.rgb * alpha * 0.12 * uTrailGain;
 }
 `;
 

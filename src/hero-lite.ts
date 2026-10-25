@@ -51,9 +51,9 @@ export function toLiteParams(src: any): Partial<LiteParams> {
 export function autoCount(): number {
   const cores = navigator.hardwareConcurrency || 4;
   const mem = (navigator as any).deviceMemory || 4;
-  if (window.innerWidth < 768 || cores <= 4 || mem <= 4) return 120000;
-  if (cores >= 8 && mem >= 8 && window.innerWidth >= 1280) return 260000;
-  return 200000;
+  if (window.innerWidth < 768 || cores <= 4 || mem <= 4) return 200000;
+  if (cores >= 8 && mem >= 8 && window.innerWidth >= 1280) return 450000;
+  return 300000;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
