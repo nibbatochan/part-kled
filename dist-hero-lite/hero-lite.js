@@ -63,7 +63,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
 
-    float reach = (0.12 + 0.38 * uDrift) * (0.45 + 1.1 * r3);
+    float reach = (0.16 + 0.5 * uDrift) * (0.45 + 1.1 * r3);
     vec2 perp = vec2(-uDir.y, uDir.x);
     pos += uDir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
@@ -72,7 +72,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
-    alpha *= 1.0 - smoothstep(0.14, 0.30, length(uDir * reach * ease));
+    alpha *= 1.0 - smoothstep(0.2, 0.42, length(uDir * reach * ease));
     streaming = step(0.001, s);
   }
 
@@ -91,9 +91,9 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 // Tilt the whole picture like a card in 3D: depth pushes near parts toward the viewer, so a turn
 // of the head shows real parallax, and the picture foreshortens a little as it turns.
 vec4 toClip(vec2 world, float z) {
-  vec3 p = vec3(world, z * 0.30 * uDepth);
-  float yaw = uLook.x * 0.07;
-  float pitch = -uLook.y * 0.045;
+  vec3 p = vec3(world, z * 0.45 * uDepth);
+  float yaw = uLook.x * 0.14;
+  float pitch = -uLook.y * 0.09;
   float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
   vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
   q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);
