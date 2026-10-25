@@ -34,14 +34,14 @@ void main() {
 
   // Thanos snap dissolution:
   // Disintegrating particles shrink and fade out as they drift
-  float maxLife = (0.7 + uDrift * 1.8) * (0.6 + 0.8 * fract(seed * 43.19));
+  float maxLife = (0.6 + uDrift * 1.2) * (0.6 + 0.8 * fract(seed * 43.19));
   float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
 
   float fade = 1.0;
   float sizeMod = 1.0;
   if (age > 0.001) {
-    fade = 1.0 - smoothstep(0.12, 0.95, lifeRatio);
-    sizeMod = 1.0 - 0.5 * lifeRatio;
+    fade = smoothstep(1.0, 0.05, lifeRatio);
+    sizeMod = 1.0 - 0.45 * lifeRatio;
   }
   vFade = fade;
 

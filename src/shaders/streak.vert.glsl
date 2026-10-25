@@ -35,10 +35,19 @@ void main() {
   vec3 pos = posData.xyz;
   float age = posData.w;
 
-  // If particle is resting at home or has dissolved, skip trail
-  float maxLife = (0.7 + uDrift * 1.8) * (0.6 + 0.8 * fract(seed * 43.19));
+  vec4 velData = texture2D(tVel, ref);
+  vec3 vel = velData.xyz;
+  float speed = length(vel);
+
+  // If particle is resting at home, slow, or has dissolved, skip trail
+  if (age < 0.005 || speed < 0.1) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
+  float maxLife = (0.6 + uDrift * 1.2) * (0.6 + 0.8 * fract(seed * 43.19));
   float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
-  float fade = (age > 0.001) ? (1.0 - smoothstep(0.15, 0.95, lifeRatio)) : 0.0;
+  float fade = smoothstep(1.0, 0.05, lifeRatio);
 
   if (fade < 0.01) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -53,17 +62,15 @@ void main() {
 
   float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
 
-  // Streaming direction set by LINE widget (e.g. towards the right)
+  // Dynamic extrusion along negative velocity vector
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
-
-  // Trail length dissolves with the ash
-  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.4 + 1.2 * fract(seed * 29.3)) * (1.0 - lifeRatio);
+  vec3 dir = (speed > 0.15) ? normalize(vel) : vec3(lineDir, 0.0);
+  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.5 + 0.8 * fract(seed * 29.3)) * (1.0 - 0.5 * lifeRatio);
 
   vec3 finalPos = pos;
   if (isTail > 0.5) {
-    // Tail trails behind the moving particle (backwards along line direction)
-    finalPos.xy = pos.xy - lineDir * trailLen;
-    finalPos.z += (fract(seed * 71.1) - 0.5) * 0.02;
+    // Tail trails behind the moving particle
+    finalPos = pos - dir * trailLen;
     vAlpha = 0.0;
   } else {
     // Head anchored at the moving particle

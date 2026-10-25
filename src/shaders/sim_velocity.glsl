@@ -124,16 +124,16 @@ void main() {
   vec3 home = mix(homeA, homeB, morphFactor);
   home.z *= (uDepth * 2.2);
 
-  // Force accumulation
+  // LINE direction vector
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
   float lineLen = length(uLine);
   vec3 F = vec3(0.0);
 
-  // THANOS SNAP DISSOLUTION DYNAMICS:
-  // Drift controls how many particles peel off and dissolve into the air!
-  // When DRIFT is high, more particles detach, float above/around, and disappear.
-  float peelThreshold = 0.08 + uDrift * 0.38;
-  bool isDriftingAsh = (seed < peelThreshold);
+  // SPATIALLY-GUIDED PEELING (matches reference ref-target-trail.png):
+  // Upwind side (left) remains 100% solid; only downwind trailing edge (right) peels into the stream
+  float windProj = dot(home.xy, lineDir);
+  float peelProb = smoothstep(0.02, 0.30, windProj) * (0.05 + uDrift * 0.45);
+  bool isDriftingAsh = (seed < peelProb);
 
   if (!isDriftingAsh) {
     // CORE BODY: holds the image, gather scale dimmed by 50%
@@ -142,24 +142,22 @@ void main() {
 
     // Subtle natural stipple breathing
     vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.08));
-    F += noiseF * (uDrift * 0.2);
+    F += noiseF * (uDrift * 0.15);
   } else {
-    // THANOS ASH/EMBER: peels off from origin pixel and floats in the wind!
-    // Wind direction along set LINE widget
-    float ashSpeed = (0.8 + uDrift * 2.8) * (0.6 + 0.8 * fract(seed * 23.7));
+    // LAMINAR WIND STREAMLINE:
+    // Particles stream high-speed along LINE direction in silky horizontal filaments
+    float ashSpeed = (2.2 + uDrift * 3.6) * (0.7 + 0.6 * fract(seed * 23.7));
     F.xy += lineDir * ashSpeed;
 
-    // Buoyant upward flutter of dust/embers rising in the breeze
-    F.y += (0.15 + uDrift * 0.5) * (0.4 + 0.6 * fract(seed * 53.1));
-
-    // Fluid curl turbulence carrying the embers
-    vec3 curl = curlNoise(p * 2.2 + vec3(uTime * 0.18, seed * 10.0, 0.0));
-    F += curl * (uDrift * 1.4);
+    // Gentle transverse micro-flutter perpendicular to wind direction (keeps stream tight & silky)
+    vec2 perpDir = vec2(-lineDir.y, lineDir.x);
+    float flutter = snoise(p * 2.2 + vec3(uTime * 0.25, seed * 7.0, 0.0));
+    F.xy += perpDir * (flutter * (uDrift * 0.35));
 
     // Travel modes
     if (uMelt > 0.5) {
       // MELT: drips downward heavily
-      F.y -= 2.4 * (1.0 - uGather * 0.5);
+      F.y -= 2.2 * (1.0 - uGather * 0.5);
     }
   }
 

@@ -4,6 +4,9 @@ import particleVert from '../shaders/particle.vert.glsl';
 import particleFrag from '../shaders/particle.frag.glsl';
 import streakVert from '../shaders/streak.vert.glsl';
 import streakFrag from '../shaders/streak.frag.glsl';
+import fullscreenVert from '../shaders/fullscreen.vert.glsl';
+import trailDecayFrag from '../shaders/trail_decay.frag.glsl';
+import compositeFrag from '../shaders/composite.frag.glsl';
 import type { Params } from './params';
 
 export interface TrackerPoint {
@@ -34,6 +37,16 @@ export class ParticleRenderer {
 
   private streakMesh!: THREE.LineSegments;
   private streakMaterial!: THREE.ShaderMaterial;
+
+  // PRD 8.5 Trail Persistence & Composite Render Targets
+  private rtScene!: THREE.WebGLRenderTarget;
+  private rtTrailA!: THREE.WebGLRenderTarget;
+  private rtTrailB!: THREE.WebGLRenderTarget;
+  private quadCamera!: THREE.OrthographicCamera;
+  private quadScene!: THREE.Scene;
+  private quadMesh!: THREE.Mesh;
+  private decayMaterial!: THREE.ShaderMaterial;
+  private compositeMaterial!: THREE.ShaderMaterial;
 
   private width: number;
   private height: number;
@@ -71,6 +84,61 @@ export class ParticleRenderer {
 
     this.initPoints();
     this.initStreaks();
+    this.initRenderTargetsAndQuad();
+  }
+
+  private initRenderTargetsAndQuad(): void {
+    const dpr = Math.min(2.0, window.devicePixelRatio || 1.0);
+    const fullW = Math.max(1, Math.floor(this.width * dpr));
+    const fullH = Math.max(1, Math.floor(this.height * dpr));
+    const halfW = Math.max(1, Math.floor(fullW / 2));
+    const halfH = Math.max(1, Math.floor(fullH / 2));
+
+    const rtOptions: THREE.RenderTargetOptions = {
+      type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      depthBuffer: false,
+      stencilBuffer: false,
+    };
+
+    this.rtScene = new THREE.WebGLRenderTarget(fullW, fullH, { ...rtOptions, depthBuffer: true });
+    this.rtTrailA = new THREE.WebGLRenderTarget(halfW, halfH, rtOptions);
+    this.rtTrailB = new THREE.WebGLRenderTarget(halfW, halfH, rtOptions);
+
+    this.quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.quadScene = new THREE.Scene();
+    const quadGeom = new THREE.PlaneGeometry(2, 2);
+
+    this.decayMaterial = new THREE.ShaderMaterial({
+      vertexShader: fullscreenVert,
+      fragmentShader: trailDecayFrag,
+      uniforms: {
+        tCurrent: { value: null },
+        tPrior: { value: null },
+        uDecay: { value: 0.94 },
+        uClear: { value: 0.0 },
+      },
+      depthTest: false,
+      depthWrite: false,
+    });
+
+    this.compositeMaterial = new THREE.ShaderMaterial({
+      vertexShader: fullscreenVert,
+      fragmentShader: compositeFrag,
+      uniforms: {
+        tScene: { value: null },
+        tTrail: { value: null },
+        uTrailsEnabled: { value: 1.0 },
+        uOnWhite: { value: 0.0 },
+      },
+      depthTest: false,
+      depthWrite: false,
+    });
+
+    this.quadMesh = new THREE.Mesh(quadGeom, this.compositeMaterial);
+    this.quadScene.add(this.quadMesh);
   }
 
   private initPoints(): void {
@@ -100,9 +168,9 @@ export class ParticleRenderer {
         uSize: { value: 1.4 },
         uDpr: { value: Math.min(2.0, window.devicePixelRatio || 1.0) },
         uMorph: { value: 0.0 },
+        uDrift: { value: 0.8 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
-        uDrift: { value: 0.8 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uLine: { value: new THREE.Vector2(0.4, 0.3) },
@@ -161,7 +229,6 @@ export class ParticleRenderer {
         uDrift: { value: 0.8 },
         uLightColor: { value: new THREE.Vector3(0.95, 0.90, 0.79) },
         uLightOn: { value: 1.0 },
-        uDrift: { value: 0.8 },
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uNegative: { value: 0.0 },
@@ -242,14 +309,14 @@ export class ParticleRenderer {
     const isNegative = params.colorMode === 'negative';
 
     if (isOnWhite) {
-      this.renderer.setClearColor(0xf8f8f7, 1);
       this.pointsMaterial.blending = THREE.NormalBlending;
       this.streakMaterial.blending = THREE.NormalBlending;
     } else {
-      this.renderer.setClearColor(0x050506, 1);
       this.pointsMaterial.blending = THREE.AdditiveBlending;
       this.streakMaterial.blending = THREE.AdditiveBlending;
     }
+
+    const clearColor = isOnWhite ? 0xf8f8f7 : 0x050506;
 
     // Update Points uniforms
     const pu = this.pointsMaterial.uniforms;
@@ -279,8 +346,8 @@ export class ParticleRenderer {
       su['tColor'].value = colorTexture;
       su['uLine'].value.set(lineX, lineY);
       su['uDrift'].value = params.drift;
-      // Drift controls the trail's lengths toward the set direction
-      su['uStreakLength'].value = (0.2 + params.drift * 2.2) * params.line.length;
+      // Drift controls the trail's lengths toward the set direction (approx 20px - 70px)
+      su['uStreakLength'].value = (0.025 + params.drift * 0.075) * params.line.length;
       su['uScan'].value = scanProgress;
       su['uScanActive'].value = params.scan ? 1.0 : 0.0;
       su['uLightColor'].value.copy(lightVec);
@@ -289,7 +356,61 @@ export class ParticleRenderer {
       su['uOnWhite'].value = isOnWhite ? 1.0 : 0.0;
     }
 
+    // 1. Trail feedback persistence pass (PRD Section 8.5)
+    // Only moving streaks accumulate and decay by 0.94, leaving static particles 100% crisp!
+    if (params.trails) {
+      // Step A: Decay prior trail frame by 0.94 into rtTrailB
+      this.renderer.setRenderTarget(this.rtTrailB);
+      this.renderer.clear();
+      this.quadMesh.material = this.decayMaterial;
+      this.decayMaterial.uniforms['tPrior'].value = this.rtTrailA.texture;
+      this.decayMaterial.uniforms['uDecay'].value = 0.94;
+      this.decayMaterial.uniforms['uClear'].value = 0.0;
+      this.renderer.render(this.quadScene, this.quadCamera);
+
+      // Step B: Render active streaks additively on top of decayed trail buffer
+      this.pointsMesh.visible = false;
+      this.streakMesh.visible = true;
+      this.renderer.autoClear = false;
+      this.renderer.render(this.scene, camera);
+      this.renderer.autoClear = true;
+      this.pointsMesh.visible = true;
+
+      // Step C: Swap ping-pong handles
+      const tmp = this.rtTrailA;
+      this.rtTrailA = this.rtTrailB;
+      this.rtTrailB = tmp;
+    } else {
+      // TRAILS off clears target
+      this.decayMaterial.uniforms['uClear'].value = 1.0;
+      this.renderer.setRenderTarget(this.rtTrailA);
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.clear();
+      this.renderer.setRenderTarget(this.rtTrailB);
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.clear();
+    }
+
+    // 2. Render live foreground scene (points + streaks) into full-res rtScene
+    this.streakMesh.visible = params.trails && this.hasActiveImage;
+    this.renderer.setRenderTarget(this.rtScene);
+    this.renderer.setClearColor(clearColor, 1);
+    this.renderer.clear();
     this.renderer.render(this.scene, camera);
+
+    // 3. Final composite pass to screen canvas with Bayer ordered dither
+    this.renderer.setRenderTarget(null);
+    this.renderer.setClearColor(clearColor, 1);
+    this.renderer.clear();
+
+    this.quadMesh.material = this.compositeMaterial;
+    const cu = this.compositeMaterial.uniforms;
+    cu['tScene'].value = this.rtScene.texture;
+    cu['tTrail'].value = this.rtTrailA.texture;
+    cu['uTrailsEnabled'].value = params.trails ? 1.0 : 0.0;
+    cu['uOnWhite'].value = isOnWhite ? 1.0 : 0.0;
+
+    this.renderer.render(this.quadScene, this.quadCamera);
   }
 
   public getTrackerPoints(
@@ -332,7 +453,17 @@ export class ParticleRenderer {
     this.width = width;
     this.height = height;
     this.renderer.setSize(width, height);
-    this.pointsMaterial.uniforms['uDpr'].value = Math.min(2.0, window.devicePixelRatio || 1.0);
+    const dpr = Math.min(2.0, window.devicePixelRatio || 1.0);
+    this.pointsMaterial.uniforms['uDpr'].value = dpr;
+
+    const fullW = Math.max(1, Math.floor(width * dpr));
+    const fullH = Math.max(1, Math.floor(height * dpr));
+    const halfW = Math.max(1, Math.floor(fullW / 2));
+    const halfH = Math.max(1, Math.floor(fullH / 2));
+
+    this.rtScene.setSize(fullW, fullH);
+    this.rtTrailA.setSize(halfW, halfH);
+    this.rtTrailB.setSize(halfW, halfH);
   }
 
   public dispose(): void {
@@ -340,6 +471,12 @@ export class ParticleRenderer {
     this.pointsMaterial.dispose();
     this.streakMesh.geometry.dispose();
     this.streakMaterial.dispose();
+    this.rtScene.dispose();
+    this.rtTrailA.dispose();
+    this.rtTrailB.dispose();
+    this.quadMesh.geometry.dispose();
+    this.decayMaterial.dispose();
+    this.compositeMaterial.dispose();
     this.renderer.dispose();
   }
 }

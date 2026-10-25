@@ -16,12 +16,13 @@ const float bayerMatrix[16] = float[16](
 );
 
 void main() {
-  // Round soft particle sprite
+  // Filmic Gaussian soft particle sprite (avoids polygon/jagged edge cutoffs)
   vec2 coord = gl_PointCoord - vec2(0.5);
-  float dist = length(coord);
-  if (dist > 0.5) discard;
+  float r2 = dot(coord, coord) * 4.0; // r2 in [0, 1]
+  if (r2 > 1.0) discard;
 
-  float alpha = smoothstep(0.5, 0.15, dist) * vFade;
+  float alpha = exp(-3.5 * r2) * vFade;
+  if (alpha < 0.015) discard;
 
   vec3 rgb = vColor.rgb;
 
@@ -40,7 +41,7 @@ void main() {
   float dither = (bayerMatrix[y * 4 + x] - 0.5) * (1.0 / 255.0);
   rgb += dither;
 
-  if (vColor.a < 0.05 || alpha < 0.015) discard;
+  if (vColor.a < 0.05) discard;
 
   gl_FragColor = vec4(rgb, alpha * vColor.a);
 }
