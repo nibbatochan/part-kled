@@ -49,7 +49,7 @@ export const defaults: Params = {
 
   line: { angle: 0.05, length: 0.85 }, // default streak angle pointing towards the right
   lineMode: 'streak',
-  pointCount: 131072,
+  pointCount: 262144,
   quality: 'auto',
 };
 

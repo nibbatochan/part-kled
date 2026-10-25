@@ -26,6 +26,11 @@ void main() {
 
   vec3 rgb = vColor.rgb;
 
+  // Rich saturation & brightness boost matching reference image
+  float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
+  rgb = mix(vec3(lum), rgb, 1.45); // 45% saturation punch for rich orange, skin, and vivid auras
+  rgb = pow(max(rgb, vec3(0.0)), vec3(0.88)) * 1.25; // 25% brightness & gamma expansion
+
   if (uNegative > 0.5) {
     rgb = 1.0 - rgb;
   }

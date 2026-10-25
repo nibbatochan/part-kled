@@ -45,7 +45,7 @@ void main() {
     return;
   }
 
-  float maxLife = (0.6 + uDrift * 1.2) * (0.6 + 0.8 * fract(seed * 43.19));
+  float maxLife = (1.0 + uDrift * 2.2) * (0.6 + 0.8 * fract(seed * 43.19));
   float lifeRatio = clamp(age / maxLife, 0.0, 1.0);
   float fade = smoothstep(1.0, 0.05, lifeRatio);
 
@@ -60,12 +60,15 @@ void main() {
     return;
   }
 
+  // Saturated color boost on streaks
   float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+  col.rgb = mix(vec3(lum), col.rgb, 1.40);
+  col.rgb = pow(max(col.rgb, vec3(0.0)), vec3(0.90)) * 1.20;
 
   // Dynamic extrusion along negative velocity vector
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
   vec3 dir = (speed > 0.15) ? normalize(vel) : vec3(lineDir, 0.0);
-  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.5 + 0.8 * fract(seed * 29.3)) * (1.0 - 0.5 * lifeRatio);
+  float trailLen = uStreakLength * (0.35 + 0.65 * lum) * (0.5 + 0.8 * fract(seed * 29.3)) * (1.0 - 0.4 * lifeRatio);
 
   vec3 finalPos = pos;
   if (isTail > 0.5) {
@@ -77,14 +80,16 @@ void main() {
     vAlpha = 0.85 * fade;
   }
 
-  // Scan illumination: wave travels along line direction, lighting up based on image light
+  // Scan illumination: concentric wavy light ripples expanding from center
   if (uScanActive > 0.5) {
-    float proj = dot(pos.xy, lineDir) * 0.6 + 0.5;
-    float distToScan = abs(proj - uScan);
-    if (distToScan < 0.055) {
-      float scanGlow = (1.0 - distToScan / 0.055);
+    float rCenter = length(pos.xy);
+    float waveFront = uScan * 1.8;
+    float distFromWave = abs(rCenter - waveFront);
+    if (distFromWave < 0.18) {
+      float wavePattern = sin(rCenter * 24.0 - uScan * 18.0);
+      float scanGlow = (1.0 - distFromWave / 0.18) * (0.5 + 0.5 * wavePattern);
       vec3 lightTint = (uLightOn > 0.5 ? uLightColor : vec3(1.0, 0.95, 0.88));
-      col.rgb += lightTint * (scanGlow * (0.4 + 1.8 * lum));
+      col.rgb += lightTint * (scanGlow * (0.5 + 2.2 * lum));
     }
   }
 

@@ -211,7 +211,7 @@ export class Engine {
 
     this.flowField.update(dt);
 
-    const effectivePointer = this.params.track ? this.pointerWorld : new THREE.Vector3(999, 999, 0);
+    const effectivePointer = new THREE.Vector3(999, 999, 0);
     this.sim.update(
       dt,
       time,

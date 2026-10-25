@@ -111,14 +111,6 @@ class App {
     window.addEventListener('pointermove', (e) => {
       this.engine.setPointer(e.clientX, e.clientY);
     });
-
-    window.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('.ui-layer') || target.tagName === 'BUTTON' || target.tagName === 'INPUT') {
-        return;
-      }
-      this.engine.triggerSplash();
-    });
   }
 
   private bindResize(): void {
@@ -140,7 +132,7 @@ class App {
     // Update 2D tracker HUD (only if an image is loaded)
     if (this.images.length > 0) {
       const trackers = this.engine.getTrackerPoints();
-      this.hud.render(trackers, this.params.marks, this.params.links);
+      this.hud.render(trackers, this.params.track && this.params.marks, this.params.links);
     } else {
       this.hud.render([], false, false);
     }

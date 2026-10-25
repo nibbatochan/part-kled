@@ -147,9 +147,9 @@ export function sampleImageParticles(
 
   const aspect = w / h;
 
-  // High-density 512x256 = 131,072 particles (ultra-sharp stipple reproduction, lightweight 2MB VRAM)
+  // Ultra high-density 512x512 = 262,144 particles (photographic stipple reproduction, ultra-fine dust)
   const texWidth = 512;
-  const texHeight = 256;
+  const texHeight = 512;
   const N = texWidth * texHeight;
 
   const home = new Float32Array(N * 4);

@@ -165,7 +165,7 @@ export class ParticleRenderer {
         tVel: { value: null },
         tColor: { value: null },
         tColorNext: { value: null },
-        uSize: { value: 1.4 },
+        uSize: { value: 1.05 },
         uDpr: { value: Math.min(2.0, window.devicePixelRatio || 1.0) },
         uMorph: { value: 0.0 },
         uDrift: { value: 0.8 },

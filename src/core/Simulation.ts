@@ -51,6 +51,7 @@ export class Simulation {
     const pu = this.posVariable.material.uniforms;
     pu['uDt'] = { value: 0.016 };
     pu['uDrift'] = { value: 0.8 };
+    pu['uGather'] = { value: 0.8 };
     pu['uLine'] = { value: new THREE.Vector2(0.4, 0.3) };
 
     // Velocity uniforms
@@ -58,7 +59,6 @@ export class Simulation {
     vu['uTime'] = { value: 0.0 };
     vu['uDt'] = { value: 0.016 };
     vu['uDrift'] = { value: 0.8 };
-    vu['uSplash'] = { value: 0.6 };
     vu['uGather'] = { value: 0.8 };
     vu['uDepth'] = { value: 0.8 };
     vu['uMorph'] = { value: 0.0 };
@@ -138,13 +138,13 @@ export class Simulation {
 
     this.posVariable.material.uniforms['uDt'].value = safeDt;
     this.posVariable.material.uniforms['uDrift'].value = params.drift;
+    this.posVariable.material.uniforms['uGather'].value = params.gather;
     this.posVariable.material.uniforms['uLine'].value.set(lineX, lineY);
 
     const vu = this.velVariable.material.uniforms;
     vu['uTime'].value = time;
     vu['uDt'].value = safeDt;
     vu['uDrift'].value = params.drift;
-    vu['uSplash'].value = params.splash;
     vu['uGather'].value = params.gather;
     vu['uDepth'].value = params.depth;
     vu['uMorph'].value = morphProgress;

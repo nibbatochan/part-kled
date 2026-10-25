@@ -8,7 +8,6 @@ uniform sampler2D tFlow;
 uniform float uTime;
 uniform float uDt;
 uniform float uDrift;
-uniform float uSplash;
 uniform float uGather;
 uniform float uDepth;
 uniform float uMorph;
@@ -122,69 +121,72 @@ void main() {
   vec3 homeA = texture2D(tHome, uv).xyz;
   vec3 homeB = texture2D(tHomeNext, uv).xyz;
   vec3 home = mix(homeA, homeB, morphFactor);
-  home.z *= (uDepth * 2.2);
+  home.z *= (uDepth * 3.5);
 
   // LINE direction vector
   vec2 lineDir = normalize(uLine + vec2(1e-4, 0.0));
   float lineLen = length(uLine);
   vec3 F = vec3(0.0);
 
-  // SPATIALLY-GUIDED PEELING (matches reference ref-target-trail.png):
-  // Upwind side (left) remains 100% solid; only downwind trailing edge (right) peels into the stream
+  // SPATIALLY-GUIDED PEELING:
+  // Drift controls how many particles peel off (high drift = massive stream of particles)
+  // Gather firmly restrains and anchors particles back to home
   float windProj = dot(home.xy, lineDir);
-  float peelProb = smoothstep(0.02, 0.30, windProj) * (0.05 + uDrift * 0.45);
+  float peelProb = smoothstep(-0.05 + 0.15 * (1.0 - uDrift), 0.35, windProj) * (uDrift * 0.82) * (1.2 - uGather * 0.75);
   bool isDriftingAsh = (seed < peelProb);
 
+  // Physical Gather spring:
+  // Pulls particles towards their home position. High gather snaps them home; low gather loosens them.
+  float gatherSpring = mix(0.8, 14.0, uGather * uGather);
+
   if (!isDriftingAsh) {
-    // CORE BODY: holds the image, gather scale dimmed by 50%
-    float gatherStrength = 0.5 * mix(0.5, 9.0, uGather * uGather);
-    F = (home - p) * gatherStrength;
+    // CORE BODY: tightly held by Gather spring
+    F = (home - p) * gatherSpring;
 
     // Subtle natural stipple breathing
     vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.08));
     F += noiseF * (uDrift * 0.15);
   } else {
-    // LAMINAR WIND STREAMLINE:
-    // Particles stream high-speed along LINE direction in silky horizontal filaments
-    float ashSpeed = (2.2 + uDrift * 3.6) * (0.7 + 0.6 * fract(seed * 23.7));
+    // DRIFTING PARTICLES:
+    // High-speed laminar wind along LINE direction
+    float ashSpeed = (2.5 + uDrift * 4.8) * (0.7 + 0.6 * fract(seed * 23.7));
     F.xy += lineDir * ashSpeed;
+
+    // Gather acts on drifting particles too: high gather restrains them, low gather lets them fly far
+    F += (home - p) * (gatherSpring * 0.35);
 
     // Gentle transverse micro-flutter perpendicular to wind direction (keeps stream tight & silky)
     vec2 perpDir = vec2(-lineDir.y, lineDir.x);
-    float flutter = snoise(p * 2.2 + vec3(uTime * 0.25, seed * 7.0, 0.0));
-    F.xy += perpDir * (flutter * (uDrift * 0.35));
+    float flutter = snoise(p * 2.5 + vec3(uTime * 0.2, seed * 5.0, 0.0));
+    F.xy += perpDir * (flutter * (uDrift * 0.28));
 
     // Travel modes
     if (uMelt > 0.5) {
       // MELT: drips downward heavily
-      F.y -= 2.2 * (1.0 - uGather * 0.5);
+      F.y -= 2.5 * (1.0 - uGather * 0.5);
     }
   }
 
-  // LINE direction & DRAW strokes
+  // DRAW strokes from flow field
   vec2 flowSample = texture2D(tFlow, clamp(p.xy * 0.5 + 0.5, 0.0, 1.0)).xy;
   F.xy += flowSample * 1.5;
 
-  // TRACK & SPLASH: pointer repulsion and kinetic burst
-  vec3 d = p - uPointer;
-  float r = length(d.xy);
-  float k = smoothstep(uRadius, 0.0, r);
-  float pointerSpeed = length(uPointerVel);
-  F += normalize(d + vec3(1e-4, 1e-4, 0.05)) * k * (2.0 + uSplash * 14.0 * pointerSpeed);
-
-  // SCAN: sweep impulse along line direction
+  // SCAN: concentric wavy ripples expanding from the center
   if (uScanActive > 0.5) {
-    vec2 scanDir = lineDir;
-    float proj = dot(p.xy, scanDir) * 0.5 + 0.5;
-    float distToScan = abs(proj - uScan);
-    if (distToScan < 0.04) {
-      float scanStrength = (1.0 - distToScan / 0.04);
-      F += vec3(scanDir * 1.5, 2.5) * scanStrength;
+    float rCenter = length(p.xy);
+    float waveFront = uScan * 1.8;
+    float distFromWave = abs(rCenter - waveFront);
+    if (distFromWave < 0.18) {
+      float wavePattern = sin(rCenter * 24.0 - uScan * 18.0);
+      float scanStrength = (1.0 - distFromWave / 0.18) * (0.5 + 0.5 * wavePattern);
+      vec2 outDir = normalize(p.xy + vec2(1e-4, 0.0));
+      F.xy += outDir * (scanStrength * 1.2);
+      F.z += scanStrength * 1.8;
     }
   }
 
-  // Damping and integration
-  float damp = exp(-mix(1.8, 3.5, uGather) * uDt);
+  // Damping and integration: damping scales with Gather
+  float damp = exp(-mix(1.2, 4.5, uGather) * uDt);
   v = v * damp + F * uDt;
 
   gl_FragColor = vec4(v, seed);

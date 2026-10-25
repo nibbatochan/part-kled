@@ -67,7 +67,6 @@ export class Panel {
   private bindSliders(): void {
     const sliderDefs: { id: string; key: keyof Params }[] = [
       { id: 'sl-drift', key: 'drift' },
-      { id: 'sl-splash', key: 'splash' },
       { id: 'sl-gather', key: 'gather' },
       { id: 'sl-depth', key: 'depth' },
     ];
