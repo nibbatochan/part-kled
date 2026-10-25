@@ -19,7 +19,7 @@ interface CachedSample {
 
 class App {
   private params: Params;
-  private engine!: Engine;
+  public engine!: Engine;
   private hud!: Hud;
   private frame!: Frame;
   private thumbs!: Thumbs;
@@ -27,9 +27,9 @@ class App {
   private panel!: Panel;
   private depthEstimator = new DepthEstimator();
 
-  private images: ProcessedImage[] = [];
+  public images: ProcessedImage[] = [];
   private sampleCache: Map<string, CachedSample> = new Map();
-  private activeIndex: number = 0;
+  public activeIndex: number = 0;
   private lastTime: number = performance.now();
 
   constructor() {
@@ -41,11 +41,16 @@ class App {
     // 1. Initialize Engine & Hud
     this.engine = new Engine(stageCanvas, this.params.pointCount);
     this.engine.setParams(this.params);
+    this.engine.setHasActiveImage(false);
+
+    (window as any).__engine = this.engine;
+    (window as any).__app = this;
 
     this.hud = new Hud('hud-canvas');
 
     // 2. Initialize Frame overlay
     this.frame = new Frame('#frame-svg', '#frame-readout');
+    this.frame.setReadout(0, 0, 'INITIALIZING');
 
     // 3. Initialize Thumbs
     this.thumbs = new Thumbs(
@@ -132,9 +137,13 @@ class App {
     // Update 3D simulation and render
     this.engine.update(dt, currentTime / 1000);
 
-    // Update 2D tracker HUD
-    const trackers = this.engine.getTrackerPoints();
-    this.hud.render(trackers, this.params.marks, this.params.links);
+    // Update 2D tracker HUD (only if an image is loaded)
+    if (this.images.length > 0) {
+      const trackers = this.engine.getTrackerPoints();
+      this.hud.render(trackers, this.params.marks, this.params.links);
+    } else {
+      this.hud.render([], false, false);
+    }
 
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -150,7 +159,7 @@ class App {
     bar.style.width = `${Math.round(pct * 100)}%`;
   }
 
-  private async getSampleDataForImage(img: ProcessedImage): Promise<CachedSample> {
+  public async getSampleDataForImage(img: ProcessedImage): Promise<CachedSample> {
     if (this.sampleCache.has(img.id)) {
       return this.sampleCache.get(img.id)!;
     }
@@ -193,8 +202,8 @@ class App {
       depthArr = depthResult.depth;
     }
 
-    this.setProgress(true, 'SAMPLING 524,288 POINTS...', 0.9);
-    const sampleData = sampleImageParticles(img.canvas, depthArr, this.params.pointCount);
+    this.setProgress(true, 'SAMPLING PARTICLES...', 0.9);
+    const sampleData = sampleImageParticles(img.canvas, depthArr);
 
     const cached: CachedSample = {
       image: img,
@@ -232,20 +241,22 @@ class App {
         this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
         this.frame.setReadout(1, this.images.length, this.images[0].hash);
       } else {
+        this.frame.setReadout(0, 0, 'NO PICTURES');
         this.dropzone.showOverlay(true);
       }
     } catch (err) {
       console.warn('Init sample error:', err);
+      this.frame.setReadout(0, 0, 'NO PICTURES');
       this.dropzone.showOverlay(true);
     }
   }
 
-  private async switchImage(index: number): Promise<void> {
-    if (index < 0 || index >= this.images.length || index === this.activeIndex) return;
+  public async switchImage(index: number): Promise<void> {
+    if (index < 0 || index >= this.images.length) return;
     const prevIdx = this.activeIndex;
     this.activeIndex = index;
 
-    const currentImg = this.images[prevIdx];
+    const currentImg = this.images[prevIdx] || this.images[index];
     const nextImg = this.images[index];
 
     const currentCached = await this.getSampleDataForImage(currentImg);
@@ -255,16 +266,18 @@ class App {
     this.frame.setReadout(index + 1, this.images.length, nextImg.hash);
     this.thumbs.setActiveIndex(index);
 
-    this.engine.startMorph();
+    if (prevIdx !== index) {
+      this.engine.startMorph();
+    }
   }
 
-  private nextImage(): void {
+  public nextImage(): void {
     if (this.images.length <= 1) return;
     const nextIdx = (this.activeIndex + 1) % this.images.length;
     this.switchImage(nextIdx);
   }
 
-  private async handleFiles(files: File[]): Promise<void> {
+  public async handleFiles(files: File[]): Promise<void> {
     this.dropzone.showOverlay(false);
     for (const f of files) {
       if (this.images.length >= 4) break;

@@ -39,5 +39,7 @@ void main() {
   float dither = (bayerMatrix[y * 4 + x] - 0.5) * (1.0 / 255.0);
   rgb += dither;
 
+  if (vColor.a < 0.05) discard;
+
   gl_FragColor = vec4(rgb, alpha * vColor.a);
 }

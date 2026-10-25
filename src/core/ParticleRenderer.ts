@@ -4,7 +4,6 @@ import particleVert from '../shaders/particle.vert.glsl';
 import particleFrag from '../shaders/particle.frag.glsl';
 import streakVert from '../shaders/streak.vert.glsl';
 import streakFrag from '../shaders/streak.frag.glsl';
-import trailFadeFrag from '../shaders/trail_fade.frag.glsl';
 import type { Params } from './params';
 
 export interface TrackerPoint {
@@ -36,27 +35,20 @@ export class ParticleRenderer {
   private streakMesh!: THREE.LineSegments;
   private streakMaterial!: THREE.ShaderMaterial;
 
-  private trailScene!: THREE.Scene;
-  private trailCamera!: THREE.OrthographicCamera;
-  private trailQuad!: THREE.Mesh;
-  private trailFadeMaterial!: THREE.ShaderMaterial;
-  private trailTargetA!: THREE.WebGLRenderTarget;
-  private trailTargetB!: THREE.WebGLRenderTarget;
-
   private width: number;
   private height: number;
   private texWidth: number;
   private texHeight: number;
   private particleCount: number;
 
-  private trackerIndices: number[] = [];
-  private trackerReadBuffer: Float32Array;
+  private trackerWorldPositions: THREE.Vector3[] = [];
+  private hasActiveImage: boolean = false;
 
   constructor(
     canvas: HTMLCanvasElement,
-    particleCount: number = 524288,
-    texWidth: number = 1024,
-    texHeight: number = 512
+    particleCount: number = 65536,
+    texWidth: number = 256,
+    texHeight: number = 256
   ) {
     this.particleCount = particleCount;
     this.texWidth = texWidth;
@@ -79,11 +71,6 @@ export class ParticleRenderer {
 
     this.initPoints();
     this.initStreaks();
-    this.initTrails();
-
-    // 40 tracker sample indices
-    this.initTrackerIndices();
-    this.trackerReadBuffer = new Float32Array(40 * 4);
   }
 
   private initPoints(): void {
@@ -97,6 +84,9 @@ export class ParticleRenderer {
       refs[i * 2 + 1] = v;
     }
 
+    // Three.js WebGLBufferRenderer requires a position attribute for draw count
+    const dummyPositions = new Float32Array(this.particleCount * 3);
+    geometry.setAttribute('position', new THREE.BufferAttribute(dummyPositions, 3));
     geometry.setAttribute('ref', new THREE.BufferAttribute(refs, 2));
 
     this.pointsMaterial = new THREE.ShaderMaterial({
@@ -124,35 +114,37 @@ export class ParticleRenderer {
     });
 
     this.pointsMesh = new THREE.Points(geometry, this.pointsMaterial);
+    // Crucial: disable frustum culling since particle positions are computed dynamically in vertex shader
+    this.pointsMesh.frustumCulled = false;
     this.scene.add(this.pointsMesh);
   }
 
   private initStreaks(): void {
-    // 1/4 of particles render streaks = particleCount / 4 line segments = 2 vertices per segment
     const streakCount = Math.floor(this.particleCount / 4);
     const vertCount = streakCount * 2;
 
     const geometry = new THREE.BufferGeometry();
     const refs = new Float32Array(vertCount * 2);
     const isTail = new Float32Array(vertCount);
+    const dummyPositions = new Float32Array(vertCount * 3);
 
     for (let i = 0; i < streakCount; i++) {
-      // Pick every 4th particle
       const pIdx = i * 4;
       const u = (pIdx % this.texWidth + 0.5) / this.texWidth;
       const v = (Math.floor(pIdx / this.texWidth) + 0.5) / this.texHeight;
 
-      // Vertex 0: head
+      // Head
       refs[i * 4 + 0] = u;
       refs[i * 4 + 1] = v;
       isTail[i * 2 + 0] = 0.0;
 
-      // Vertex 1: tail
+      // Tail
       refs[i * 4 + 2] = u;
       refs[i * 4 + 3] = v;
       isTail[i * 2 + 1] = 1.0;
     }
 
+    geometry.setAttribute('position', new THREE.BufferAttribute(dummyPositions, 3));
     geometry.setAttribute('ref', new THREE.BufferAttribute(refs, 2));
     geometry.setAttribute('isTail', new THREE.BufferAttribute(isTail, 1));
 
@@ -175,54 +167,49 @@ export class ParticleRenderer {
     });
 
     this.streakMesh = new THREE.LineSegments(geometry, this.streakMaterial);
+    this.streakMesh.frustumCulled = false;
     this.scene.add(this.streakMesh);
   }
 
-  private initTrails(): void {
-    const halfW = Math.floor(this.width / 2);
-    const halfH = Math.floor(this.height / 2);
+  public rebuildPointsAndStreaks(particleCount: number, texWidth: number, texHeight: number): void {
+    this.particleCount = particleCount;
+    this.texWidth = texWidth;
+    this.texHeight = texHeight;
 
-    this.trailTargetA = new THREE.WebGLRenderTarget(halfW, halfH, {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-    });
-    this.trailTargetB = new THREE.WebGLRenderTarget(halfW, halfH, {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-    });
+    if (this.pointsMesh) {
+      this.pointsMesh.geometry.dispose();
+      this.scene.remove(this.pointsMesh);
+    }
+    if (this.streakMesh) {
+      this.streakMesh.geometry.dispose();
+      this.scene.remove(this.streakMesh);
+    }
 
-    this.trailScene = new THREE.Scene();
-    this.trailCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    this.trailFadeMaterial = new THREE.ShaderMaterial({
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: trailFadeFrag,
-      uniforms: {
-        tDiffuse: { value: null },
-        uFade: { value: 0.94 },
-      },
-      depthWrite: false,
-    });
-
-    const quadGeo = new THREE.PlaneGeometry(2, 2);
-    this.trailQuad = new THREE.Mesh(quadGeo, this.trailFadeMaterial);
-    this.trailScene.add(this.trailQuad);
+    this.initPoints();
+    this.initStreaks();
   }
 
-  private initTrackerIndices(): void {
-    // Pick 40 well-spaced indices
-    this.trackerIndices = [];
-    const step = Math.floor(this.particleCount / 40);
-    for (let i = 0; i < 40; i++) {
-      this.trackerIndices.push(Math.min(this.particleCount - 1, i * step + 128));
+  public setHasActiveImage(hasImage: boolean): void {
+    this.hasActiveImage = hasImage;
+    this.pointsMesh.visible = hasImage;
+    this.streakMesh.visible = hasImage;
+  }
+
+  public setTrackerFeaturePoints(homeData: Float32Array, pointCount: number): void {
+    this.trackerWorldPositions = [];
+    if (!this.hasActiveImage) return;
+
+    // Pick 40 non-empty feature points spread out across the subject
+    const step = Math.max(1, Math.floor(pointCount / 60));
+    for (let i = 0; i < pointCount && this.trackerWorldPositions.length < 40; i += step) {
+      const idx = i * 4;
+      const x = homeData[idx];
+      const y = homeData[idx + 1];
+      const z = homeData[idx + 2];
+      // Check that it's not empty space
+      if (Math.abs(x) > 0.001 || Math.abs(y) > 0.001 || Math.abs(z) > 0.001) {
+        this.trackerWorldPositions.push(new THREE.Vector3(x, y, z));
+      }
     }
   }
 
@@ -236,6 +223,11 @@ export class ParticleRenderer {
     morphProgress: number,
     scanProgress: number
   ): void {
+    if (!this.hasActiveImage) {
+      this.renderer.clear();
+      return;
+    }
+
     const lightVec = (params.lightOn && params.light !== 'off')
       ? (LIGHT_COLORS[params.light] || LIGHT_COLORS.cream)
       : LIGHT_COLORS.off;
@@ -243,7 +235,6 @@ export class ParticleRenderer {
     const isOnWhite = params.background === 'white';
     const isNegative = params.colorMode === 'negative';
 
-    // Clear color according to theme
     if (isOnWhite) {
       this.renderer.setClearColor(0xf8f8f7, 1);
       this.pointsMaterial.blending = THREE.NormalBlending;
@@ -273,8 +264,8 @@ export class ParticleRenderer {
     pu['uLine'].value.set(lineX, lineY);
 
     // Update Streaks uniforms
-    this.streakMesh.visible = params.trails;
-    if (params.trails) {
+    this.streakMesh.visible = params.trails && this.hasActiveImage;
+    if (this.streakMesh.visible) {
       const su = this.streakMaterial.uniforms;
       su['tPos'].value = posTexture;
       su['tVel'].value = velTexture;
@@ -286,35 +277,27 @@ export class ParticleRenderer {
       su['uOnWhite'].value = isOnWhite ? 1.0 : 0.0;
     }
 
-    // Standard render directly to screen
     this.renderer.render(this.scene, camera);
   }
 
   public getTrackerPoints(
     camera: THREE.PerspectiveCamera,
-    posTexture: THREE.Texture,
     count: number
   ): TrackerPoint[] {
-    const gl = this.renderer.getContext();
-    const result: TrackerPoint[] = [];
-    const n = Math.min(count, this.trackerIndices.length);
+    if (!this.hasActiveImage || this.trackerWorldPositions.length === 0) {
+      return [];
+    }
 
-    // Camera projection setup
+    const result: TrackerPoint[] = [];
+    const n = Math.min(count, this.trackerWorldPositions.length);
+
     const halfW = this.width / 2;
     const halfH = this.height / 2;
     const tempVec = new THREE.Vector3();
 
     for (let i = 0; i < n; i++) {
-      const pIdx = this.trackerIndices[i];
-      const u = (pIdx % this.texWidth) / this.texWidth;
-      const v = Math.floor(pIdx / this.texWidth) / this.texHeight;
-
-      // Approximate 3D position
-      const wx = (u - 0.5) * 1.2;
-      const wy = (0.5 - v) * 1.0;
-      const wz = 0.0;
-
-      tempVec.set(wx, wy, wz);
+      const wPos = this.trackerWorldPositions[i];
+      tempVec.copy(wPos);
       tempVec.project(camera);
 
       const sx = tempVec.x * halfW + halfW;
@@ -322,9 +305,9 @@ export class ParticleRenderer {
 
       result.push({
         id: i + 1,
-        worldX: wx,
-        worldY: wy,
-        worldZ: wz,
+        worldX: wPos.x,
+        worldY: wPos.y,
+        worldZ: wPos.z,
         screenX: sx,
         screenY: sy,
       });
@@ -345,8 +328,6 @@ export class ParticleRenderer {
     this.pointsMaterial.dispose();
     this.streakMesh.geometry.dispose();
     this.streakMaterial.dispose();
-    this.trailTargetA.dispose();
-    this.trailTargetB.dispose();
     this.renderer.dispose();
   }
 }

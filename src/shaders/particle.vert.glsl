@@ -54,7 +54,6 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mvPosition;
 
-  // Particle size attenuation with camera distance and z relief
-  float pointScale = 300.0 / -mvPosition.z;
-  gl_PointSize = max(1.0, uSize * uDpr * pointScale * (1.0 + pos.z * 0.3));
+  // Crisp stipple dot size: 1.5 to 3.0 CSS pixels (scaled by DPR)
+  gl_PointSize = max(1.0, uSize * uDpr * (1.0 + pos.z * 0.35));
 }

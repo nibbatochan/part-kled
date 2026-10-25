@@ -139,7 +139,7 @@ export class HeroInstance {
         depthArr[i] = depthData[i * 4] / 255.0;
       }
 
-      const sampleData = sampleImageParticles(imgCanvas, depthArr, count);
+      const sampleData = sampleImageParticles(imgCanvas, depthArr);
       this.engine.loadSampleData(sampleData);
 
       // Cross-fade: reveal canvas, fade out poster

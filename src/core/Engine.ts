@@ -15,9 +15,10 @@ export class Engine {
   public flowField: FlowField;
 
   private params: Params = { ...defaults };
-  private pointCount: number = 524288;
-  private texWidth: number = 1024;
-  private texHeight: number = 512;
+  private pointCount: number = 65536;
+  private texWidth: number = 256;
+  private texHeight: number = 256;
+  private hasActiveImage: boolean = false;
 
   // GPU Data Textures
   private tHomeCurrent!: THREE.DataTexture;
@@ -41,9 +42,10 @@ export class Engine {
   private scanProgress = 0.0;
   private scanSpeed = 0.35; // sweeps in ~2.8s
 
-  constructor(canvas: HTMLCanvasElement, pointCount: number = 524288) {
+  constructor(canvas: HTMLCanvasElement, pointCount: number = 65536) {
     this.canvas = canvas;
     this.pointCount = pointCount;
+    this.texWidth = 256;
     this.texHeight = Math.ceil(pointCount / this.texWidth);
 
     this.renderer = new ParticleRenderer(canvas, this.pointCount, this.texWidth, this.texHeight);
@@ -53,10 +55,36 @@ export class Engine {
     this.sim.setFlowTexture(this.flowField.texture);
   }
 
+  public setHasActiveImage(has: boolean): void {
+    this.hasActiveImage = has;
+    this.renderer.setHasActiveImage(has);
+  }
+
   public loadSampleData(
     currentData: SamplePointData,
     nextData?: SamplePointData
   ): void {
+    // Dynamically rebuild simulation & geometry if image resolution/particle count changes
+    if (currentData.texWidth !== this.texWidth || currentData.texHeight !== this.texHeight) {
+      this.texWidth = currentData.texWidth;
+      this.texHeight = currentData.texHeight;
+      this.pointCount = currentData.count;
+
+      this.sim.dispose();
+      this.sim = new Simulation(this.renderer.renderer, this.texWidth, this.texHeight);
+      this.sim.setFlowTexture(this.flowField.texture);
+      this.renderer.rebuildPointsAndStreaks(this.pointCount, this.texWidth, this.texHeight);
+
+      const pointsEl = document.getElementById('meta-points');
+      if (pointsEl) {
+        pointsEl.textContent = `${this.pointCount.toLocaleString()} POINTS`;
+      }
+    }
+
+    this.hasActiveImage = true;
+    this.renderer.setHasActiveImage(true);
+    this.renderer.setTrackerFeaturePoints(currentData.home, currentData.count);
+
     // 1. Current Home & Color
     this.tHomeCurrent = new THREE.DataTexture(
       currentData.home,
@@ -125,7 +153,6 @@ export class Engine {
 
     this.cameraCtrl.setPointer(ndcX, ndcY);
 
-    // Unproject to z=0 plane for particle physics
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.cameraCtrl.camera);
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -143,7 +170,6 @@ export class Engine {
       this.lastPointerWorld.copy(hit);
       this.pointerWorld.copy(hit);
 
-      // If DRAW is active, paint into flow field
       if (this.params.draw) {
         const normX = (hit.x * 0.5 + 0.5);
         const normY = (hit.y * 0.5 + 0.5);
@@ -155,7 +181,6 @@ export class Engine {
   }
 
   public triggerSplash(): void {
-    // Large impulse at pointer position
     this.pointerVelWorld.set(
       (Math.random() - 0.5) * 8.0,
       (Math.random() - 0.5) * 8.0,
@@ -164,16 +189,13 @@ export class Engine {
   }
 
   public update(dt: number, time: number): void {
-    // 1. Camera update
     this.cameraCtrl.update(this.params.depth);
 
-    // 2. Morph progress
     if (this.isMorphing) {
       const elapsed = (performance.now() - this.morphStartTime) / 1000;
       this.morphProgress = Math.min(1.0, elapsed / this.morphDuration);
       if (this.morphProgress >= 1.0) {
         this.isMorphing = false;
-        // Swap textures
         this.tHomeCurrent = this.tHomeNext;
         this.tColorCurrent = this.tColorNext;
         this.sim.setHomeTextures(this.tHomeCurrent, this.tHomeNext);
@@ -181,17 +203,14 @@ export class Engine {
       }
     }
 
-    // 3. Scan progress
     if (this.params.scan) {
       this.scanProgress = (this.scanProgress + this.scanSpeed * dt) % 1.0;
     } else {
       this.scanProgress = 0.0;
     }
 
-    // 4. FlowField update
     this.flowField.update(dt);
 
-    // 5. Simulation step
     const effectivePointer = this.params.track ? this.pointerWorld : new THREE.Vector3(999, 999, 0);
     this.sim.update(
       dt,
@@ -203,10 +222,8 @@ export class Engine {
       this.scanProgress
     );
 
-    // Slowly damp pointer velocity
     this.pointerVelWorld.multiplyScalar(0.85);
 
-    // 6. Render particles and streaks
     this.renderer.render(
       this.cameraCtrl.camera,
       this.sim.getPosTexture(),
@@ -221,11 +238,7 @@ export class Engine {
 
   public getTrackerPoints(): TrackerPoint[] {
     const count = this.params.trackers === 'dense' ? 40 : 12;
-    return this.renderer.getTrackerPoints(
-      this.cameraCtrl.camera,
-      this.sim.getPosTexture(),
-      count
-    );
+    return this.renderer.getTrackerPoints(this.cameraCtrl.camera, count);
   }
 
   public resize(width: number, height: number): void {

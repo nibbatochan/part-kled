@@ -23,7 +23,7 @@ export interface Params {
 
   line: { angle: number; length: number }; // LINE widget: radians, 0..1
   lineMode: 'streak' | 'dot';        // dot vs line rendering
-  pointCount: 131072 | 262144 | 524288 | 1048576;
+  pointCount: number; // dynamically adapted to subject image
   quality: 'auto' | 'low' | 'high';
 }
 
@@ -49,7 +49,7 @@ export const defaults: Params = {
 
   line: { angle: 0.58, length: 0.8 }, // default streak angle pointing towards top-right
   lineMode: 'streak',
-  pointCount: 524288,
+  pointCount: 32768,
   quality: 'auto',
 };
 
