@@ -47,7 +47,8 @@
   --line: rgba(233, 236, 238, 0.20);      /* box borders */
   --line-strong: rgba(233, 236, 238, 0.55);
   --grid: rgba(233, 236, 238, 0.045);     /* background grid lines */
-  --accent: #c8ff4d;
+  --accent: #e9ecee;      /* active state: plain white on grey, no colour */
+  --mark: #c8ff4d;        /* the one green mark: the title square */
   --light-cream: #f2e6c9;
   --light-ice: #bfe0ff;
   --light-orange: #ff9a3c;
@@ -58,7 +59,7 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   --label-size: 10.5px;
   --label-track: 0.12em;  /* uppercase everywhere */
-  --console-w: clamp(340px, 26vw, 440px);
+  --console-w: clamp(374px, 28.6vw, 484px); /* 10% wider than before */
   --grid-step: 24px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --t: 140ms;

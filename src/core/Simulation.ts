@@ -71,6 +71,7 @@ export class Simulation {
     vu['uScan'] = { value: 0.0 };
     vu['uScanActive'] = { value: 0.0 };
     vu['uScanMode'] = { value: 0.0 };
+    vu['uScanLevel'] = { value: 3.0 };
     vu['uZScale'] = { value: 0.14 };
     vu['uTrails'] = { value: 1.0 };
     vu['uScanCenter'] = { value: new THREE.Vector2(0, 0) };
@@ -174,6 +175,7 @@ export class Simulation {
     vu['uScan'].value = scanProgress;
     vu['uScanActive'].value = params.scan ? 1.0 : 0.0;
     vu['uScanMode'].value = params.scanMode;
+    vu['uScanLevel'].value = params.scanLevel;
     vu['uZScale'].value = params.depth * 0.55 * 0.5;
     vu['uTrails'].value = params.trails ? 1.0 : 0.0;
     vu['uScanCenter'].value.set(pointerOn ? pointer.x : 0, pointerOn ? pointer.y : 0);

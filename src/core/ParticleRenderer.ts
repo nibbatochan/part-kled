@@ -136,6 +136,7 @@ export class ParticleRenderer {
         uWhite: { value: 1.0 },
         uGamma: { value: 1.0 },
         uContrast: { value: 0.0 },
+        uOpacity: { value: 1.0 },
         uHue: { value: 0.0 },
         uSaturation: { value: 1.0 },
         uBW: { value: 0.0 },
@@ -184,6 +185,7 @@ export class ParticleRenderer {
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uScanMode: { value: 0.0 },
+        uScanLevel: { value: 3.0 },
         uZScale: { value: 0.14 },
         uScanCenter: { value: new THREE.Vector2(0, 0) },
         uLine: { value: new THREE.Vector2(1.0, 0.0) },
@@ -252,6 +254,7 @@ export class ParticleRenderer {
         uScan: { value: 0.0 },
         uScanActive: { value: 0.0 },
         uScanMode: { value: 0.0 },
+        uScanLevel: { value: 3.0 },
         uTrailAmount: { value: 1.0 },
         uTrailDetail: { value: 0.5 },
         uTrailStrength: { value: 1.0 },
@@ -349,6 +352,7 @@ export class ParticleRenderer {
     pu['uScan'].value = scanProgress;
     pu['uScanActive'].value = params.scan ? 1.0 : 0.0;
     pu['uScanMode'].value = params.scanMode;
+    pu['uScanLevel'].value = params.scanLevel;
     pu['uZScale'].value = params.depth * 0.55 * 0.5;
     pu['uScanCenter'].value.set(ctx.pointerOn ? ctx.pointer.x : 0, ctx.pointerOn ? ctx.pointer.y : 0);
     pu['uNegative'].value = isNegative ? 1.0 : 0.0;
@@ -374,6 +378,7 @@ export class ParticleRenderer {
       su['uScan'].value = scanProgress;
       su['uScanActive'].value = params.scan ? 1.0 : 0.0;
       su['uScanMode'].value = params.scanMode;
+      su['uScanLevel'].value = params.scanLevel;
       su['uTrailAmount'].value = params.trail.amount;
       su['uTrailDetail'].value = params.trail.detail;
       su['uTrailStrength'].value = params.trail.strength;
@@ -442,6 +447,7 @@ export class ParticleRenderer {
     cu['uWhite'].value = params.fx.white;
     cu['uGamma'].value = params.fx.gamma;
     cu['uContrast'].value = params.fx.contrast;
+    cu['uOpacity'].value = params.fx.opacity;
     cu['uHue'].value = params.fx.hue;
     cu['uSaturation'].value = params.fx.saturation;
     cu['uBW'].value = params.colorMode === 'bw' ? 1.0 : 0.0;

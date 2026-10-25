@@ -7,6 +7,7 @@ uniform float uBlack;
 uniform float uWhite;
 uniform float uGamma;
 uniform float uContrast;
+uniform float uOpacity;
 uniform float uHue;
 uniform float uSaturation;
 uniform float uBW;
@@ -39,28 +40,15 @@ void main() {
   vec3 rgb = scene.rgb;
   float a = scene.a;
 
-  // Dark paper: scene holds (sum colour*weight, sum weight). Mean colour * coverage gives the
-  // source brightness regardless of how many dots overlap a pixel.
   if (uOnWhite < 0.5) {
+    // Dark paper: scene holds (sum colour*weight, sum weight). Mean colour * coverage gives the
+    // source brightness regardless of how many dots overlap a pixel.
     float w = scene.a;
     // 0.9 gamma: a slight lift of the brightness curve
     rgb = pow(max(scene.rgb / max(w, 1e-4), vec3(0.0)), vec3(0.9)) * min(w, 1.0);
-    a = min(w, 1.0);
-  }
 
-  if (uTrailsEnabled > 0.5) {
-    vec4 trail = texture2D(tTrail, vUv);
-    if (uOnWhite > 0.5) {
-      rgb = mix(rgb, trail.rgb, trail.a * 0.4);
-    } else {
-      // Additive velvety persistence glow
-      rgb += trail.rgb * 0.38 * uTrailGain;
-    }
-    a = max(a, trail.a);
-  }
-
-  // Dark paper only: the effects tab. Levels, gamma, curve, hue, saturation, then black & white.
-  if (uOnWhite < 0.5) {
+    // Effects tab: levels, gamma, curve, hue, saturation, black & white, then opacity.
+    // These act on the picture only. The trails are added after this block, untouched.
     rgb = clamp((rgb - uBlack) / max(uWhite - uBlack, 1e-3), 0.0, 1.0);
     rgb = pow(rgb, vec3(1.0 / uGamma));
     rgb = clamp(0.5 + (rgb - 0.5) * (1.0 + uContrast), 0.0, 1.0);
@@ -68,6 +56,21 @@ void main() {
     float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
     rgb = clamp(mix(vec3(lum), rgb, uSaturation), 0.0, 1.0);
     if (uBW > 0.5) rgb = vec3(lum);
+    rgb *= uOpacity;
+
+    // The canvas is opaque: the picture's own coverage no longer doubles as hidden transparency
+    a = 1.0;
+  }
+
+  if (uTrailsEnabled > 0.5) {
+    vec4 trail = texture2D(tTrail, vUv);
+    if (uOnWhite > 0.5) {
+      rgb = mix(rgb, trail.rgb, trail.a * 0.4);
+      a = max(a, trail.a);
+    } else {
+      // Additive velvety persistence glow
+      rgb += trail.rgb * 0.38 * uTrailGain;
+    }
   }
 
   // 1/255 ordered dither to prevent banding in dark gradients

@@ -35,6 +35,7 @@ export class Panel {
     this.bindEffects();
     this.bindToggles();
     this.bindScanMode();
+    this.bindScanLevel();
     this.bindModes();
     this.bindSwatches();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
@@ -151,6 +152,18 @@ export class Panel {
     });
   }
 
+  // Impact counter beside the scan style: 1 (faint) to 5 (strong)
+  private bindScanLevel(): void {
+    const step = (d: number) => {
+      this.params.scanLevel = Math.max(1, Math.min(5, this.params.scanLevel + d));
+      this.params.scan = true;
+      this.syncUiToParams();
+      this.onParamsChangeCb(this.params);
+    };
+    document.getElementById('scan-level-dec')?.addEventListener('click', () => step(-1));
+    document.getElementById('scan-level-inc')?.addEventListener('click', () => step(1));
+  }
+
   private bindModes(): void {
     // Travel: SWARM / MELT
     const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');
@@ -233,6 +246,9 @@ export class Panel {
     });
 
     this.syncEffects();
+
+    const levelEl = document.getElementById('scan-level');
+    if (levelEl) levelEl.textContent = String(this.params.scanLevel);
 
     // Scan style label
     const scanLabel = document.getElementById('scan-mode-label');

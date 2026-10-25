@@ -26,7 +26,9 @@ float streamPhase(float age, float seed, float drift, float gather) {
 // 2 RADAR (beam turning around the cursor or centre), 3 LINES (fine bands travelling along LINE),
 // 4 DEPTH (a band that moves from the far relief to the near relief, strongest on bright parts).
 // z / zScale: particle depth and the largest depth the relief reaches. lum: particle brightness.
-float scanBand(vec2 p, vec2 lineDir, float scan, float mode, vec2 c, float z, float zScale, float lum) {
+uniform float uScanLevel; // 1..5, 3 = original impact
+
+float scanBandRaw(vec2 p, vec2 lineDir, float scan, float mode, vec2 c, float z, float zScale, float lum) {
   if (mode < 0.5) {
     float bd = (dot(p, lineDir) - mix(-0.85, 0.85, scan)) / 0.05;
     return exp(-bd * bd);
@@ -49,6 +51,11 @@ float scanBand(vec2 p, vec2 lineDir, float scan, float mode, vec2 c, float z, fl
   }
   float f = abs(fract(dot(p, lineDir) * 7.0 - scan * 3.0) - 0.5) / 0.07;
   return exp(-f * f) * 0.8;
+}
+
+// The scan impact counter (1 to 5) scales the band everywhere it is used
+float scanBand(vec2 p, vec2 lineDir, float scan, float mode, vec2 c, float z, float zScale, float lum) {
+  return scanBandRaw(p, lineDir, scan, mode, c, z, zScale, lum) * (uScanLevel * (1.0 / 3.0));
 }
 
 // Direction the scan pushes particles in

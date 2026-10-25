@@ -25,7 +25,7 @@ export class Frame {
     const m = 14; // inset of the frame marks from the stage edge
     const stroke = 'rgba(233, 236, 238, 0.45)';
     const strokeFaint = 'rgba(233, 236, 238, 0.14)';
-    const accent = '#c8ff4d';
+    const accent = 'rgba(233, 236, 238, 0.9)';
 
     let svgHtml = '';
 

@@ -5,6 +5,7 @@ export interface FxParams {
   white: number;      // 0.5..1   levels: white point
   gamma: number;      // 0.4..2.2 levels: midtone gamma (1 = none)
   contrast: number;   // -1..1    curve: contrast around mid grey
+  opacity: number;    // 0..1     image opacity (the picture only, not the trails)
   hue: number;        // -180..180 degrees
   saturation: number; // 0..2     1 = unchanged
 }
@@ -29,6 +30,7 @@ export interface Params {
   track: boolean;   // pointer repel
   scanMode: number; // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH
   scan: boolean;    // sweep line
+  scanLevel: number; // 1..5 scan impact (3 = the original strength)
   trails: boolean;  // fading streaks
 
   travel: 'swarm' | 'melt';
@@ -56,6 +58,7 @@ export const defaults: Params = {
   track: true,
   scan: false,
   scanMode: 0,
+  scanLevel: 3,
   trails: true,
 
   travel: 'swarm',
@@ -69,7 +72,7 @@ export const defaults: Params = {
   pointCount: 524288,
   quality: 'auto',
 
-  fx: { black: 0, white: 1, gamma: 1, contrast: 0, hue: 0, saturation: 1 },
+  fx: { black: 0, white: 1, gamma: 1, contrast: 0, opacity: 1, hue: 0, saturation: 1 },
   trail: { amount: 1, strength: 1, length: 1, detail: 0.5 },
 };
 

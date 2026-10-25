@@ -40,7 +40,6 @@
           <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
           <dl class="meta">
             <dt>MODEL</dt><dd>DEPTH ANYTHING V2</dd>
-            <dt>POINTS</dt><dd id="meta-points">524,288</dd>
             <dt>AUTHOR</dt><dd>SUMANTH REDDY</dd>
           </dl>
         </header>
@@ -72,22 +71,22 @@
         <section class="box">
           <h2><i>02</i> MOTION</h2>
           <div class="slider-group" data-param="drift">
-            <label for="sl-drift">DRIFT</label>
+            <label for="sl-drift">FLOW</label>
             <input type="range" id="sl-drift" min="0" max="1" step="0.01" value="0.80" />
             <output></output>
           </div>
           <div class="slider-group" data-param="splash">
-            <label for="sl-splash">SPLASH</label>
+            <label for="sl-splash">BURST</label>
             <input type="range" id="sl-splash" min="0" max="1" step="0.01" value="0.50" />
             <output></output>
           </div>
           <div class="slider-group" data-param="gather">
-            <label for="sl-gather">GATHER</label>
+            <label for="sl-gather">PULL</label>
             <input type="range" id="sl-gather" min="0" max="1" step="0.01" value="0.80" />
             <output></output>
           </div>
           <div class="slider-group" data-param="depth">
-            <label for="sl-depth">DEPTH</label>
+            <label for="sl-depth">RELIEF</label>
             <input type="range" id="sl-depth" min="0" max="1" step="0.01" value="0.80" />
             <output></output>
           </div>
@@ -123,7 +122,7 @@
         <section class="box">
           <h2><i>04</i> MODES</h2>
           <div class="row">
-            <span class="row-label">LAYERS</span>
+            <span class="row-label">FEATURES</span>
             <div class="seg">
               <button class="toggle-btn" data-toggle="draw">DRAW</button>
               <button class="toggle-btn active" data-toggle="track">TRACK</button>
@@ -131,14 +130,17 @@
             </div>
           </div>
           <div class="row">
-            <span class="row-label">SCAN</span>
+            <span class="row-label">SCANNER</span>
             <div class="seg">
               <button class="toggle-btn" data-toggle="scan">ON</button>
               <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
+              <button class="toggle-btn step-btn" id="scan-level-dec" type="button" title="Weaker scan" aria-label="Weaker scan">&minus;</button>
+              <output class="level" id="scan-level" title="Scan impact, 1 to 5">3</output>
+              <button class="toggle-btn step-btn" id="scan-level-inc" type="button" title="Stronger scan" aria-label="Stronger scan">+</button>
             </div>
           </div>
           <div class="row">
-            <span class="row-label">TRAVEL</span>
+            <span class="row-label">STYLE</span>
             <div class="seg">
               <button class="mode-btn active" data-travel="swarm">SWARM</button>
               <button class="mode-btn" data-travel="melt">MELT</button>
@@ -152,7 +154,7 @@
             </div>
           </div>
           <div class="row">
-            <span class="row-label">LIGHT</span>
+            <span class="row-label">TINT</span>
             <div class="swatches-row">
               <button class="swatch-btn active" data-light="cream" style="--c: var(--light-cream)" title="Cream"></button>
               <button class="swatch-btn" data-light="ice" style="--c: var(--light-ice)" title="Ice Blue"></button>
@@ -167,6 +169,12 @@
 
         <section id="fx-panel" class="box">
           <h2><i>05</i> EFFECTS <button id="fx-reset" class="mini" type="button">RESET</button></h2>
+          <span class="seg-label">IMAGE</span>
+          <div class="slider-group fx-slider" data-path="fx.opacity">
+            <label for="fx-fx-opacity">OPACITY</label>
+            <input type="range" id="fx-fx-opacity" data-path="fx.opacity" min="0" max="1" step="0.01" />
+            <output></output>
+          </div>
           <span class="seg-label">LEVELS</span>
           <div class="slider-group fx-slider" data-path="fx.black">
             <label for="fx-fx-black">BLACK</label>
