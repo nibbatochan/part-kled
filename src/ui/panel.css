@@ -160,6 +160,7 @@ canvas#hud-canvas {
 }
 
 .thumb-slot {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -167,6 +168,38 @@ canvas#hud-canvas {
   border: none;
   cursor: pointer;
   padding: 0;
+}
+
+.slot-delete {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(18, 18, 20, 0.95);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink-dim);
+  font-size: 11px;
+  line-height: 12px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--t) var(--ease), color var(--t) var(--ease), border-color var(--t) var(--ease);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.thumb-slot:hover .slot-delete {
+  opacity: 1;
+}
+
+.slot-delete:hover {
+  color: #ff4a3d;
+  border-color: #ff4a3d;
 }
 
 .slot-num {

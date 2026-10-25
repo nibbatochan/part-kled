@@ -125,41 +125,66 @@ void main() {
   home.z *= (uDepth * 2.2);
 
   // Force accumulation
-  // GATHER: spring force returning particles to their home position
-  vec3 F = (home - p) * mix(0.5, 9.0, uGather * uGather);
+  // GATHER: soft organic spring force
+  float baseGather = mix(0.35, 3.2, uGather);
 
-  // DRIFT: fluid curl noise
-  vec3 noiseF = curlNoise(p * 1.5 + vec3(0.0, 0.0, uTime * 0.12));
-  F += noiseF * (uDrift * 1.4);
+  // STREAMING TRAIL:
+  // Individual particles detach along uLine direction (to the right)
+  vec2 trailDir = normalize(uLine + vec2(1e-4, 0.0));
+  float trailStrength = uDrift * max(0.2, length(uLine));
 
-  // LINE direction & DRAW strokes
+  // Cyclical streaming phase per particle based on seed
+  float streamPhase = fract(seed * 19.37 + uTime * 0.12);
+  float isStreaming = smoothstep(0.35, 0.8, streamPhase) * smoothstep(0.1, 0.5, uDrift);
+
+  // If streaming, gather is softened so particles stream outwards
+  float effGather = mix(baseGather, baseGather * 0.08, isStreaming);
+  vec3 F = (home - p) * effGather;
+
+  // TRAVEL MODES: SWARM vs MELT
+  if (uMelt > 0.5) {
+    // MELT: particles stream rightward while dripping heavily downward with viscous drag
+    F.xy += trailDir * (trailStrength * 1.2 * isStreaming);
+    F.y -= (1.6 + uDrift * 1.4) * isStreaming;
+    v.x *= 0.95;
+  } else {
+    // SWARM: particles stream rightward with fluid curl noise turbulence
+    vec3 curl = curlNoise(p * 2.2 + vec3(uTime * 0.12, seed * 5.0, 0.0));
+    F += curl * (uDrift * 1.2);
+    F.xy += trailDir * (trailStrength * 2.2 * isStreaming);
+  }
+
+  // Soft loop-back for particles that streamed too far past boundary
+  float distFromHome = length(p.xy - home.xy);
+  if (distFromHome > 1.4) {
+    F += (home - p) * 3.5;
+  }
+
+  // DRAW strokes from flow field
   vec2 flowSample = texture2D(tFlow, clamp(p.xy * 0.5 + 0.5, 0.0, 1.0)).xy;
-  vec2 streakDir = (flowSample + uLine) * (0.35 + uDrift * 0.8);
-  F.xy += streakDir;
+  F.xy += flowSample * 1.5;
 
-  // TRACK & SPLASH: pointer repulsion and kinetic burst
+  // TRACK & SPLASH: pointer repulsion and kinetic burst (dimmed by 70%)
   vec3 d = p - uPointer;
   float r = length(d.xy);
   float k = smoothstep(uRadius, 0.0, r);
-  float pointerSpeed = length(uPointerVel);
-  F += normalize(d + vec3(1e-4, 1e-4, 0.05)) * k * (2.0 + uSplash * 14.0 * pointerSpeed);
-
-  // TRAVEL: MELT sags downward
-  F.y -= uMelt * 1.5 * (1.0 - uGather * 0.85);
+  float pointerSpeed = min(2.0, length(uPointerVel));
+  float splashSpread = uSplash * 2.8 * pointerSpeed;
+  F += normalize(d + vec3(1e-4, 1e-4, 0.05)) * k * (1.2 + splashSpread);
 
   // SCAN: sweep impulse along line direction
   if (uScanActive > 0.5) {
     vec2 scanDir = normalize(uLine + vec2(1e-4, 0.0));
-    float proj = dot(p.xy, scanDir) * 0.5 + 0.5;
+    float proj = dot(p.xy, scanDir) * 0.6 + 0.5;
     float distToScan = abs(proj - uScan);
-    if (distToScan < 0.04) {
-      float scanStrength = (1.0 - distToScan / 0.04);
-      F += vec3(scanDir * 1.5, 2.5) * scanStrength;
+    if (distToScan < 0.05) {
+      float scanStrength = (1.0 - distToScan / 0.05);
+      F += vec3(scanDir * 1.2, 2.0) * scanStrength;
     }
   }
 
   // Damping and integration
-  float damp = exp(-mix(1.8, 3.5, uGather) * uDt);
+  float damp = exp(-mix(1.5, 3.2, uGather) * uDt);
   v = v * damp + F * uDt;
 
   gl_FragColor = vec4(v, seed);

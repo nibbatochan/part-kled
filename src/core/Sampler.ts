@@ -79,11 +79,12 @@ export function computeImportanceWeights(
       if (hasExplicitAlpha) {
         mask[idx] = a > 0.05 ? 1.0 : 0.0;
       } else {
-        mask[idx] = (maxC > 0.08 || depth[idx] > 0.1) ? 1.0 : 0.0;
+        // In opaque photos, every pixel is part of the image
+        mask[idx] = 1.0;
       }
 
       if (mask[idx] > 0) activeCount++;
-      saliency[idx] = sat * 0.5;
+      saliency[idx] = sat * 0.4;
     }
   }
 
@@ -103,7 +104,8 @@ export function computeImportanceWeights(
       const gradMag = Math.min(1.0, Math.hypot(gradX, gradY) * 2.0);
 
       saliency[idx] = Math.min(1.0, saliency[idx] + gradMag * 0.5);
-      weights[idx] = mask[idx] * (0.35 + 0.65 * saliency[idx]);
+      // Balanced distribution: 65% uniform stipple coverage + 35% edge definition
+      weights[idx] = mask[idx] * (0.65 + 0.35 * saliency[idx]);
     }
   }
 
@@ -186,12 +188,21 @@ export function sampleImageParticles(
     home[homeIdx + 2] = (zDepth - 0.5);
     home[homeIdx + 3] = 1.0;
 
-    const cIdx = (y0 * w + x0) * 4;
+    // High-fidelity bilinear color interpolation
+    const idx00 = (y0 * w + x0) * 4;
+    const idx10 = (y0 * w + x1) * 4;
+    const idx01 = (y1 * w + x0) * 4;
+    const idx11 = (y1 * w + x1) * 4;
+    const w00 = (1 - fx) * (1 - fy);
+    const w10 = fx * (1 - fy);
+    const w01 = (1 - fx) * fy;
+    const w11 = fx * fy;
+
     const colIdx = i * 4;
-    color[colIdx + 0] = rgba[cIdx + 0];
-    color[colIdx + 1] = rgba[cIdx + 1];
-    color[colIdx + 2] = rgba[cIdx + 2];
-    color[colIdx + 3] = rgba[cIdx + 3];
+    color[colIdx + 0] = Math.round(rgba[idx00 + 0] * w00 + rgba[idx10 + 0] * w10 + rgba[idx01 + 0] * w01 + rgba[idx11 + 0] * w11);
+    color[colIdx + 1] = Math.round(rgba[idx00 + 1] * w00 + rgba[idx10 + 1] * w10 + rgba[idx01 + 1] * w01 + rgba[idx11 + 1] * w11);
+    color[colIdx + 2] = Math.round(rgba[idx00 + 2] * w00 + rgba[idx10 + 2] * w10 + rgba[idx01 + 2] * w01 + rgba[idx11 + 2] * w11);
+    color[colIdx + 3] = Math.round(rgba[idx00 + 3] * w00 + rgba[idx10 + 3] * w10 + rgba[idx01 + 3] * w01 + rgba[idx11 + 3] * w11);
   }
 
   return {

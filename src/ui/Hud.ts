@@ -33,22 +33,67 @@ export class Hud {
 
   public render(
     trackers: TrackerPoint[],
-    showMarks: boolean,
-    showLinks: boolean
+    showLinks: boolean,
+    showScan: boolean = false,
+    scanProgress: number = 0,
+    lineAngle: number = 0,
+    lightColorHex: string = '#f2e6c9'
   ): void {
     this.ctx.clearRect(0, 0, this.width, this.height);
-    if (!showMarks && !showLinks) return;
 
     const ctx = this.ctx;
-    const ink = 'rgba(244, 244, 242, 0.75)';
-    const inkFaint = 'rgba(244, 244, 242, 0.18)';
 
-    // 1. Draw LINKS between nearby trackers
-    if (showLinks && trackers.length > 1) {
+    // 1. Draw SCAN sweep beam across canvas if active
+    if (showScan) {
+      const cx = this.width / 2;
+      const cy = this.height / 2;
+      const maxDim = Math.hypot(this.width, this.height);
+
+      // Normal to sweep direction (scan travels along lineAngle)
+      const scanDirX = Math.cos(lineAngle);
+      const scanDirY = -Math.sin(lineAngle);
+
+      // Position along sweep axis: from -maxDim/2 to +maxDim/2
+      const offset = (scanProgress - 0.5) * maxDim * 0.9;
+      const beamCenterX = cx + scanDirX * offset;
+      const beamCenterY = cy + scanDirY * offset;
+
+      // Line perpendicular to sweep direction
+      const perpX = -scanDirY;
+      const perpY = scanDirX;
+
+      const p1x = beamCenterX - perpX * maxDim;
+      const p1y = beamCenterY - perpY * maxDim;
+      const p2x = beamCenterX + perpX * maxDim;
+      const p2y = beamCenterY + perpY * maxDim;
+
+      // Luminous glow band
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(p1x, p1y);
+      ctx.lineTo(p2x, p2y);
+      ctx.strokeStyle = lightColorHex;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Soft outer glow
+      ctx.beginPath();
+      ctx.moveTo(p1x, p1y);
+      ctx.lineTo(p2x, p2y);
+      ctx.lineWidth = 5.0;
+      ctx.globalAlpha = 0.18;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Draw LINKS connecting nearby feature nodes
+    if (showLinks && trackers.length >= 2) {
+      const inkFaint = 'rgba(244, 244, 242, 0.26)';
       ctx.strokeStyle = inkFaint;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      const maxDist = 120; // screen distance threshold
+      const maxDist = 95; // clean connection distance
       for (let i = 0; i < trackers.length; i++) {
         for (let j = i + 1; j < trackers.length; j++) {
           const dx = trackers[i].screenX - trackers[j].screenX;
@@ -61,50 +106,6 @@ export class Hud {
         }
       }
       ctx.stroke();
-    }
-
-    // 2. Draw MARKS (corner brackets + label)
-    if (showMarks) {
-      const bracketSize = 7;
-      const fmt = (n: number) => (n >= 0 ? `+${n.toFixed(2)}` : n.toFixed(2));
-      const pad2 = (n: number) => n.toString().padStart(2, '0');
-
-      ctx.font = '8.5px "JetBrains Mono", monospace';
-      ctx.fillStyle = ink;
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 1;
-
-      trackers.forEach((t) => {
-        const x = t.screenX;
-        const y = t.screenY;
-
-        // Skip if outside visible viewport
-        if (x < -20 || x > this.width + 20 || y < -20 || y > this.height + 20) return;
-
-        // Draw 4 corner brackets
-        ctx.beginPath();
-        // Top-left
-        ctx.moveTo(x - bracketSize, y - bracketSize + 4);
-        ctx.lineTo(x - bracketSize, y - bracketSize);
-        ctx.lineTo(x - bracketSize + 4, y - bracketSize);
-        // Top-right
-        ctx.moveTo(x + bracketSize - 4, y - bracketSize);
-        ctx.lineTo(x + bracketSize, y - bracketSize);
-        ctx.lineTo(x + bracketSize, y - bracketSize + 4);
-        // Bottom-left
-        ctx.moveTo(x - bracketSize, y + bracketSize - 4);
-        ctx.lineTo(x - bracketSize, y + bracketSize);
-        ctx.lineTo(x - bracketSize + 4, y + bracketSize);
-        // Bottom-right
-        ctx.moveTo(x + bracketSize - 4, y + bracketSize);
-        ctx.lineTo(x + bracketSize, y + bracketSize);
-        ctx.lineTo(x + bracketSize, y + bracketSize - 4);
-        ctx.stroke();
-
-        // Label: NN +x.xx +y.xx +z.xx
-        const label = `${pad2(t.id)} ${fmt(t.worldX)} ${fmt(t.worldY)} ${fmt(t.worldZ)}`;
-        ctx.fillText(label, x + bracketSize + 4, y + 3);
-      });
     }
   }
 }

@@ -1,25 +1,24 @@
 // src/core/params.ts
 export interface Params {
   // sliders, all 0..1
-  drift: number;   // default 0.8: noise flow around home
-  splash: number;  // default 0.6: burst on fast pointer / click
-  gather: number;  // default 0.8: spring back to home
-  depth: number;   // default 0.8: z displacement + parallax
+  drift: number;   // default 0.8: streaming trails towards right
+  splash: number;  // default 0.4: kinetic burst
+  gather: number;  // default 0.7: spring back to home
+  depth: number;   // default 0.8: z displacement + 3D relief
 
   // toggles
   draw: boolean;    // paint flow strokes
   track: boolean;   // pointer repel + tracker follow
   links: boolean;   // lines between trackers
   scan: boolean;    // sweep line
-  trails: boolean;  // fading streaks
-  marks: boolean;   // bracket labels
+  trails: boolean;  // streaming pixel trails
 
-  trackers: 'sparse' | 'dense';      // 12 vs 40 boxes
   travel: 'swarm' | 'melt';
   background: 'dark' | 'white';      // ON WHITE
   colorMode: 'true' | 'negative';
   light: 'cream' | 'ice' | 'orange' | 'red' | 'green' | 'violet' | 'off';
   lightOn: boolean;                  // S key
+  lightDirection: 'left' | 'top' | 'bottom' | 'highlights';
 
   line: { angle: number; length: number }; // LINE widget: radians, 0..1
   lineMode: 'streak' | 'dot';        // dot vs line rendering
@@ -29,27 +28,26 @@ export interface Params {
 
 export const defaults: Params = {
   drift: 0.8,
-  splash: 0.6,
-  gather: 0.8,
+  splash: 0.35,
+  gather: 0.7,
   depth: 0.8,
 
   draw: false,
   track: true,
   links: false,
-  scan: false,
+  scan: true,
   trails: true,
-  marks: true,
 
-  trackers: 'sparse',
   travel: 'swarm',
   background: 'dark',
   colorMode: 'true',
   light: 'cream',
   lightOn: true,
+  lightDirection: 'left',
 
-  line: { angle: 0.58, length: 0.8 }, // default streak angle pointing towards top-right
+  line: { angle: 0.0, length: 0.85 }, // default pointing towards the right (0 rad = +X)
   lineMode: 'streak',
-  pointCount: 32768,
+  pointCount: 65536,
   quality: 'auto',
 };
 
@@ -72,11 +70,10 @@ export const presets: Record<string, Partial<Params>> = {
   },
   scan: {
     drift: 0.4,
-    splash: 0.4,
-    gather: 0.85,
+    splash: 0.35,
+    gather: 0.75,
     scan: true,
     links: true,
-    marks: true,
   },
 };
 

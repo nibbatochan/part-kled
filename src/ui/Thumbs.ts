@@ -8,17 +8,20 @@ export class Thumbs {
   private activeIndex: number = 0;
   private onSelectCb: (index: number) => void;
   private onAddClickCb: () => void;
+  private onDeleteCb?: (index: number) => void;
 
   constructor(
     containerSelector: string,
     onSelect: (index: number) => void,
-    onAddClick: () => void
+    onAddClick: () => void,
+    onDelete?: (index: number) => void
   ) {
     const el = document.querySelector<HTMLElement>(containerSelector);
     if (!el) throw new Error('Thumbs container not found');
     this.container = el;
     this.onSelectCb = onSelect;
     this.onAddClickCb = onAddClick;
+    this.onDeleteCb = onDelete;
 
     const addBtn = document.getElementById('add-slot-btn');
     if (!addBtn) throw new Error('Add slot button not found');
@@ -76,8 +79,18 @@ export class Thumbs {
       box.className = 'slot-box';
       box.style.backgroundImage = `url(${img.thumbUrl})`;
 
+      const delBtn = document.createElement('button');
+      delBtn.className = 'slot-delete';
+      delBtn.innerHTML = '×';
+      delBtn.title = 'Delete image';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onDeleteCb?.(idx);
+      });
+
       slot.appendChild(num);
       slot.appendChild(box);
+      slot.appendChild(delBtn);
 
       slot.addEventListener('click', () => {
         this.setActiveIndex(idx);

@@ -15,12 +15,12 @@ const float bayerMatrix[16] = float[16](
 );
 
 void main() {
-  // Round soft particle sprite
+  // Round soft particle sprite with crisp stipple core
   vec2 coord = gl_PointCoord - vec2(0.5);
   float dist = length(coord);
   if (dist > 0.5) discard;
 
-  float alpha = smoothstep(0.5, 0.15, dist);
+  float alpha = 1.0 - smoothstep(0.32, 0.5, dist);
 
   vec3 rgb = vColor.rgb;
 
