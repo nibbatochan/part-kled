@@ -919,3 +919,8 @@ body.dragging .dropzone-box {
 .console .pair .slider-group label, .console .pan-panel .slider-group label, .console .fx-slider label { letter-spacing: 0.04em; }
 .console .pair .slider-group { grid-template-columns: 74px 1fr 40px; }
 .console .mini { height: 22px; }
+
+/* Pan icon: visible without a border; no focus ring on mouse clicks */
+.round-btn:focus:not(:focus-visible) { outline: none; }
+.pan-dot span { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); display: block; }
+.pan-dot { opacity: 0.85; }
