@@ -48,6 +48,7 @@ export class Panel {
     this.bindSwatches();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
     this.bindFullscreen();
+    this.bindPanIcon();
 
     this.syncUiToParams();
   }
@@ -157,7 +158,7 @@ export class Panel {
   }
 
   /** A row of buttons that set one string field: data-<attr>="value". */
-  private bindSegment(attr: 'trackstyle' | 'panstyle', key: 'trackStyle' | 'panStyle'): void {
+  private bindSegment(attr: 'trackstyle', key: 'trackStyle'): void {
     const btns = document.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`);
     btns.forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -216,7 +217,6 @@ export class Panel {
 
   private bindModes(): void {
     this.bindSegment('trackstyle', 'trackStyle');
-    this.bindSegment('panstyle', 'panStyle');
     // Travel: SWARM / MELT
     const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');
     travelBtns.forEach((btn) => {
@@ -270,6 +270,16 @@ export class Panel {
     btnAdd?.addEventListener('click', onOpenAdd);
   }
 
+  /** The PAN icon in the middle of the canvas opens and closes the pan controls. */
+  private bindPanIcon(): void {
+    const icon = document.getElementById('pan-icon');
+    const panel = document.getElementById('pan-panel');
+    icon?.addEventListener('click', () => {
+      const open = panel?.classList.toggle('hidden') === false;
+      icon.setAttribute('aria-expanded', String(open));
+    });
+  }
+
   private bindFullscreen(): void {
     const fsBtn = document.getElementById('fullscreen-btn');
     fsBtn?.addEventListener('click', () => {
@@ -295,7 +305,8 @@ export class Panel {
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);
 
     document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => b.classList.toggle('active', b.dataset.trackstyle === this.params.trackStyle));
-    document.querySelectorAll<HTMLButtonElement>('[data-panstyle]').forEach((b) => b.classList.toggle('active', b.dataset.panstyle === this.params.panStyle));
+    // HOVER off disables HARSH and SOFT
+    document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => (b.disabled = !this.params.track));
 
     // Scan style label
     const scanLabel = document.getElementById('scan-mode-label');

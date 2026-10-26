@@ -86,3 +86,12 @@ Budget from device tiers (`pointBudget()`): 200k low, 300k default, 450k strong.
 - PULSE: a light wave travels through the depth, front to back. Lit dots brighten and grow.
 - TRAIL section: AMOUNT, STRENGTH, DETAIL (moved out of Effects).
 - EFFECTS: image only (levels, contrast, hue, saturation, opacity, B&W). Drifting particles and trails use PART SAT and tint only.
+
+## Canvas layout update
+
+- DRIFT: compass at the bottom right of the canvas, ANGLE above and STRENGTH below it.
+- PAN: icon in the canvas centre. Opens CURSOR, FLOAT and AMOUNT. 3D ORBIT and the pan on/off toggle removed.
+- MODES: COLOUR removed. TRACK is now HOVER. HARSH and SOFT are disabled when HOVER is off. ON states are solid blocks with a dot; a chosen style is underlined.
+- PARTICLES: one section (RANDOM, DIM, PART SAT, SIZE, TRAIL DIR, TRAIL LEN, TRAIL AMT). TRAIL STRENGTH and DETAIL sliders removed; they stay at their defaults.
+- EFFECTS - IMAGE: section 05. RESET has an icon.
+- FLOW: reach raised again.

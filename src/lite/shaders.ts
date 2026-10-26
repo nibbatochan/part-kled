@@ -105,7 +105,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float ca = cos(ang), sa = sin(ang);
     vec2 dir = vec2(uDir.x * ca - uDir.y * sa, uDir.x * sa + uDir.y * ca);
     // FLOW: reach raised again (about 2.5x the first version at full flow)
-    float reach = (0.5 + 1.5 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
+    float reach = (0.8 + 2.4 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
     vec2 perp = vec2(-dir.y, dir.x);
     pos += dir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together

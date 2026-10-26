@@ -19,7 +19,6 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     lean: p.lean,
     depth: p.depth,
     pan: p.panMode ? p.panAmount : 0,
-    panOrbit: p.panStyle === 'orbit',
     floatOn: p.floatOn,
     randomness: p.randomness,
     trailSize: p.trailSize,
@@ -60,34 +59,15 @@ export class WebEngine {
   private lite: LiteEngine;
   private canvas: HTMLCanvasElement;
   private pending: LiteSample | null = null;
-  private drag: { x: number; y: number } | null = null;
-  private orbitOn = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.lite = new LiteEngine(canvas, { maxDpr: 1.5 });
     this.lite.setLayout({ fit: 'contain', zoom: 0.72 }); // same picture size as the studio
 
-    // ORBIT: drag on the stage to turn the picture; double-click returns to the front view
-    canvas.addEventListener('pointerdown', (e) => {
-      if (!this.orbitOn) return;
-      this.drag = { x: e.clientX, y: e.clientY };
-      this.lite.dragStart();
-    });
-    window.addEventListener('pointermove', (e) => {
-      if (!this.drag) return;
-      this.lite.dragMove(e.clientX - this.drag.x, e.clientY - this.drag.y);
-      this.drag = { x: e.clientX, y: e.clientY };
-    });
-    window.addEventListener('pointerup', () => {
-      this.drag = null;
-      this.lite.dragEnd();
-    });
-    canvas.addEventListener('dblclick', () => this.lite.resetOrbit());
   }
 
   setParams(p: Params): void {
-    this.orbitOn = p.panMode && p.panStyle === 'orbit' && p.panAmount > 0;
     this.lite.setParams(toLiteParams(p));
   }
 

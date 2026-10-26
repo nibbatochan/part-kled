@@ -9,13 +9,71 @@
   </head>
   <body>
     <div id="app">
-      <!-- Left: the stage. The canvas, its frame marks, the drop prompt and the loader all live here. -->
+      <!-- Left: the stage. The canvas, its frame marks, the drop prompt, the loader, PAN and DRIFT live here. -->
       <main id="stage-wrap" class="stage-wrap">
         <canvas id="stage"></canvas>
 
         <div id="frame-overlay" class="frame-overlay">
           <svg id="frame-svg" class="frame-svg" width="100%" height="100%"></svg>
           <div id="frame-readout" class="frame-readout">01 / 01 &nbsp; 3B4E83186AA6E41A83DDEE</div>
+        </div>
+
+        <!-- PAN: an icon in the centre of the canvas. Click to open the cursor, float and amount controls. -->
+        <div id="stage-pan" class="stage-pan">
+          <button id="pan-icon" class="pan-icon" type="button" title="Pan" aria-label="Pan" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4">
+              <path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/>
+            </svg>
+          </button>
+          <div id="pan-panel" class="pan-panel hidden">
+            <div class="row">
+              <span class="row-label">CURSOR</span>
+              <div class="seg">
+                <button class="toggle-btn" data-toggle="panMode">ON</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">FLOAT</span>
+              <div class="seg">
+                <button class="toggle-btn" data-toggle="floatOn">ON</button>
+              </div>
+            </div>
+            <div class="slider-group" data-param="panAmount">
+              <label for="sl-pan">AMOUNT</label>
+              <input type="range" id="sl-pan" data-path="panAmount" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+        </div>
+
+        <!-- DRIFT: the compass at the bottom right of the canvas, with ANGLE above and STRENGTH below it -->
+        <div id="stage-drift" class="stage-drift">
+          <div id="line-widget" class="line-widget-box" role="slider" tabindex="0"
+               aria-label="Drift direction" title="Drag to aim the drift. Distance from centre sets strength. Double-click to reset.">
+            <svg id="line-svg" width="56" height="56" viewBox="0 0 88 88">
+              <circle class="dial-ring" cx="44" cy="44" r="40" />
+              <g class="dial-ticks">
+                <line x1="44" y1="4" x2="44" y2="9" />
+                <line x1="84" y1="44" x2="79" y2="44" />
+                <line x1="44" y1="84" x2="44" y2="79" />
+                <line x1="4" y1="44" x2="9" y2="44" />
+              </g>
+              <line id="line-vector" class="dial-vector" x1="44" y1="44" x2="44" y2="44" />
+              <polygon id="line-arrow" class="dial-arrow" points="0,0" />
+              <circle id="line-handle-end" class="dial-handle" cx="44" cy="44" r="4.5" />
+              <circle class="dial-center" cx="44" cy="44" r="1.8" />
+            </svg>
+          </div>
+          <div class="drift-col">
+            <div class="drift-fields">
+              <label for="in-angle">ANGLE</label>
+              <input type="number" id="in-angle" min="-180" max="180" step="1" value="0" />
+            </div>
+            <div class="drift-fields">
+              <label for="in-strength">STRENGTH</label>
+              <input type="number" id="in-strength" min="25" max="100" step="1" value="90" />
+            </div>
+          </div>
         </div>
 
         <div id="dropzone" class="dropzone-overlay hidden">
@@ -83,7 +141,32 @@
               <output></output>
             </div>
           </div>
-          <div class="subhead">RANDOM / PARTICLE</div>
+        </section>
+
+        <section class="box">
+          <h2><i>03</i> MODES</h2>
+          <div class="row">
+            <span class="row-label">HOVER</span>
+            <div class="seg">
+              <button class="toggle-btn" data-toggle="track">ON</button>
+              <button class="mode-btn" data-trackstyle="old" title="Harsh: repels and follows the cursor's motion">HARSH</button>
+              <button class="mode-btn" data-trackstyle="soft" title="Gentle push away from the cursor">SOFT</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">SCANNER</span>
+            <div class="seg">
+              <button class="toggle-btn" data-toggle="scan">ON</button>
+              <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
+              <button class="toggle-btn step-btn" id="scan-level-dec" type="button" title="Weaker scan" aria-label="Weaker scan">&minus;</button>
+              <output class="level" id="scan-level" title="Scan impact, 1 to 5">3</output>
+              <button class="toggle-btn step-btn" id="scan-level-inc" type="button" title="Stronger scan" aria-label="Stronger scan">+</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2><i>04</i> PARTICLES</h2>
           <div class="pair">
             <div class="slider-group" data-param="randomness">
               <label for="sl-random" title="How much each particle's path differs: direction and distance">RANDOM</label>
@@ -101,7 +184,7 @@
               <output></output>
             </div>
             <div class="slider-group" data-param="trailSize">
-              <label for="sl-tsize" title="Dot size of the drifting particles">TRAIL SIZE</label>
+              <label for="sl-tsize" title="Dot size of the drifting particles">SIZE</label>
               <input type="range" id="sl-tsize" data-path="trailSize" min="0.2" max="3" step="0.01" />
               <output></output>
             </div>
@@ -115,116 +198,16 @@
               <input type="range" id="sl-length" data-path="trail.length" min="0.3" max="2" step="0.01" />
               <output></output>
             </div>
-          </div>
-        </section>
-
-        <section class="box">
-          <h2><i>03</i> DRIFT DIRECTION</h2>
-          <div class="dial-row">
-            <div id="line-widget" class="line-widget-box" role="slider" tabindex="0"
-                 aria-label="Drift direction" title="Drag to aim the drift. Distance from centre sets strength. Double-click to reset.">
-              <svg id="line-svg" width="56" height="56" viewBox="0 0 88 88">
-                <circle class="dial-ring" cx="44" cy="44" r="40" />
-                <g class="dial-ticks">
-                  <line x1="44" y1="4" x2="44" y2="9" />
-                  <line x1="84" y1="44" x2="79" y2="44" />
-                  <line x1="44" y1="84" x2="44" y2="79" />
-                  <line x1="4" y1="44" x2="9" y2="44" />
-                </g>
-                <line id="line-vector" class="dial-vector" x1="44" y1="44" x2="44" y2="44" />
-                <polygon id="line-arrow" class="dial-arrow" points="0,0" />
-                <circle id="line-handle-end" class="dial-handle" cx="44" cy="44" r="4.5" />
-                <circle class="dial-center" cx="44" cy="44" r="1.8" />
-              </svg>
-            </div>
-            <div class="dial-info">
-              <div class="dial-fields">
-                <label for="in-angle">ANGLE</label>
-                <input type="number" id="in-angle" min="-180" max="180" step="1" value="0" />
-                <label for="in-strength">STRENGTH</label>
-                <input type="number" id="in-strength" min="25" max="100" step="1" value="90" />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="box">
-          <h2><i>04</i> PAN</h2>
-          <div class="row">
-            <span class="row-label">ON</span>
-            <div class="seg">
-              <button class="toggle-btn" data-toggle="panMode" title="Tilt or turn the picture">PAN</button>
-              <button class="toggle-btn" data-toggle="floatOn" title="The picture hovers gently">FLOAT</button>
-            </div>
-          </div>
-          <div class="row">
-            <span class="row-label">STYLE</span>
-            <div class="seg">
-              <button class="mode-btn" data-panstyle="cursor" title="Tilt toward the cursor">CURSOR</button>
-              <button class="mode-btn" data-panstyle="orbit" title="Drag the stage to orbit to any side. Double-click to reset.">3D ORBIT</button>
-            </div>
-          </div>
-          <div class="pair single">
-            <div class="slider-group" data-param="panAmount">
-              <label for="sl-pan">AMOUNT</label>
-              <input type="range" id="sl-pan" data-path="panAmount" data-format="pct" min="0" max="1" step="0.01" />
-              <output></output>
-            </div>
-          </div>
-        </section>
-
-        <section class="box">
-          <h2><i>05</i> MODES</h2>
-          <div class="row">
-            <span class="row-label">TRACK</span>
-            <div class="seg">
-              <button class="toggle-btn" data-toggle="track">ON</button>
-              <button class="mode-btn" data-trackstyle="old" title="Harsh: repels and follows the cursor's motion">HARSH</button>
-              <button class="mode-btn" data-trackstyle="soft" title="Gentle push away from the cursor">SOFT</button>
-            </div>
-          </div>
-          <div class="row">
-            <span class="row-label">SCANNER</span>
-            <div class="seg">
-              <button class="toggle-btn" data-toggle="scan">ON</button>
-              <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
-              <button class="toggle-btn step-btn" id="scan-level-dec" type="button" title="Weaker scan" aria-label="Weaker scan">&minus;</button>
-              <output class="level" id="scan-level" title="Scan impact, 1 to 5">3</output>
-              <button class="toggle-btn step-btn" id="scan-level-inc" type="button" title="Stronger scan" aria-label="Stronger scan">+</button>
-            </div>
-          </div>
-          <div class="row">
-            <span class="row-label">COLOUR</span>
-            <div class="seg">
-              <button class="mode-btn" data-colormode="bw">B&amp;W</button>
-              <button class="mode-btn active" data-colormode="true">TRUE</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="box">
-          <h2><i>06</i> TRAIL</h2>
-          <div class="pair">
             <div class="slider-group" data-param="trail.amount">
-              <label for="sl-tamount">AMOUNT</label>
+              <label for="sl-tamount" title="How many particles leave a trail">TRAIL AMT</label>
               <input type="range" id="sl-tamount" data-path="trail.amount" min="0" max="1" step="0.01" />
-              <output></output>
-            </div>
-            <div class="slider-group" data-param="trail.strength">
-              <label for="sl-tstr">STRENGTH</label>
-              <input type="range" id="sl-tstr" data-path="trail.strength" min="0" max="2" step="0.01" />
-              <output></output>
-            </div>
-            <div class="slider-group" data-param="trail.detail">
-              <label for="sl-tdetail">DETAIL</label>
-              <input type="range" id="sl-tdetail" data-path="trail.detail" min="0" max="1" step="0.01" />
               <output></output>
             </div>
           </div>
         </section>
 
         <section id="fx-panel" class="box">
-          <h2><i>07</i> EFFECTS <button id="fx-reset" class="mini" type="button">RESET</button></h2>
+          <h2><i>05</i> EFFECTS - IMAGE <button id="fx-reset" class="mini" type="button" title="Reset effects"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
           <div class="pair">
             <div class="slider-group fx-slider" data-path="fx.opacity">
               <label for="fx-fx-opacity">OPACITY</label>

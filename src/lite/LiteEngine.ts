@@ -25,7 +25,6 @@ export interface LiteParams {
   speed: number;        // 1 = default
   sway: number;         // 0..1 idle camera drift (always on, not PAN)
   pan: number;          // 0..1 tilt amount; 0 = PAN off
-  panOrbit: boolean;    // PAN style: false = CURSOR tilt, true = 3D orbit
   floatOn: boolean;     // FLOAT: the picture hovers gently
   track: boolean;       // cursor acts on the particles
   trackOld: boolean;    // TRACK style: true = OLD (repel + follow motion), false = SOFT (gentle push)
@@ -59,7 +58,6 @@ export const liteDefaults: LiteParams = {
   speed: 1,
   sway: 0.6,
   pan: 0.5,
-  panOrbit: false,
   floatOn: false,
   track: true,
   trackOld: false,
@@ -168,9 +166,6 @@ export class LiteEngine {
   private look = { x: 0, y: 0 };
   private lookTarget = { x: 0, y: 0 };
   private sway = { x: 0, y: 0 };
-  // ORBIT: the angle the user dragged to, kept after the drag ends
-  private orbit = { yaw: 0, pitch: 0 };
-  private dragging = false;
   private burstX = 0;
   private burstY = 0;
   private burstAge = BURST_LIFE;
@@ -333,26 +328,6 @@ export class LiteEngine {
     this.clickT = this.time;
   }
 
-  /** ORBIT style: drag on the stage to turn the picture to any side. */
-  dragStart(): void {
-    this.dragging = true;
-  }
-
-  dragMove(dx: number, dy: number): void {
-    if (!this.dragging) return;
-    this.orbit.yaw += dx * 0.01;
-    this.orbit.pitch = Math.max(-1.5, Math.min(1.5, this.orbit.pitch + dy * 0.01));
-  }
-
-  dragEnd(): void {
-    this.dragging = false;
-  }
-
-  /** Back to the front view (double-click). */
-  resetOrbit(): void {
-    this.orbit = { yaw: 0, pitch: 0 };
-  }
-
   private toWorld(x: number, y: number): [number, number] {
     const wx = ((x - this.cssW / 2) * this.dpr - this.offX) / this.scale;
     const wy = (-(y - this.cssH / 2) * this.dpr - this.offY) / this.scale;
@@ -416,9 +391,8 @@ export class LiteEngine {
     const p = this.params;
 
     // PAN: cursor tilt scaled by the amount. CURSOR style tilts; ORBIT style turns the picture further.
-    const orbitOn = p.panOrbit && p.pan > 0;
-    const tgtX = (orbitOn ? this.orbit.yaw : 0) + this.lookTarget.x * p.pan * 0.3;
-    const tgtY = (orbitOn ? this.orbit.pitch : 0) + this.lookTarget.y * p.pan * 0.18;
+    const tgtX = this.lookTarget.x * p.pan * 0.3;
+    const tgtY = this.lookTarget.y * p.pan * 0.18;
     this.look.x += (tgtX - this.look.x) * k;
     this.look.y += (tgtY - this.look.y) * k;
     // Idle sway is separate and always on

@@ -869,3 +869,28 @@ body.dragging .dropzone-box {
 .line-widget-box { width: 56px; height: 56px; }
 .dial-row { gap: 8px; }
 .dial-fields input[type='number'] { width: 46px; }
+
+/* ───────── Canvas layout update: PAN in the centre, DRIFT bottom right, hover and scanner states ───────── */
+.stage-pan { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; }
+.pan-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: rgba(5, 6, 7, 0.75); color: var(--ink-dim); cursor: pointer; transition: color var(--t) var(--ease), border-color var(--t) var(--ease); }
+.pan-icon:hover, .pan-icon[aria-expanded='true'] { color: var(--ink); border-color: var(--line-strong); }
+.pan-panel { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); width: 210px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line-strong); background: rgba(5, 6, 7, 0.94); }
+.pan-panel.hidden { display: none; }
+.pan-panel .row { padding: 0; grid-template-columns: 62px 1fr; }
+.pan-panel .slider-group { grid-template-columns: 58px 1fr 34px; padding: 2px 0; }
+
+.stage-drift { position: absolute; right: 14px; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 8px; }
+.stage-drift .line-widget-box { width: 56px; height: 56px; background: rgba(5, 6, 7, 0.6); }
+.drift-col { display: flex; flex-direction: column; gap: 6px; }
+.drift-fields { display: flex; flex-direction: column; gap: 2px; }
+.drift-fields label { font-size: 8px; letter-spacing: 0.14em; color: var(--ink-dim); }
+.drift-fields input[type='number'] { width: 62px; height: 20px; padding: 0 6px; border: 1px solid var(--line); background: rgba(5, 6, 7, 0.6); color: var(--ink); font-family: var(--font-mono); font-size: 11px; text-align: right; outline: none; user-select: text; -webkit-user-select: text; -moz-appearance: textfield; appearance: textfield; }
+.drift-fields input[type='number']::-webkit-inner-spin-button, .drift-fields input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Hover and scanner: ON is a solid block with a dot; a chosen style is an underline, so they read differently */
+.toggle-btn.active { background: var(--accent); color: #050607; }
+.toggle-btn.active::before { content: '● '; }
+.mode-btn.active { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.seg button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.mini svg { vertical-align: -1px; margin-right: 3px; }
