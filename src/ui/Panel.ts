@@ -49,6 +49,7 @@ export class Panel {
     this.bindActions(onNext, onToggleLight, onOpenAdd);
     this.bindFullscreen();
     this.bindPanIcon();
+    this.bindThreeD();
 
     this.syncUiToParams();
   }
@@ -270,7 +271,16 @@ export class Panel {
     btnAdd?.addEventListener('click', onOpenAdd);
   }
 
-  /** The PAN icon in the middle of the canvas opens and closes the pan controls. */
+  /** The 3D button on the canvas: drag turns the picture in any direction, wheel moves through it. */
+  private bindThreeD(): void {
+    document.getElementById('threed-btn')?.addEventListener('click', () => {
+      this.params.threeD = !this.params.threeD;
+      this.syncUiToParams();
+      this.onParamsChangeCb(this.params);
+    });
+  }
+
+  /** The PAN icon on the canvas opens and closes the pan controls. */
   private bindPanIcon(): void {
     const icon = document.getElementById('pan-icon');
     const panel = document.getElementById('pan-panel');
@@ -305,6 +315,9 @@ export class Panel {
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);
 
     document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => b.classList.toggle('active', b.dataset.trackstyle === this.params.trackStyle));
+    const threed = document.getElementById('threed-btn');
+    threed?.classList.toggle('on', this.params.threeD);
+    threed?.setAttribute('aria-pressed', String(this.params.threeD));
     // PAN icon shows when the cursor turn is on
     document.getElementById('pan-icon')?.classList.toggle('on', this.params.panMode && this.params.panAmount > 0);
     // HOVER off disables HARSH and SOFT

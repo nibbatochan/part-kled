@@ -20,6 +20,7 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     depth: p.depth,
     pan: p.panMode ? p.panAmount : 0,
     floatOn: p.floatOn,
+    threeD: p.threeD,
     randomness: p.randomness,
     trailSize: p.trailSize,
     trailAngle: p.trailAngle,
@@ -65,9 +66,34 @@ export class WebEngine {
     this.lite = new LiteEngine(canvas, { maxDpr: 1.5 });
     this.lite.setLayout({ fit: 'contain', zoom: 0.72 }); // same picture size as the studio
 
+    // 3D: drag to turn in any direction, wheel to move through, double-click to reset
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!this.threeD) return;
+      this.drag = { x: e.clientX, y: e.clientY };
+      this.lite.dragStart();
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!this.drag) return;
+      this.lite.dragMove(e.clientX - this.drag.x, e.clientY - this.drag.y);
+      this.drag = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('pointerup', () => {
+      this.drag = null;
+      this.lite.dragEnd();
+    });
+    canvas.addEventListener('wheel', (e) => {
+      if (!this.threeD) return;
+      e.preventDefault();
+      this.lite.wheelMove(e.deltaY);
+    }, { passive: false });
+    canvas.addEventListener('dblclick', () => this.lite.resetOrbit());
   }
 
+  private threeD = false;
+  private drag: { x: number; y: number } | null = null;
+
   setParams(p: Params): void {
+    this.threeD = p.threeD;
     this.lite.setParams(toLiteParams(p));
   }
 

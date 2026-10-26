@@ -25,6 +25,7 @@ export interface LiteParams {
   speed: number;        // 1 = default
   sway: number;         // 0..1 idle camera drift (always on, not PAN)
   pan: number;          // 0..1 tilt amount; 0 = PAN off
+  threeD: boolean;      // 3D: drag turns the picture in any direction, wheel moves through it
   floatOn: boolean;     // FLOAT: the picture hovers gently
   track: boolean;       // cursor acts on the particles
   trackOld: boolean;    // TRACK style: true = OLD (repel + follow motion), false = SOFT (gentle push)
@@ -59,6 +60,7 @@ export const liteDefaults: LiteParams = {
   sway: 0.6,
   pan: 0.5,
   floatOn: false,
+  threeD: false,
   track: true,
   trackOld: false,
   burst: 0,
@@ -117,7 +119,7 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
 
 const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
-  'uRandom', 'uTrailSize', 'uTrailAngle', 'uDim', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
+  'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uDim', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW',
@@ -166,6 +168,10 @@ export class LiteEngine {
   private look = { x: 0, y: 0 };
   private lookTarget = { x: 0, y: 0 };
   private sway = { x: 0, y: 0 };
+  // 3D: the turn the user dragged to, and how far they moved through the picture
+  private orbit = { yaw: 0, pitch: 0 };
+  private dragging = false;
+  private dolly = 0;
   private burstX = 0;
   private burstY = 0;
   private burstAge = BURST_LIFE;
@@ -328,6 +334,32 @@ export class LiteEngine {
     this.clickT = this.time;
   }
 
+  /** 3D: drag to turn the picture. No limits, so it turns in every direction. */
+  dragStart(): void {
+    this.dragging = true;
+  }
+
+  dragMove(dx: number, dy: number): void {
+    if (!this.dragging) return;
+    this.orbit.yaw += dx * 0.01;
+    this.orbit.pitch += dy * 0.01;
+  }
+
+  dragEnd(): void {
+    this.dragging = false;
+  }
+
+  /** 3D: wheel moves through the picture (closer or further). */
+  wheelMove(deltaY: number): void {
+    this.dolly = Math.max(-0.8, Math.min(0.8, this.dolly - deltaY * 0.001));
+  }
+
+  /** Double-click: back to the front view. */
+  resetOrbit(): void {
+    this.orbit = { yaw: 0, pitch: 0 };
+    this.dolly = 0;
+  }
+
   private toWorld(x: number, y: number): [number, number] {
     const wx = ((x - this.cssW / 2) * this.dpr - this.offX) / this.scale;
     const wy = (-(y - this.cssH / 2) * this.dpr - this.offY) / this.scale;
@@ -393,8 +425,9 @@ export class LiteEngine {
 
     // PAN: cursor tilt scaled by the amount. CURSOR style tilts; ORBIT style turns the picture further.
     // Cursor turn: at the edge of the stage the picture turns by about 26 degrees at amount 0.5
-    const tgtX = this.lookTarget.x * p.pan * 0.9;
-    const tgtY = this.lookTarget.y * p.pan * 0.5;
+    // 3D turns by drag and ignores the cursor; otherwise the cursor turns the picture by PAN amount
+    const tgtX = p.threeD ? this.orbit.yaw : this.lookTarget.x * p.pan * 0.9;
+    const tgtY = p.threeD ? this.orbit.pitch : this.lookTarget.y * p.pan * 0.5;
     this.look.x += (tgtX - this.look.x) * k;
     this.look.y += (tgtY - this.look.y) * k;
     // Idle sway is separate and always on
@@ -433,6 +466,7 @@ export class LiteEngine {
       gl.uniform1f(U.uLean, p.lean);
       gl.uniform1f(U.uHalfW, s.aspect / 2);
       gl.uniform1f(U.uRandom, p.randomness);
+      gl.uniform1f(U.uDolly, this.dolly);
       gl.uniform1f(U.uTrailSize, p.trailSize);
       gl.uniform1f(U.uTrailAngle, (p.trailAngle * Math.PI) / 180);
       gl.uniform1f(U.uDim, p.dim);

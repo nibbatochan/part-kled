@@ -34,6 +34,7 @@ export interface Params {
   panAmount: number; // 0..1 how far PAN tilts
   panStyle: 'cursor' | 'orbit'; // PAN style: tilt toward the cursor, or a fuller 3D orbit
   floatOn: boolean; // FLOAT: the picture hovers gently
+  threeD: boolean; // 3D: drag to turn in any direction, wheel to move through
   randomness: number; // 0..1 randomness of the particle path
   trailSize: number; // dot size of drifting particles (multiplier)
   trailAngle: number; // degrees, trail direction turned away from the drift path
@@ -74,6 +75,7 @@ export const defaults: Params = {
   panAmount: 0.5,
   panStyle: 'cursor',
   floatOn: false,
+  threeD: false,
   randomness: 0.3,
   trailSize: 1,
   trailAngle: 0,

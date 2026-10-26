@@ -54,6 +54,7 @@ uniform float uZScale;
 uniform float uOpacity;     // picture only, trails are not dimmed
 uniform float uMorph;       // 0..1 progress of the morph into the next picture
 uniform float uRole;        // 0 normal, 3 morphing
+uniform float uDolly;       // 3D: move through the picture (camera distance)
 
 out vec3 vCol;
 
@@ -153,7 +154,8 @@ vec4 toClip(vec2 world, float z) {
   float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
   vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
   q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);
-  float persp = 1.0 / (1.0 - q.z * 0.5);
+  float zc = q.z + uDolly;
+  float persp = 1.0 / (1.0 - zc * 0.5);
   vec2 px = q.xy * persp * uScale + uOffset;
   return vec4(px / (uView * 0.5), 0.0, 1.0);
 }
