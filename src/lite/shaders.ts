@@ -105,7 +105,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float ang = (r4 - 0.5) * uRandom * 1.2;
     float ca = cos(ang), sa = sin(ang);
     vec2 dir = vec2(uDir.x * ca - uDir.y * sa, uDir.x * sa + uDir.y * ca);
-    float reach = (0.9 + 3.0 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom); // max range: about 3.9 picture heights at full flow
+    // Reach also sets the trail: a trail is the same path, a little further back. Max about 2 picture heights at full flow.
+    float reach = (0.4 + 1.6 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
     vec2 perp = vec2(-dir.y, dir.x);
     pos += dir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
@@ -115,7 +116,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
     // Streaks fade only far out, so drifting particles can travel past the canvas edges
-    alpha *= 1.0 - smoothstep(2.6, 3.8, length(dir * reach * ease));
+    alpha *= 1.0 - smoothstep(1.2, 2.0, length(dir * reach * ease));
     // DIM: the drift paths are dimmed procedurally, in soft bands, so the dots read better
     alpha *= mix(1.0, 0.4, uDim * (0.5 + 0.5 * sin(s * 7.0 + r4 * 6.2831853)));
     streaming = smoothstep(0.0, 0.12, s); // 0 on the picture, 1 once drifting (smooth, so colour blends)

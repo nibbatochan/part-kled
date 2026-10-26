@@ -132,7 +132,7 @@ export const presets: Record<string, Partial<Params>> = {
 export function withLightStart(p: Params): Params {
   return {
     ...p,
-    drift: 0.7,                       // FLOW: slightly high
+    drift: 0.3,                       // FLOW: 30%
     depth: 0.5,                       // DEPTH 50%
     lean: 0,
     line: { angle: (31 * Math.PI) / 180, length: 0.55 }, // ANGLE 31 degrees (top right), STRENGTH 55

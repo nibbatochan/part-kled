@@ -88,7 +88,7 @@ const ok =
   drift.angle === 0.785 && drift.length === 0.8 && drift.pan === 0.8 && drift.lean === 0.5 &&
   drift.bar === '100%' && drift.engine.pan === 0.8 && drift.engine.lean === 0.5 &&
   afterDrift.lit > 100 && afterDrift.glError === 0 && shift === 0 &&
-  perImage.onZero !== perImage.backOnOne && perImage.backOnOne === 0.25 && perImage.onZero === 0.7;
+  perImage.onZero !== perImage.backOnOne && perImage.backOnOne === 0.25 && perImage.onZero === 0.3;
 
 await browser.close();
 if (!ok) {
