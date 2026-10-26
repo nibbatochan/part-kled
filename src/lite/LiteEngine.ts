@@ -20,6 +20,8 @@ export interface LiteParams {
   lean: number;         // -1..1 side of the picture the streamers come from (0 = centred)
   depth: number;        // RELIEF: 0..1
   randomness: number;   // 0..1 path randomness (direction and distance per particle)
+  trailSize: number;    // dot size of drifting particles, 0.2..3
+  trailAngle: number;   // degrees, trail direction turned away from the drift path
   speed: number;        // 1 = default
   sway: number;         // 0..1 idle camera drift (always on, not PAN)
   pan: number;          // 0..1 tilt amount; 0 = PAN off
@@ -52,6 +54,8 @@ export const liteDefaults: LiteParams = {
   lean: 0,
   depth: 0.5,
   randomness: 0.3,
+  trailSize: 1,
+  trailAngle: 0,
   speed: 1,
   sway: 0.6,
   pan: 0.5,
@@ -115,7 +119,7 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
 
 const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
-  'uRandom', 'uDim', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
+  'uRandom', 'uTrailSize', 'uTrailAngle', 'uDim', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW',
@@ -164,6 +168,9 @@ export class LiteEngine {
   private look = { x: 0, y: 0 };
   private lookTarget = { x: 0, y: 0 };
   private sway = { x: 0, y: 0 };
+  // ORBIT: the angle the user dragged to, kept after the drag ends
+  private orbit = { yaw: 0, pitch: 0 };
+  private dragging = false;
   private burstX = 0;
   private burstY = 0;
   private burstAge = BURST_LIFE;
@@ -326,6 +333,26 @@ export class LiteEngine {
     this.clickT = this.time;
   }
 
+  /** ORBIT style: drag on the stage to turn the picture to any side. */
+  dragStart(): void {
+    this.dragging = true;
+  }
+
+  dragMove(dx: number, dy: number): void {
+    if (!this.dragging) return;
+    this.orbit.yaw += dx * 0.01;
+    this.orbit.pitch = Math.max(-1.5, Math.min(1.5, this.orbit.pitch + dy * 0.01));
+  }
+
+  dragEnd(): void {
+    this.dragging = false;
+  }
+
+  /** Back to the front view (double-click). */
+  resetOrbit(): void {
+    this.orbit = { yaw: 0, pitch: 0 };
+  }
+
   private toWorld(x: number, y: number): [number, number] {
     const wx = ((x - this.cssW / 2) * this.dpr - this.offX) / this.scale;
     const wy = (-(y - this.cssH / 2) * this.dpr - this.offY) / this.scale;
@@ -389,9 +416,11 @@ export class LiteEngine {
     const p = this.params;
 
     // PAN: cursor tilt scaled by the amount. CURSOR style tilts; ORBIT style turns the picture further.
-    const panScale = p.pan * (p.panOrbit ? 2 : 1);
-    this.look.x += (this.lookTarget.x * panScale - this.look.x) * k;
-    this.look.y += (this.lookTarget.y * panScale - this.look.y) * k;
+    const orbitOn = p.panOrbit && p.pan > 0;
+    const tgtX = (orbitOn ? this.orbit.yaw : 0) + this.lookTarget.x * p.pan * 0.3;
+    const tgtY = (orbitOn ? this.orbit.pitch : 0) + this.lookTarget.y * p.pan * 0.18;
+    this.look.x += (tgtX - this.look.x) * k;
+    this.look.y += (tgtY - this.look.y) * k;
     // Idle sway is separate and always on
     const sw = p.sway;
     this.sway.x = (Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.11 + 1.3) * 0.4) * sw;
@@ -410,7 +439,7 @@ export class LiteEngine {
     const hue = (fx.hue * Math.PI) / 180;
     // SCAN starts where the user clicked and restarts its sweep there
     const scanPhase = ((t - this.clickT) * SCAN_RATE) % 1;
-    const scanOn = p.scan && p.scanMode < 4.5; // BURST is not a band; it is the click shock
+    const scanOn = p.scan && p.scanMode !== 5; // BURST is the click shock, not a band
     const velX = Math.max(-2, Math.min(2, this.ptrVel.x));
     const velY = Math.max(-2, Math.min(2, this.ptrVel.y));
 
@@ -428,6 +457,8 @@ export class LiteEngine {
       gl.uniform1f(U.uLean, p.lean);
       gl.uniform1f(U.uHalfW, s.aspect / 2);
       gl.uniform1f(U.uRandom, p.randomness);
+      gl.uniform1f(U.uTrailSize, p.trailSize);
+      gl.uniform1f(U.uTrailAngle, (p.trailAngle * Math.PI) / 180);
       gl.uniform1f(U.uDim, p.dim);
       gl.uniform1f(U.uPSat, p.pSat);
       gl.uniform2f(U.uLook, this.look.x, this.look.y);

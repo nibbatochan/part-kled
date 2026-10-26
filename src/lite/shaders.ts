@@ -26,6 +26,8 @@ uniform vec2 uDir;        // drift direction (unit) * strength factor
 uniform float uLean;      // -1..1 which side of the picture the streamers come from
 uniform float uHalfW;     // half the picture width in world units
 uniform float uRandom;    // 0..1 randomness of the path (direction and distance per particle)
+uniform float uTrailSize; // dot size of drifting particles, multiplier of the picture dot
+uniform float uTrailAngle; // radians, trail direction turned away from the drift path
 uniform float uDim;       // 0..1 procedural dimming along the drift paths
 uniform float uPSat;      // particle saturation, 1 = as sampled
 uniform vec2 uLook;       // PAN: cursor tilt, already scaled by the pan amount and style
@@ -65,6 +67,7 @@ float rnd(uint id, uint salt) {
   return float(hashu(id * 747796405u + salt * 2891336453u)) * (1.0 / 4294967296.0);
 }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec3 partSat(vec3 c) { return clamp(mix(vec3(luma(c)), c, uPSat), 0.0, 1.0); }
 
 // World position and opacity of one particle; sOff pulls it back along its own path (trail tails).
 vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out float alpha, out float streaming) {
@@ -101,8 +104,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float ang = (r4 - 0.5) * uRandom * 1.2;
     float ca = cos(ang), sa = sin(ang);
     vec2 dir = vec2(uDir.x * ca - uDir.y * sa, uDir.x * sa + uDir.y * ca);
-    // FLOW: the reach doubled against the first version (maximum now about 1.8 world units)
-    float reach = (0.32 + 1.0 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
+    // FLOW: reach raised again (about 2.5x the first version at full flow)
+    float reach = (0.5 + 1.5 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
     vec2 perp = vec2(-dir.y, dir.x);
     pos += dir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
@@ -114,7 +117,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     alpha *= 1.0 - smoothstep(0.2, 0.42, length(dir * reach * ease));
     // DIM: the drift paths are dimmed procedurally, in soft bands, so the dots read better
     alpha *= mix(1.0, 0.4, uDim * (0.5 + 0.5 * sin(s * 7.0 + r4 * 6.2831853)));
-    streaming = step(0.001, s);
+    streaming = smoothstep(0.0, 0.12, s); // 0 on the picture, 1 once drifting (smooth, so colour blends)
   }
 
   // Tiny shimmer so the held picture is alive
@@ -145,8 +148,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 // Tilt the whole picture like a card in 3D: depth pushes near parts toward the viewer.
 vec4 toClip(vec2 world, float z) {
   vec3 p = vec3(world, z * 0.45 * uDepth);
-  float yaw = uLook.x * 0.3 + uSway.x * 0.14;
-  float pitch = -(uLook.y * 0.18 + uSway.y * 0.09);
+  float yaw = uLook.x + uSway.x * 0.14;      // uLook holds the angles (PAN cursor tilt or ORBIT drag)
+  float pitch = -(uLook.y + uSway.y * 0.09);
   float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
   vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
   q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);
@@ -191,7 +194,6 @@ vec3 effects(vec3 c) {
 const POINTS = `
 void main() {
   // MORPH: the dot moves from its place in the old picture to its place in the new one.
-  // Same rule as the studio: a per-particle phase offset, then smoothstep.
   uint id = uint(gl_VertexID);
   float morphing = step(2.5, uRole);
   float e = clamp(uMorph + (rnd(id, 9u) - 0.5) * 0.4, 0.0, 1.0);
@@ -202,22 +204,31 @@ void main() {
   float alpha, streaming;
   vec2 w = place(id, home, luma(mc), 0.0, 1.0, alpha, streaming);
   gl_Position = toClip(w, home.z);
-  gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
-  vec3 c = effects(mc);
-  c = tint(c);
-  c = clamp(mix(vec3(luma(c)), c, uPSat), 0.0, 1.0); // particle saturation
+  // IMAGE dots get the Effects tab. DRIFTING dots get particle saturation instead.
+  // streaming is 0 on the picture and 1 on the drifting particles, so the two blend smoothly.
+  vec3 c = tint(mix(effects(mc), partSat(mc), streaming));
   float lum = luma(c);
-  if (uScanOn > 0.5) {
+
+  // PULSE scan: a wave of light travels through the depth, front to back, and lights the dots it passes
+  float pulse = 0.0;
+  if (uScanOn > 0.5 && uScanMode > 5.5) {
+    float dz = home.z + 0.5;
+    pulse = pow(0.5 + 0.5 * sin(uTime * 2.4 - dz * 6.0), 4.0) * (uScanLevel / 3.0);
+    c = clamp(c + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.25 + 0.5 * lum), 0.0, 1.0);
+  } else if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
     float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, home.z, uZScale, lum);
     c += (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * g * (0.12 + 0.4 * lum);
   }
+  // TRAIL SIZE: drifting dots are sized by it. The pulse makes the lit dots bigger.
+  gl_PointSize = mix(uPointPx, max(1.0, uPointPx * uTrailSize), streaming) + pulse * 1.5;
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
   vec3 cb = clamp(c * uBright, 0.0, 1.0);
   vec3 o = 1.0 - pow(1.0 - cb, vec3(aMeta.a * 5.0 / max(uCover, 0.25)));
-  vCol = o * alpha * (streaming > 0.5 ? 0.7 : 1.0) * uOpacity;
+  float opacity = mix(uOpacity, 1.0, streaming); // OPACITY is for the image only
+  vCol = o * alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.8);
 }
 `;
 
@@ -243,11 +254,17 @@ void main() {
     vCol = vec3(0.0);
     return;
   }
-  vec2 w = tail ? place(id, aHome, luminance, -uTrailLen * lenVar, 1.0, a2, st2) : head;
+  vec2 w = head;
+  if (tail) {
+    // TRAIL DIRECTION: turn the tail away from the drift path by uTrailAngle
+    vec2 off = place(id, aHome, luminance, -uTrailLen * lenVar, 1.0, a2, st2) - head;
+    float ca = cos(uTrailAngle), sa = sin(uTrailAngle);
+    w = head + vec2(off.x * ca - off.y * sa, off.x * sa + off.y * ca);
+  }
   gl_Position = toClip(w, aHome.z);
-  // Trails carry no effects: only the light tint. Head bright, tail tapers with detail.
+  // Trails carry no Effects: only particle saturation and the light tint. Head bright, tail tapers with detail.
   float tailK = mix(0.22, 0.04, uTrailDetail);
-  vCol = tint(aMeta.rgb) * alpha * (tail ? tailK : 0.3) * uTrailGain;
+  vCol = tint(partSat(aMeta.rgb)) * alpha * (tail ? tailK : 0.3) * uTrailGain;
 }
 `;
 

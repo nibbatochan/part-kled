@@ -863,3 +863,9 @@ body.dragging .dropzone-box {
 .dial-fields { gap: 2px 6px; }
 .dial-fields input[type='number'] { height: 20px; width: 50px; }
 .box h2 .mini { height: 16px; font-size: 8px; }
+
+/* Revamp 2: sub-section label, smaller drift dial */
+.subhead { padding: 4px 8px 2px; font-size: 8.5px; letter-spacing: 0.16em; color: var(--ink-dim); border-top: 1px solid var(--line); margin: 4px 6px 0; }
+.line-widget-box { width: 56px; height: 56px; }
+.dial-row { gap: 8px; }
+.dial-fields input[type='number'] { width: 46px; }

@@ -74,3 +74,15 @@ Budget from device tiers (`pointBudget()`): 200k low, 300k default, 450k strong.
 - New picture morphs in from the picture on screen, same particle index, per-particle delay, 1.6 s (the studio's morph rule).
 - EFFECTS: PARTICLE SAT (`pSat`) saturates the dots themselves.
 - Not done: NEAR direction (unclear what it should control).
+
+## Change list (2026-10-27)
+
+- FLOW reach raised again (about 2.5x the first version at full flow).
+- MOTION: FLOW, DEPTH (was RELIEF), LEAN; sub-section RANDOM / PARTICLE: RANDOM, DIM, PART SAT (drifting particles only), TRAIL SIZE (dot size of drifting particles), TRAIL DIR (degrees, turns trails off the drift path), TRAIL LEN.
+- DRIFT: dial 56 px, value readout text removed (arrow shows angle, length shows strength); manual ANGLE and STRENGTH boxes kept.
+- PAN: PAN and FLOAT toggles; STYLE CURSOR or 3D ORBIT (drag the stage to turn to any side, double-click resets); AMOUNT scales the cursor tilt. The orbit itself is not limited by AMOUNT.
+- MODES: TRACK old option is labelled HARSH; SOFT unchanged.
+- SCANNER: RADAR and LINES removed. Cycle: SWEEP, RING, DEPTH, BURST, PULSE.
+- PULSE: a light wave travels through the depth, front to back. Lit dots brighten and grow.
+- TRAIL section: AMOUNT, STRENGTH, DETAIL (moved out of Effects).
+- EFFECTS: image only (levels, contrast, hue, saturation, opacity, B&W). Drifting particles and trails use PART SAT and tint only.

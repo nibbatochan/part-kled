@@ -2,7 +2,14 @@
 import { defaults, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
 
-const SCAN_MODES = ['SWEEP', 'RING', 'RADAR', 'LINES', 'DEPTH', 'BURST'];
+// Scanner cycle: the shader's mode ids. RADAR and LINES are removed from the cycle.
+const SCAN_CYCLE = [
+  { id: 0, name: 'SWEEP' },
+  { id: 1, name: 'RING' },
+  { id: 4, name: 'DEPTH' },
+  { id: 5, name: 'BURST' },
+  { id: 6, name: 'PULSE' },
+];
 
 export class Panel {
   private params: Params;
@@ -187,7 +194,8 @@ export class Panel {
   private bindScanMode(): void {
     const btn = document.getElementById('scan-mode-btn');
     btn?.addEventListener('click', () => {
-      this.params.scanMode = (this.params.scanMode + 1) % SCAN_MODES.length;
+      const at = SCAN_CYCLE.findIndex((c) => c.id === this.params.scanMode);
+      this.params.scanMode = SCAN_CYCLE[(at + 1) % SCAN_CYCLE.length].id;
       this.params.scan = true;
       this.syncUiToParams();
       this.onParamsChangeCb(this.params);
@@ -291,7 +299,9 @@ export class Panel {
 
     // Scan style label
     const scanLabel = document.getElementById('scan-mode-label');
-    if (scanLabel) scanLabel.textContent = SCAN_MODES[this.params.scanMode] ?? SCAN_MODES[0];
+    // A saved RADAR or LINES style falls back to SWEEP
+    if (!SCAN_CYCLE.some((c) => c.id === this.params.scanMode)) this.params.scanMode = 0;
+    if (scanLabel) scanLabel.textContent = SCAN_CYCLE.find((c) => c.id === this.params.scanMode)?.name ?? 'SWEEP';
 
     // Light toggle button
 
