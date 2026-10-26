@@ -41,6 +41,7 @@ export class Panel {
 
     this.bindDirectionInputs();
     this.bindEffects();
+    this.bindValueInputs();
     this.bindToggles();
     this.bindScanMode();
     this.bindScanLevel();
@@ -148,14 +149,49 @@ export class Panel {
 
   /** Shows the value beside the slider: percent when data-format="pct", else the step's decimals. */
   private updateSliderOutput(input: HTMLInputElement): void {
-    const out = input.parentElement?.querySelector('output');
+    const out = input.parentElement?.querySelector<HTMLElement | HTMLInputElement>('output, input.slider-val');
     if (!out) return;
+    let text: string;
     if (input.dataset.format === 'pct') {
-      out.textContent = `${Math.round(parseFloat(input.value) * 100)}%`;
-      return;
+      text = String(Math.round(parseFloat(input.value) * 100));
+    } else {
+      const decimals = input.step.includes('.') ? (input.step.split('.')[1]?.length ?? 2) : 0;
+      text = Number(input.value).toFixed(decimals);
     }
-    const decimals = input.step.includes('.') ? (input.step.split('.')[1]?.length ?? 2) : 0;
-    out.textContent = Number(input.value).toFixed(decimals);
+    if (out instanceof HTMLInputElement) out.value = text;
+    else out.textContent = text;
+  }
+
+  /** Every slider gets a number box beside it: type a value, then Enter or leave the box to apply it. */
+  private bindValueInputs(): void {
+    this.pathSliders().forEach((slider) => {
+      const out = slider.parentElement?.querySelector('output');
+      if (!out) return;
+      const pct = slider.dataset.format === 'pct';
+      const box = document.createElement('input');
+      box.type = 'number';
+      box.className = 'slider-val';
+      box.min = String(pct ? parseFloat(slider.min) * 100 : parseFloat(slider.min));
+      box.max = String(pct ? parseFloat(slider.max) * 100 : parseFloat(slider.max));
+      box.step = pct ? '1' : slider.step;
+      box.setAttribute('aria-label', slider.previousElementSibling?.textContent ?? 'value');
+      out.replaceWith(box);
+      box.addEventListener('change', () => {
+        const raw = parseFloat(box.value);
+        if (Number.isFinite(raw)) {
+          const lo = parseFloat(slider.min);
+          const hi = parseFloat(slider.max);
+          const v = Math.min(hi, Math.max(lo, pct ? raw / 100 : raw));
+          slider.value = String(v);
+          this.setPath(slider.dataset.path ?? '', v);
+          this.onParamsChangeCb(this.params);
+        }
+        this.syncEffects();
+      });
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') box.blur();
+      });
+    });
   }
 
   /** A row of buttons that set one string field: data-<attr>="value". */

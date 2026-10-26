@@ -260,7 +260,11 @@ void main() {
   vec2 w = head;
   if (tail) {
     // TRAIL DIRECTION: turn the tail away from the drift path by uTrailAngle
-    vec2 back = -dirT * uTrailLen * lenVar;
+    // Positive: the tail runs back along the particle's own path and stops at its home pixel.
+    // Negative: the tail runs forward along the drift direction.
+    float L = uTrailLen * lenVar;
+    vec2 disp = head - aHome.xy;
+    vec2 back = L >= 0.0 ? -normalize(disp + vec2(1e-6)) * min(L, length(disp)) : -dirT * L;
     float ca = cos(uTrailAngle), sa = sin(uTrailAngle);
     w = head + vec2(back.x * ca - back.y * sa, back.x * sa + back.y * ca);
   }
