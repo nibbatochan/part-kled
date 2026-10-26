@@ -32,7 +32,7 @@ export interface LiteParams {
   burst: number;        // 0..1 click burst strength (BURST scan style)
   trails: boolean;      // trail lines on
   trailAmount: number;  // 0..1 share of streaks kept
-  trailLength: number;  // PARTICLE LENGTH: 0.3..2
+  trailLength: number;  // TRAIL LEN: -1..1, negative trails forward
   trailStrength: number;// 0..2
   trailDetail: number;  // 0..1
   pSat: number;         // 0..2 particle saturation, 1 = as sampled
