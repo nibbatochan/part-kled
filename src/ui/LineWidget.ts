@@ -157,7 +157,8 @@ export class LineWidget {
     );
 
     if (this.readoutEl) {
-      const deg = Math.round(((angle * 180) / Math.PI + 360) % 360);
+      // -180..180, the same range as the typed angle field
+      const deg = ((((Math.round((angle * 180) / Math.PI) + 180) % 360) + 360) % 360) - 180;
       this.readoutEl.textContent = `${deg}° · ${Math.round(length * 100)}%`;
     }
 

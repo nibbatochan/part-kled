@@ -41,13 +41,33 @@ const scanned = await page.evaluate(() => {
 });
 const withScan = await lit();
 
-const report = { first, second, scanned, withScan, errors };
+// Drift controls: typed angle and strength, scatter and lean sliders, and the loader never past 100%
+const drift = await page.evaluate(() => {
+  const fire = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+  fire(document.getElementById('in-angle'), '45');
+  fire(document.getElementById('in-strength'), '80');
+  fire(document.getElementById('sl-scatter'), '1');
+  fire(document.getElementById('sl-lean'), '0.5');
+  const p = window.__app.panel.getParams();
+  window.__app.setProgress(true, 'TEST', 40); // 4000% before the fix
+  const bar = document.getElementById('progress-fill').style.width;
+  window.__app.setProgress(false);
+  const lite = window.__app.engine.lite.params;
+  return { angle: +p.line.angle.toFixed(3), length: p.line.length, scatter: p.scatter, lean: p.lean, bar,
+    engine: { scatter: lite.scatter, lean: lite.lean, angle: +lite.angle.toFixed(3) } };
+});
+const afterDrift = await lit();
+
+const report = { first, second, scanned, withScan, drift, afterDrift, errors };
 console.log(JSON.stringify(report, null, 2));
 
 const ok =
   first.lit > 100 && second.lit > 100 && withScan.lit > 100 &&
   first.glError === 0 && second.glError === 0 && withScan.glError === 0 &&
-  scanned.scan === true && scanned.level === 4 && errors.length === 0;
+  scanned.scan === true && scanned.level === 4 && errors.length === 0 &&
+  drift.angle === 0.785 && drift.length === 0.8 && drift.scatter === 1 && drift.lean === 0.5 &&
+  drift.bar === '100%' && drift.engine.scatter === 1 && drift.engine.lean === 0.5 &&
+  afterDrift.lit > 100 && afterDrift.glError === 0;
 
 await browser.close();
 if (!ok) {

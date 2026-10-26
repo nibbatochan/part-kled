@@ -620,6 +620,54 @@ canvas#stage {
   color: var(--ink);
 }
 
+.dial-fields {
+  display: grid;
+  grid-template-columns: auto 56px 10px;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 2px 0;
+}
+
+.dial-fields label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--ink-dim);
+}
+
+.dial-fields .unit {
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+
+.dial-fields input[type='number'] {
+  width: 56px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  user-select: text;
+  -webkit-user-select: text;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  transition: border-color var(--t) var(--ease);
+}
+
+.dial-fields input[type='number']:hover,
+.dial-fields input[type='number']:focus {
+  border-color: var(--line-strong);
+}
+
+.dial-fields input[type='number']::-webkit-inner-spin-button,
+.dial-fields input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .dial-hint {
   font-size: 8.5px;
   line-height: 1.5;

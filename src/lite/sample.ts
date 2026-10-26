@@ -23,6 +23,8 @@ function gcd(a: number, b: number): number {
 export function sampleLite(
   img: CanvasImageSource & { width: number; height: number },
   depthFull: Float32Array | null,
+  dw: number,
+  dh: number,
   count: number
 ): LiteSample {
   const sw = img.width;
@@ -41,8 +43,6 @@ export function sampleLite(
   // Depth comes in at picture size (from the estimator); sample it down to the working size
   const depth = new Float32Array(w * h);
   if (depthFull) {
-    const dw = sw;
-    const dh = sh;
     for (let y = 0; y < h; y++) {
       const sy = Math.min(dh - 1, Math.floor(((y + 0.5) / h) * dh));
       for (let x = 0; x < w; x++) {

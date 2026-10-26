@@ -17,6 +17,8 @@ export interface LiteParams {
   angle: number;        // radians, counter-clockwise from +x
   length: number;       // 0.25..1 drift strength
   depth: number;        // 0..1 relief
+  scatter: number;      // 0..1 how different the drift distances are
+  lean: number;         // -1..1 light-based side bias
   speed: number;        // 1 = default
   sway: number;         // 0..1 idle camera drift
   track: boolean;       // cursor pushes the picture
@@ -41,6 +43,8 @@ export const liteDefaults: LiteParams = {
   angle: 0.5,
   length: 0.5,
   depth: 0.5,
+  scatter: 0.7,
+  lean: 0,
   speed: 1,
   sway: 0.6,
   track: true,
@@ -96,7 +100,7 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
 }
 
 const UNIFORMS = [
-  'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLook', 'uPtr', 'uPtrOn',
+  'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uScatter', 'uLean', 'uSpeed', 'uDir', 'uLook', 'uPtr', 'uPtrOn',
   'uBurst', 'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail',
   'uLightCol', 'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW',
@@ -315,6 +319,8 @@ export class LiteEngine {
       gl.uniform1f(U.uTime, t);
       gl.uniform1f(U.uDrift, p.drift);
       gl.uniform1f(U.uDepth, p.depth);
+      gl.uniform1f(U.uScatter, p.scatter);
+      gl.uniform1f(U.uLean, p.lean);
       gl.uniform1f(U.uSpeed, p.speed);
       gl.uniform2f(U.uDir, dx, dy);
       gl.uniform2f(U.uLook, this.look.x, this.look.y);

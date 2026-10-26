@@ -28,6 +28,14 @@ Flow (drift) and drift direction, burst, relief, track, trails with amount, leng
 detail, scan (all styles, levels 1 to 5), light tint and LIGHT on/off, Effects (levels, gamma, curve,
 hue, saturation, B&W, opacity; picture only, trails untouched), five pictures, delete, next, light start values.
 
+## Drift and loading changes
+
+- **SCATTER** (0..1): spread of drift distances. 0 = every streamer travels the same distance.
+- **LEAN** (-1..1): light-based side bias. Bright parts drift further toward the lean side, dark parts the other way, and more streamers start on that side.
+- **ANGLE / STRENGTH** number inputs beside the dial, in step with it (angle -180..180 degrees, strength 25..100%).
+- **Loader**: the bar was driven by transformers.js progress that is already 0..100, so it showed 4000% to 10000%. Now divided by 100, kept monotonic and clamped to 100% in `setProgress`.
+- **Speed**: depth is estimated and refined at 768 px on the long edge (the sampler reads at the same size); the model is fetched in the background after the samples load, with one throwaway run to compile GPU shaders; WebGPU uses the fp16 model (about 2.7x faster than q8 on the test machine), then falls back to WASM q8; a failed model load is remembered instead of retried for every picture. Measured: a 1125x2000 upload takes about 1.3 s end to end on the test machine.
+
 ## Not in the web build (controls disabled in `index.html`)
 
 - **DRAW**: flow strokes would need a per-frame field. Dropped.

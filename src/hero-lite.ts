@@ -143,7 +143,7 @@ export class HeroLite {
       engine.setLayout({ fit: o.fit ?? 'contain', zoom: 1, alignX: o.alignX ?? 0, alignY: o.alignY ?? 0 });
 
       const count = typeof o.pointCount === 'number' ? o.pointCount : autoCount();
-      engine.setSample(sampleLite(img, depth ? greyArray(depth) : null, count));
+      engine.setSample(sampleLite(img, depth ? greyArray(depth) : null, depth?.width ?? 0, depth?.height ?? 0, count));
 
       const rect = this.container.getBoundingClientRect();
       engine.resize(rect.width, rect.height);

@@ -23,6 +23,8 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     angle: p.line.angle,
     length: p.line.length,
     depth: p.depth,
+    scatter: p.scatter,
+    lean: p.lean,
     track: p.track,
     burst: p.splash,
     trails: p.trails,

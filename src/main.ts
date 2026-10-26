@@ -2,7 +2,7 @@
 import { defaults, loadFromStorage, saveToStorage, withLightStart, type Params } from './core/params';
 import { WebEngine, pointBudget } from './web/WebEngine';
 import { sampleLite, type LiteSample } from './lite/sample';
-import { DepthEstimator } from './depth/DepthEstimator';
+import { DEPTH_MAX_SIDE, DepthEstimator } from './depth/DepthEstimator';
 import { Dropzone } from './ui/Dropzone';
 import { Frame } from './ui/Frame';
 import { Panel } from './ui/Panel';
@@ -98,7 +98,13 @@ class App {
     requestAnimationFrame((t) => this.loop(t));
 
     // Load initial sample images
-    this.initDefaultSamples();
+    // The samples ship with baked depth, so the model is not needed yet. Fetch it in the background
+    // once they are up, so the first upload does not wait for the download.
+    this.initDefaultSamples().then(() => {
+      const warm = () => this.depthEstimator.warmup();
+      if ('requestIdleCallback' in window) (window as any).requestIdleCallback(warm, { timeout: 4000 });
+      else setTimeout(warm, 1500);
+    });
   }
 
   private bindPointer(): void {
@@ -147,7 +153,7 @@ class App {
 
     ind.classList.toggle('hidden', !show);
     txt.textContent = text;
-    bar.style.width = `${Math.round(pct * 100)}%`;
+    bar.style.width = `${Math.round(Math.min(1, Math.max(0, pct)) * 100)}%`; // never past 100%
   }
 
   public async getSampleDataForImage(img: ProcessedImage): Promise<CachedSample> {
@@ -157,6 +163,8 @@ class App {
 
     // Check if pre-baked depth map exists for sample (instant, no loader)
     let depthArr: Float32Array | null = null;
+    let dw = 0;
+    let dh = 0;
     const baseName = img.name.replace(/\.[^.]+$/, '');
     if (baseName.startsWith('sample-')) {
       try {
@@ -168,13 +176,17 @@ class App {
           await new Promise<void>((r) => { imgEl.onload = () => r(); imgEl.src = url; });
           URL.revokeObjectURL(url);
 
+          // Same working size the estimator uses: the sampler never reads depth at full picture size
+          const k = Math.min(1, DEPTH_MAX_SIDE / Math.max(img.width, img.height));
+          dw = Math.max(2, Math.round(img.width * k));
+          dh = Math.max(2, Math.round(img.height * k));
           const c = document.createElement('canvas');
-          c.width = img.width;
-          c.height = img.height;
-          const ctx = c.getContext('2d')!;
-          ctx.drawImage(imgEl, 0, 0, img.width, img.height);
-          const dData = ctx.getImageData(0, 0, img.width, img.height).data;
-          depthArr = new Float32Array(img.width * img.height);
+          c.width = dw;
+          c.height = dh;
+          const ctx = c.getContext('2d', { willReadFrequently: true })!;
+          ctx.drawImage(imgEl, 0, 0, dw, dh);
+          const dData = ctx.getImageData(0, 0, dw, dh).data;
+          depthArr = new Float32Array(dw * dh);
           for (let i = 0; i < depthArr.length; i++) {
             depthArr[i] = dData[i * 4] / 255.0;
           }
@@ -189,6 +201,8 @@ class App {
         this.setProgress(true, text, p);
       });
       depthArr = depthResult.depth;
+      dw = depthResult.width;
+      dh = depthResult.height;
     }
 
     // Sampling blocks the main thread for a moment: show the loader only for that real work,
@@ -201,7 +215,7 @@ class App {
     });
     let sampleData: LiteSample;
     try {
-      sampleData = sampleLite(img.canvas, depthArr, pointBudget());
+      sampleData = sampleLite(img.canvas, depthArr, dw, dh, pointBudget());
     } finally {
       this.setProgress(false);
     }

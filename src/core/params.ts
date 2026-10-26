@@ -24,6 +24,8 @@ export interface Params {
   splash: number;  // default 0.6: burst on fast pointer / click
   gather: number;  // default 0.8: spring back to home
   depth: number;   // default 0.8: z displacement + parallax
+  scatter: number; // 0..1 how different the drift distances are (0 = all alike, 1 = very mixed)
+  lean: number;    // -1..1 light-based side bias: bright parts drift toward + (right), dark toward - (left)
 
   // toggles
   draw: boolean;    // paint flow strokes
@@ -53,6 +55,8 @@ export const defaults: Params = {
   splash: 0.5,
   gather: 0.5,
   depth: 0.5,
+  scatter: 0.7,
+  lean: 0,
 
   draw: false,
   track: true,

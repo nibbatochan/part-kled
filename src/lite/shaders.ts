@@ -19,6 +19,8 @@ uniform vec2 uOffset;     // px, picture centre relative to canvas centre (y up)
 uniform float uTime;
 uniform float uDrift;     // 0..1
 uniform float uDepth;     // 0..1
+uniform float uScatter;   // 0..1 spread of drift distances
+uniform float uLean;      // -1..1 light-based side bias
 uniform float uSpeed;     // 1 = default
 uniform vec2 uDir;        // drift direction (unit) * strength factor
 uniform vec2 uLook;       // parallax look, -1..1
@@ -64,7 +66,9 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   // Bright parts of the picture shed more particles: light weighting
   float lc = min(light, 0.7); // the brightest specks (eyes) do not get to shed more
   float lw = 0.2 + 1.6 * lc * lc;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul, 0.0, 0.95);
+  // LEAN also decides which side particles start from: more of them on the side it points to
+  float side = 1.0 + uLean * clamp(home.x * 3.0, -1.0, 1.0) * 0.6;
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul * side, 0.0, 0.95);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -78,16 +82,20 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
 
-    float reach = (0.16 + 0.5 * uDrift) * (0.45 + 1.1 * r3);
-    vec2 perp = vec2(-uDir.y, uDir.x);
-    pos += uDir * reach * ease;
+    // SCATTER: 0 = every streamer travels the same distance, 1 = from barely moving to far away
+    float reach = (0.16 + 0.5 * uDrift) * mix(1.0, 0.15 + 1.7 * r3, uScatter);
+    // LEAN: bright parts of the picture drift further toward the lean side, dark parts the other way
+    vec2 dir = uDir;
+    dir.x += uLean * (clamp(light, 0.0, 1.0) * 2.0 - 1.0) * 0.9;
+    vec2 perp = vec2(-dir.y, dir.x);
+    pos += dir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
     float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * 0.25;
     pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
-    alpha *= 1.0 - smoothstep(0.2, 0.42, length(uDir * reach * ease));
+    alpha *= 1.0 - smoothstep(0.2, 0.42, length(dir * reach * ease));
     streaming = step(0.001, s);
   }
 

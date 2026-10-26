@@ -27,11 +27,13 @@ export class Panel {
     // Line Widget
     this.lineWidget = new LineWidget('line-widget', (val: LineWidgetValue) => {
       this.params.line = { ...val };
+      this.syncDirectionInputs();
       this.onParamsChangeCb(this.params);
     });
     this.lineWidget.setValue(this.params.line);
 
     this.bindSliders();
+    this.bindDirectionInputs();
     this.bindEffects();
     this.bindToggles();
     this.bindScanMode();
@@ -71,6 +73,8 @@ export class Panel {
       { id: 'sl-splash', key: 'splash' },
       { id: 'sl-gather', key: 'gather' },
       { id: 'sl-depth', key: 'depth' },
+      { id: 'sl-scatter', key: 'scatter' },
+      { id: 'sl-lean', key: 'lean' },
     ];
 
     sliderDefs.forEach(({ id, key }) => {
@@ -84,6 +88,37 @@ export class Panel {
         this.onParamsChangeCb(this.params);
       });
     });
+  }
+
+  /** Typed angle (degrees) and strength (%) beside the dial; the dial and the numbers stay in step. */
+  private bindDirectionInputs(): void {
+    const angle = document.getElementById('in-angle') as HTMLInputElement | null;
+    const strength = document.getElementById('in-strength') as HTMLInputElement | null;
+    if (!angle || !strength) return;
+    const apply = () => {
+      const deg = parseFloat(angle.value);
+      const pct = parseFloat(strength.value);
+      if (!Number.isFinite(deg) || !Number.isFinite(pct)) return; // half-typed: wait
+      const length = Math.min(1, Math.max(0.25, pct / 100));
+      this.params.line = { angle: (deg * Math.PI) / 180, length };
+      this.lineWidget.setValue(this.params.line);
+      this.onParamsChangeCb(this.params);
+    };
+    angle.addEventListener('input', apply);
+    strength.addEventListener('input', apply);
+    // Leaving a field snaps it to the value that is really in use (clamped, rounded)
+    angle.addEventListener('change', () => this.syncDirectionInputs());
+    strength.addEventListener('change', () => this.syncDirectionInputs());
+  }
+
+  private syncDirectionInputs(): void {
+    const angle = document.getElementById('in-angle') as HTMLInputElement | null;
+    const strength = document.getElementById('in-strength') as HTMLInputElement | null;
+    if (!angle || !strength) return;
+    let deg = Math.round((this.params.line.angle * 180) / Math.PI);
+    deg = ((((deg + 180) % 360) + 360) % 360) - 180; // -180..179
+    if (document.activeElement !== angle) angle.value = String(deg);
+    if (document.activeElement !== strength) strength.value = String(Math.round(this.params.line.length * 100));
   }
 
   private updatePercent(input: HTMLInputElement): void {
@@ -231,7 +266,7 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Sliders
-    (['drift', 'splash', 'gather', 'depth'] as const).forEach((key) => {
+    (['drift', 'splash', 'gather', 'depth', 'scatter', 'lean'] as const).forEach((key) => {
       const el = document.getElementById(`sl-${key}`) as HTMLInputElement | null;
       if (!el) return;
       el.value = this.params[key].toString();
@@ -272,5 +307,6 @@ export class Panel {
 
     // Line widget
     this.lineWidget.setValue(this.params.line);
+    this.syncDirectionInputs();
   }
 }
