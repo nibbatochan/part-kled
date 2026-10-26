@@ -28,7 +28,6 @@ uniform float uHalfW;     // half the picture width in world units
 uniform float uRandom;    // 0..1 randomness of the path (direction and distance per particle)
 uniform float uTrailSize; // dot size of drifting particles, multiplier of the picture dot
 uniform float uTrailAngle; // radians, trail direction turned away from the drift path
-uniform float uDim;       // 0..1 procedural dimming along the drift paths
 uniform float uPSat;      // particle saturation, 1 = as sampled
 uniform vec2 uLook;       // PAN: cursor tilt, already scaled by the pan amount and style
 uniform vec2 uSway;       // idle camera sway, not affected by PAN
@@ -71,7 +70,7 @@ float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 vec3 partSat(vec3 c) { return clamp(mix(vec3(luma(c)), c, uPSat), 0.0, 1.0); }
 
 // World position and opacity of one particle; sOff pulls it back along its own path (trail tails).
-vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out float alpha, out float streaming) {
+vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out float alpha, out float streaming, out vec2 dirOut) {
   float r0 = rnd(id, 1u);
   float r1 = rnd(id, 2u);
   float r2 = rnd(id, 3u);
@@ -117,8 +116,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     // Streaks fade out before they leave the picture's neighbourhood
     // Streaks fade only far out, so drifting particles can travel past the canvas edges
     alpha *= 1.0 - smoothstep(1.2, 2.0, length(dir * reach * ease));
-    // DIM: the drift paths are dimmed procedurally, in soft bands, so the dots read better
-    alpha *= mix(1.0, 0.4, uDim * (0.5 + 0.5 * sin(s * 7.0 + r4 * 6.2831853)));
+    dirOut = normalize(dir);
     streaming = smoothstep(0.0, 0.12, s); // 0 on the picture, 1 once drifting (smooth, so colour blends)
   }
 
@@ -205,7 +203,8 @@ void main() {
   vec3 mc = mix(aMeta.rgb, aMeta2.rgb, e);
 
   float alpha, streaming;
-  vec2 w = place(id, home, luma(mc), 0.0, 1.0, alpha, streaming);
+  vec2 dirP;
+  vec2 w = place(id, home, luma(mc), 0.0, 1.0, alpha, streaming, dirP);
   gl_Position = toClip(w, home.z);
 
   // IMAGE dots get the Effects tab. DRIFTING dots get particle saturation instead.
@@ -237,10 +236,12 @@ void main() {
 
 const TRAILS = `
 void main() {
-  // Instanced 2-vertex lines: vertex 0 is the head, vertex 1 is the tail further back along the path
+  // One line per particle. Vertex 0 is the head, vertex 1 the tail: a fixed length back along the
+  // drift direction, so trails show at any FLOW, not only near the maximum.
   bool tail = gl_VertexID == 1;
-  uint id = uint(gl_InstanceID) * 2u;
-  if (rnd(id, 6u) > uTrailAmount) {
+  uint id = uint(gl_InstanceID);
+  // TRAIL AMOUNT: 0..2, where 1 keeps half of the particles
+  if (rnd(id, 6u) > uTrailAmount * 0.5) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
     return;
@@ -248,10 +249,9 @@ void main() {
   float lenVar = 0.4 + rnd(id, 5u); // no two streaks the same length
   float luminance = luma(aMeta.rgb);
 
-  // Both ends decide from the HEAD, so a line is never half-culled (a lone end would stretch it
-  // to the cull point and draw a long ray across the picture)
-  float alpha, streaming, a2, st2;
-  vec2 head = place(id, aHome, luminance, 0.0, 1.0, alpha, streaming);
+  float alpha, streaming;
+  vec2 dirT;
+  vec2 head = place(id, aHome, luminance, 0.0, 1.0, alpha, streaming, dirT);
   if (streaming < 0.5) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
@@ -260,9 +260,9 @@ void main() {
   vec2 w = head;
   if (tail) {
     // TRAIL DIRECTION: turn the tail away from the drift path by uTrailAngle
-    vec2 off = place(id, aHome, luminance, -uTrailLen * lenVar, 1.0, a2, st2) - head;
+    vec2 back = -dirT * uTrailLen * lenVar;
     float ca = cos(uTrailAngle), sa = sin(uTrailAngle);
-    w = head + vec2(off.x * ca - off.y * sa, off.x * sa + off.y * ca);
+    w = head + vec2(back.x * ca - back.y * sa, back.x * sa + back.y * ca);
   }
   gl_Position = toClip(w, aHome.z);
   // Trails carry no Effects: only particle saturation and the light tint. Head bright, tail tapers with detail.

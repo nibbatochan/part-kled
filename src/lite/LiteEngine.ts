@@ -35,7 +35,6 @@ export interface LiteParams {
   trailLength: number;  // PARTICLE LENGTH: 0.3..2
   trailStrength: number;// 0..2
   trailDetail: number;  // 0..1
-  dim: number;          // 0..1 procedural dimming along the drift paths
   pSat: number;         // 0..2 particle saturation, 1 = as sampled
   brightness: number;   // 1 = as the source
   opacity: number;      // 0..1 picture only
@@ -69,7 +68,6 @@ export const liteDefaults: LiteParams = {
   trailLength: 0.6,
   trailStrength: 0.5,
   trailDetail: 0.25,
-  dim: 0.3,
   pSat: 1.2,
   brightness: 1.15,
   opacity: 1,
@@ -90,7 +88,7 @@ export interface LiteLayout {
   alignY: number;
 }
 
-const TRAIL_STRIDE = 2;
+const TRAIL_STRIDE = 1; // one trail line per particle
 const MIN_DRAWN = 40000;
 const SCAN_RATE = 0.155; // the studio's scan speed: one pass about every 6.5 s
 const BURST_LIFE = 1.1;  // seconds, the studio's burst lifetime
@@ -119,7 +117,7 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
 
 const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
-  'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uDim', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
+  'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW',
@@ -469,7 +467,6 @@ export class LiteEngine {
       gl.uniform1f(U.uDolly, this.dolly);
       gl.uniform1f(U.uTrailSize, p.trailSize);
       gl.uniform1f(U.uTrailAngle, (p.trailAngle * Math.PI) / 180);
-      gl.uniform1f(U.uDim, p.dim);
       gl.uniform1f(U.uPSat, p.pSat);
       gl.uniform2f(U.uLook, this.look.x, this.look.y);
       gl.uniform2f(U.uSway, this.sway.x, this.sway.y);
@@ -481,7 +478,7 @@ export class LiteEngine {
       gl.uniform1f(U.uCover, cover);
       gl.uniform1f(U.uPointPx, pointPx);
       gl.uniform1f(U.uBright, p.brightness);
-      gl.uniform1f(U.uTrailLen, 0.12 * p.trailLength);
+      gl.uniform1f(U.uTrailLen, 0.5 * p.trailLength);
       gl.uniform1f(U.uTrailGain, p.trailStrength);
       gl.uniform1f(U.uTrailAmount, p.trailAmount);
       gl.uniform1f(U.uTrailDetail, p.trailDetail);

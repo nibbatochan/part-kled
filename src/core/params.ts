@@ -38,7 +38,6 @@ export interface Params {
   randomness: number; // 0..1 randomness of the particle path
   trailSize: number; // dot size of drifting particles (multiplier)
   trailAngle: number; // degrees, trail direction turned away from the drift path
-  dim: number; // 0..1 procedural dimming along the drift paths
   pSat: number; // 0..2 particle saturation
   trackStyle: 'old' | 'soft'; // TRACK style: OLD repels and follows the motion, SOFT is a gentle push
   scan: boolean;    // sweep line
@@ -79,7 +78,6 @@ export const defaults: Params = {
   randomness: 0.3,
   trailSize: 1,
   trailAngle: 0,
-  dim: 0.3,
   pSat: 1.2,
   trackStyle: 'old',
   scanLevel: 3,
@@ -140,7 +138,7 @@ export function withLightStart(p: Params): Params {
     trailSize: 0.45,                  // PARTICLE SIZE 0.45
     pSat: 1,                          // PART SAT 1
     trailAngle: 0,                    // TRAIL DIR 0
-    trail: { ...defaults.trail, amount: 0.55, length: 0.3 }, // TRAIL AMT 0.55, TRAIL LEN inside the particles
+    trail: { ...defaults.trail, amount: 1.1, length: 0.3 }, // TRAIL AMT 0.55, TRAIL LEN inside the particles
     track: false,                     // HOVER off
     scan: true,                       // SCANNER on, BURST
     scanMode: 5,

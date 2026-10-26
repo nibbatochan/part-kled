@@ -24,7 +24,6 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     randomness: p.randomness,
     trailSize: p.trailSize,
     trailAngle: p.trailAngle,
-    dim: p.dim,
     pSat: p.pSat,
     track: p.track,
     trackOld: p.trackStyle === 'old',
