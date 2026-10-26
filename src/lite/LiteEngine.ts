@@ -62,6 +62,8 @@ export const liteDefaults: LiteParams = {
 
 export interface LiteLayout {
   fit: 'contain' | 'cover';
+  /** Picture size as a share of the fitted size (the studio shows it at about 0.72 of the stage height) */
+  zoom: number;
   /** -1 left, 0 centre, 1 right */
   alignX: number;
   alignY: number;
@@ -103,7 +105,7 @@ const UNIFORMS = [
 export class LiteEngine {
   readonly gl: WebGL2RenderingContext;
   params: LiteParams = { ...liteDefaults, fx: { ...liteDefaults.fx } };
-  layout: LiteLayout = { fit: 'contain', alignX: 0, alignY: 0 };
+  layout: LiteLayout = { fit: 'contain', zoom: 1, alignX: 0, alignY: 0 };
 
   private canvas: HTMLCanvasElement;
   private pointProg: WebGLProgram;
@@ -260,7 +262,8 @@ export class LiteEngine {
     if (!s) return;
     const W = this.canvas.width;
     const H = this.canvas.height;
-    const imgH = this.layout.fit === 'cover' ? Math.max(H, W / s.aspect) : Math.min(H, W / s.aspect);
+    const fitH = this.layout.fit === 'cover' ? Math.max(H, W / s.aspect) : Math.min(H, W / s.aspect);
+    const imgH = fitH * this.layout.zoom;
     this.scale = imgH; // world height is 1
     const imgW = imgH * s.aspect;
     this.offX = this.layout.alignX * Math.max(0, (W - imgW) / 2);
@@ -293,7 +296,7 @@ export class LiteEngine {
 
     const p = this.params;
     const base = Math.max(1, Math.round(this.dpr));
-    const pointPx = this.cover(base) >= 1.3 ? base : base * 2;
+    const pointPx = base; // fine grain: one device pixel per point (studio dots are this size)
     const dirLen = 0.45 + 0.55 * p.length;
     const dx = Math.cos(p.angle) * dirLen;
     const dy = Math.sin(p.angle) * dirLen;

@@ -37,6 +37,8 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     scan: p.scan,
     scanMode: p.scanMode,
     scanLevel: p.scanLevel,
+    // calibrated so the mean brightness matches the studio's (measured: studio 10.1, web 10.5 on the same frame)
+    brightness: 1.1,
   };
 }
 
@@ -56,6 +58,7 @@ export class WebEngine {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.lite = new LiteEngine(canvas, { maxDpr: 1.5 });
+    this.lite.setLayout({ fit: 'contain', zoom: 0.72 }); // same picture size as the studio
   }
 
   setParams(p: Params): void {

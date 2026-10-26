@@ -140,7 +140,7 @@ export class HeroLite {
       const engine = new LiteEngine(this.canvas, { maxDpr: o.maxDpr });
       this.engine = engine;
       engine.setParams({ ...liteDefaults, ...toLiteParams(cfg) });
-      engine.setLayout({ fit: o.fit ?? 'contain', alignX: o.alignX ?? 0, alignY: o.alignY ?? 0 });
+      engine.setLayout({ fit: o.fit ?? 'contain', zoom: 1, alignX: o.alignX ?? 0, alignY: o.alignY ?? 0 });
 
       const count = typeof o.pointCount === 'number' ? o.pointCount : autoCount();
       engine.setSample(sampleLite(img, depth ? greyArray(depth) : null, count));
