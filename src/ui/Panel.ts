@@ -149,7 +149,8 @@ export class Panel {
 
   /** Shows the value beside the slider: percent when data-format="pct", else the step's decimals. */
   private updateSliderOutput(input: HTMLInputElement): void {
-    const out = input.parentElement?.querySelector<HTMLElement | HTMLInputElement>('output, input.slider-val');
+    const parent = input.parentElement;
+    const out = parent?.querySelector('output');
     if (!out) return;
     let text: string;
     if (input.dataset.format === 'pct') {
@@ -158,11 +159,12 @@ export class Panel {
       const decimals = input.step.includes('.') ? (input.step.split('.')[1]?.length ?? 2) : 0;
       text = Number(input.value).toFixed(decimals);
     }
-    if (out instanceof HTMLInputElement) out.value = text;
-    else out.textContent = text;
+    out.textContent = text;
+    const box = parent?.querySelector<HTMLInputElement>('input.slider-val');
+    if (box) box.value = text;
   }
 
-  /** Every slider gets a number box beside it: type a value, then Enter or leave the box to apply it. */
+  /** Every slider's value is a number box that stays hidden until the number is clicked. Enter or leave the box to apply it. */
   private bindValueInputs(): void {
     this.pathSliders().forEach((slider) => {
       const out = slider.parentElement?.querySelector('output');
@@ -171,11 +173,31 @@ export class Panel {
       const box = document.createElement('input');
       box.type = 'number';
       box.className = 'slider-val';
+      box.hidden = true;
       box.min = String(pct ? parseFloat(slider.min) * 100 : parseFloat(slider.min));
       box.max = String(pct ? parseFloat(slider.max) * 100 : parseFloat(slider.max));
       box.step = pct ? '1' : slider.step;
       box.setAttribute('aria-label', slider.previousElementSibling?.textContent ?? 'value');
-      out.replaceWith(box);
+      out.after(box);
+      out.classList.add('slider-readout');
+      out.tabIndex = 0;
+      const open = () => {
+        out.hidden = true;
+        box.hidden = false;
+        box.focus();
+        box.select();
+      };
+      out.addEventListener('click', open);
+      out.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      });
+      box.addEventListener('blur', () => {
+        box.hidden = true;
+        out.hidden = false;
+      });
       box.addEventListener('change', () => {
         const raw = parseFloat(box.value);
         if (Number.isFinite(raw)) {

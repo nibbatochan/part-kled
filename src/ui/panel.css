@@ -926,4 +926,5 @@ body.dragging .dropzone-box {
 /* Number box beside each slider (type a value) */
 .slider-val { width: 100%; min-width: 0; height: 18px; padding: 0 2px; border: 1px solid var(--line); background: rgba(5, 6, 7, 0.6); color: var(--ink); font-family: var(--font-mono); font-size: 10px; text-align: right; outline: none; user-select: text; -webkit-user-select: text; -moz-appearance: textfield; appearance: textfield; }
 .slider-val:hover, .slider-val:focus { border-color: var(--line-strong); }
+.slider-readout { cursor: text; }
 .slider-val::-webkit-inner-spin-button, .slider-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
