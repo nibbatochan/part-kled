@@ -19,11 +19,12 @@ uniform vec2 uOffset;     // px, picture centre relative to canvas centre (y up)
 uniform float uTime;
 uniform float uDrift;     // 0..1
 uniform float uDepth;     // 0..1
-uniform float uScatter;   // 0..1 spread of drift distances
-uniform float uLean;      // -1..1 light-based side bias
 uniform float uSpeed;     // 1 = default
 uniform vec2 uDir;        // drift direction (unit) * strength factor
-uniform vec2 uLook;       // parallax look, -1..1
+uniform float uLean;      // -1..1 which side of the picture the streamers come from
+uniform float uHalfW;     // half the picture width in world units
+uniform vec2 uLook;       // PAN: cursor tilt, already scaled by the pan amount
+uniform vec2 uSway;       // idle camera sway, not affected by PAN
 uniform vec2 uPtr;        // pointer in world units
 uniform float uPtrOn;
 uniform vec4 uBurst;      // click burst: x, y (world), age (s), amplitude (0 when done)
@@ -41,7 +42,9 @@ uniform float uScan;        // 0..1 position of the band
 uniform float uScanMode;    // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH
 uniform vec2 uScanCenter;
 uniform float uZScale;
-uniform float uOpacity;   // picture only, trails are not dimmed
+uniform float uOpacity;     // picture only, trails are not dimmed
+uniform float uMorph;       // 0..1 pixel shift between two pictures
+uniform float uRole;        // 0 normal, 1 leaving picture, 2 arriving picture
 
 out vec3 vCol;
 
@@ -63,12 +66,16 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float r2 = rnd(id, 3u);
   float r3 = rnd(id, 4u);
 
+  // LEAN: the chance to stream depends on where the particle sits across the picture.
+  // Lean right: most streamers come from the right side; lean left: from the left. A floor keeps
+  // some streamers on the far side, and brightness (lw) still decides the rest.
+  float xn = clamp(home.x / max(uHalfW, 1e-3) * 0.5 + 0.5, 0.0, 1.0);
+  float origin = (0.12 + exp(uLean * 8.0 * (xn - 0.5))) / 1.12;
+
   // Bright parts of the picture shed more particles: light weighting
   float lc = min(light, 0.7); // the brightest specks (eyes) do not get to shed more
   float lw = 0.2 + 1.6 * lc * lc;
-  // LEAN also decides which side particles start from: more of them on the side it points to
-  float side = 1.0 + uLean * clamp(home.x * 3.0, -1.0, 1.0) * 0.6;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul * side, 0.0, 0.95);
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul * origin, 0.0, 0.95);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -82,20 +89,17 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
 
-    // SCATTER: 0 = every streamer travels the same distance, 1 = from barely moving to far away
-    float reach = (0.16 + 0.5 * uDrift) * mix(1.0, 0.15 + 1.7 * r3, uScatter);
-    // LEAN: bright parts of the picture drift further toward the lean side, dark parts the other way
-    vec2 dir = uDir;
-    dir.x += uLean * (clamp(light, 0.0, 1.0) * 2.0 - 1.0) * 0.9;
-    vec2 perp = vec2(-dir.y, dir.x);
-    pos += dir * reach * ease;
+    // Drift distance: the drift direction sets the way, this sets how far each one goes
+    float reach = (0.16 + 0.5 * uDrift) * (0.45 + 1.1 * r3);
+    vec2 perp = vec2(-uDir.y, uDir.x);
+    pos += uDir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
     float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * 0.25;
     pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
-    alpha *= 1.0 - smoothstep(0.2, 0.42, length(dir * reach * ease));
+    alpha *= 1.0 - smoothstep(0.2, 0.42, length(uDir * reach * ease));
     streaming = step(0.001, s);
   }
 
@@ -108,7 +112,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float f = uPtrOn * smoothstep(0.14, 0.0, dl);
   pos += dq / max(dl, 1e-4) * f * f * 0.03;
 
-  // Click burst (BURST): a ring that travels outward and pushes what it passes
+  // Click burst (BURST scan style): a ring that travels outward and pushes what it passes
   vec2 bq = pos - uBurst.xy;
   float bl = length(bq);
   float ring = (bl - uBurst.z * 0.9) / 0.06;
@@ -120,8 +124,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 // Tilt the whole picture like a card in 3D: depth pushes near parts toward the viewer.
 vec4 toClip(vec2 world, float z) {
   vec3 p = vec3(world, z * 0.45 * uDepth);
-  float yaw = uLook.x * 0.14;
-  float pitch = -uLook.y * 0.09;
+  float yaw = uLook.x * 0.3 + uSway.x * 0.14;
+  float pitch = -(uLook.y * 0.18 + uSway.y * 0.09);
   float cy = cos(yaw), sy = sin(yaw), cp = cos(pitch), sp = sin(pitch);
   vec3 q = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
   q = vec3(q.x, q.y * cp - q.z * sp, q.y * sp + q.z * cp);
@@ -165,8 +169,18 @@ vec3 effects(vec3 c) {
 
 const POINTS = `
 void main() {
+  // Pixel shift between two pictures: each dot has its own moment to leave or arrive
+  float rr = rnd(uint(gl_VertexID), 7u);
+  if ((uRole > 0.5 && uRole < 1.5 && rr <= uMorph) || (uRole > 1.5 && rr > uMorph)) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    vCol = vec3(0.0);
+    return;
+  }
+
   float alpha, streaming;
   vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, 1.0, alpha, streaming);
+  float shift = uRole > 0.5 ? sin(uMorph * 3.14159265) : 0.0;
+  w += vec2(cos(rr * 6.2831853), sin(rr * 6.2831853)) * 0.06 * shift;
   gl_Position = toClip(w, aHome.z);
   gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 

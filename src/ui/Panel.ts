@@ -2,7 +2,7 @@
 import { defaults, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
 
-const SCAN_MODES = ['SWEEP', 'RING', 'RADAR', 'LINES', 'DEPTH'];
+const SCAN_MODES = ['SWEEP', 'RING', 'RADAR', 'LINES', 'DEPTH', 'BURST'];
 
 export class Panel {
   private params: Params;
@@ -70,11 +70,9 @@ export class Panel {
   private bindSliders(): void {
     const sliderDefs: { id: string; key: keyof Params }[] = [
       { id: 'sl-drift', key: 'drift' },
-      { id: 'sl-splash', key: 'splash' },
-      { id: 'sl-gather', key: 'gather' },
       { id: 'sl-depth', key: 'depth' },
-      { id: 'sl-scatter', key: 'scatter' },
       { id: 'sl-lean', key: 'lean' },
+      { id: 'sl-pan', key: 'panAmount' },
     ];
 
     sliderDefs.forEach(({ id, key }) => {
@@ -266,15 +264,16 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Sliders
-    (['drift', 'splash', 'gather', 'depth', 'scatter', 'lean'] as const).forEach((key) => {
-      const el = document.getElementById(`sl-${key}`) as HTMLInputElement | null;
+    const sliders: [string, keyof Params][] = [['sl-drift', 'drift'], ['sl-depth', 'depth'], ['sl-lean', 'lean'], ['sl-pan', 'panAmount']];
+    sliders.forEach(([id, key]) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
       if (!el) return;
-      el.value = this.params[key].toString();
+      el.value = (this.params[key] as number).toString();
       this.updatePercent(el);
     });
 
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['draw', 'track', 'scan', 'trails'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
@@ -290,8 +289,6 @@ export class Panel {
     if (scanLabel) scanLabel.textContent = SCAN_MODES[this.params.scanMode] ?? SCAN_MODES[0];
 
     // Light toggle button
-    const btnLight = document.getElementById('btn-light');
-    if (btnLight) btnLight.classList.toggle('active', this.params.lightOn);
 
     // Travel
     const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');

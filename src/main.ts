@@ -10,6 +10,15 @@ import { MAX_IMAGES, Thumbs } from './ui/Thumbs';
 import { processImageFile, type ProcessedImage } from './utils/image';
 import { setupKeyboardShortcuts } from './utils/keys';
 
+/** Defaults for a picture that has no settings yet: the light start values, dark background. */
+function freshSettings(): Params {
+  return withLightStart({ ...clone(defaults), background: 'dark' });
+}
+
+function clone(p: Params): Params {
+  return JSON.parse(JSON.stringify(p)) as Params;
+}
+
 interface CachedSample {
   image: ProcessedImage;
   depth: Float32Array;
@@ -27,6 +36,8 @@ class App {
 
   public images: ProcessedImage[] = [];
   private sampleCache: Map<string, CachedSample> = new Map();
+  // Each picture keeps its own settings. A picture with none yet gets the fresh defaults.
+  private settingsByImage: Map<string, Params> = new Map();
   public activeIndex: number = 0;
   private lastTime: number = performance.now();
 
@@ -268,7 +279,13 @@ class App {
   public async switchImage(index: number): Promise<void> {
     if (index < 0 || index >= this.images.length) return;
     const prevIdx = this.activeIndex;
+    if (prevIdx !== index && this.images[prevIdx]) {
+      this.settingsByImage.set(this.images[prevIdx].id, clone(this.params));
+    }
     this.activeIndex = index;
+    if (prevIdx !== index) {
+      this.panel.setParams(this.settingsByImage.get(this.images[index].id) ?? freshSettings());
+    }
 
     const currentImg = this.images[prevIdx] || this.images[index];
     const nextImg = this.images[index];
@@ -322,8 +339,6 @@ class App {
       this.images.push(proc);
     }
 
-    // A new picture starts light: low flow, drift strength and trails
-    this.panel.setParams(withLightStart(this.panel.getParams()));
     this.thumbs.setImages(this.images, this.images.length - 1);
     this.switchImage(this.images.length - 1);
   }

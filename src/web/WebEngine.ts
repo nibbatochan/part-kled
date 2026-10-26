@@ -1,10 +1,13 @@
 // src/web/WebEngine.ts
 // Same surface as core/Engine, so the studio UI and App run unchanged. Motion and drawing come from the
-// light renderer in src/lite. Not in this build: DRAW (flow strokes), PULL (gather spring), MELT travel
-// and the morph between pictures. Those controls are disabled in index.html.
+// light renderer in src/lite. Not in this build: DRAW (flow strokes), PULL (gather spring), MELT travel,
+// and the separate burst slider (BURST is now a scan style). Those controls are removed from index.html.
 import { LiteEngine, type LiteParams } from '../lite/LiteEngine';
 import type { LiteSample } from '../lite/sample';
 import type { Params } from '../core/params';
+
+/** Scan style index of BURST in the web build (after SWEEP, RING, RADAR, LINES, DEPTH). */
+export const BURST_MODE = 5;
 
 const LIGHT_RGB: Record<Params['light'], [number, number, number] | null> = {
   cream: [0.95, 0.9, 0.79],
@@ -18,16 +21,18 @@ const LIGHT_RGB: Record<Params['light'], [number, number, number] | null> = {
 
 /** Studio settings in, light renderer settings out. */
 export function toLiteParams(p: Params): Partial<LiteParams> {
+  const bursting = p.scanMode === BURST_MODE;
   return {
     drift: p.drift,
     angle: p.line.angle,
     length: p.line.length,
-    depth: p.depth,
-    scatter: p.scatter,
     lean: p.lean,
+    depth: p.depth,
+    pan: p.panMode ? p.panAmount : 0,
     track: p.track,
-    burst: p.splash,
-    trails: p.trails,
+    // BURST scan style: the click shock, its strength set by the scanner level (3 = studio strength)
+    burst: bursting ? p.scanLevel / 3 : 0,
+    trails: true, // trails are off when TRAIL AMOUNT is 0
     trailAmount: p.trail.amount,
     trailLength: p.trail.length,
     trailStrength: p.trail.strength,
@@ -36,7 +41,7 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     bw: p.colorMode === 'bw',
     fx: { ...p.fx },
     light: p.lightOn ? LIGHT_RGB[p.light] : null,
-    scan: p.scan,
+    scan: p.scan && !bursting,
     scanMode: p.scanMode,
     scanLevel: p.scanLevel,
     // calibrated so the mean brightness matches the studio's (measured: studio 10.1, web 10.5 on the same frame)
@@ -56,6 +61,7 @@ export function pointBudget(): number {
 export class WebEngine {
   private lite: LiteEngine;
   private canvas: HTMLCanvasElement;
+  private pending: LiteSample | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -69,21 +75,18 @@ export class WebEngine {
 
   setHasActiveImage(_has: boolean): void {}
 
-  private pending: LiteSample | null = null;
-
   /**
-   * The studio hands over the picture on screen and the one it is switching to. The light build has
-   * no morph, so it shows the current one now and swaps to the next one at startMorph (same task, no flicker).
+   * The studio hands over the picture on screen and the one it is switching to. The light build shows
+   * the current one now; startMorph then runs the pixel shift into the next one (same task, no flicker).
    */
   loadSampleData(current: LiteSample, next: LiteSample): void {
     this.pending = next;
     this.lite.setSample(current);
   }
 
-  // shortcut: picture switch is a cut, not a morph; upgrade by blending two sample buffers in the shader
   startMorph(onComplete?: () => void): void {
     if (this.pending) {
-      this.lite.setSample(this.pending);
+      this.lite.transitionTo(this.pending);
       this.pending = null;
     }
     onComplete?.();

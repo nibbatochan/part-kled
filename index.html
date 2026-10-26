@@ -62,7 +62,6 @@
           </div>
           <div class="btn-grid">
             <button id="btn-next" class="cmd"><span class="symbol">▶</span> NEXT <span class="kbd-hint">SPACE</span></button>
-            <button id="btn-light" class="cmd active"><span class="symbol dot">●</span> LIGHT <span class="kbd-hint">S</span></button>
             <button id="btn-add-pictures" class="cmd">+ ADD PICTURES</button>
             <button id="fullscreen-btn" class="cmd" title="Fullscreen (F)">⛶ FULLSCREEN <span class="kbd-hint">F</span></button>
           </div>
@@ -75,29 +74,19 @@
             <input type="range" id="sl-drift" min="0" max="1" step="0.01" value="0.80" />
             <output></output>
           </div>
-          <div class="slider-group" data-param="splash">
-            <label for="sl-splash">BURST</label>
-            <input type="range" id="sl-splash" min="0" max="1" step="0.01" value="0.50" />
-            <output></output>
-          </div>
-          <div class="slider-group" data-param="gather">
-            <label for="sl-gather">PULL</label>
-            <input type="range" id="sl-gather" min="0" max="1" step="0.01" value="0.80" disabled title="Not in the web build" />
-            <output></output>
-          </div>
           <div class="slider-group" data-param="depth">
             <label for="sl-depth">RELIEF</label>
             <input type="range" id="sl-depth" min="0" max="1" step="0.01" value="0.80" />
             <output></output>
           </div>
-          <div class="slider-group" data-param="scatter">
-            <label for="sl-scatter" title="How different the drift distances are">SCATTER</label>
-            <input type="range" id="sl-scatter" min="0" max="1" step="0.01" value="0.70" />
+          <div class="slider-group" data-param="lean">
+            <label for="sl-lean" title="Which side of the picture the particles come from. Centre = all sides. Drift direction sets where they go.">LEAN</label>
+            <input type="range" id="sl-lean" min="-1" max="1" step="0.01" value="0" />
             <output></output>
           </div>
-          <div class="slider-group" data-param="lean">
-            <label for="sl-lean" title="Light-based side bias: bright parts drift right, dark parts left (or the reverse when negative)">LEAN</label>
-            <input type="range" id="sl-lean" min="-1" max="1" step="0.01" value="0" />
+          <div class="slider-group" data-param="panAmount">
+            <label for="sl-pan" title="How far the picture tilts toward the cursor (PAN must be on)">PAN AMT</label>
+            <input type="range" id="sl-pan" min="0" max="1" step="0.01" value="0.50" />
             <output></output>
           </div>
         </section>
@@ -142,9 +131,8 @@
           <div class="row">
             <span class="row-label">FEATURES</span>
             <div class="seg">
-              <button class="toggle-btn" data-toggle="draw" disabled title="Not in the web build">DRAW</button>
               <button class="toggle-btn active" data-toggle="track">TRACK</button>
-              <button class="toggle-btn active" data-toggle="trails">TRAILS</button>
+              <button class="toggle-btn" data-toggle="panMode" title="3D pan that follows the cursor. Amount in MOTION.">PAN</button>
             </div>
           </div>
           <div class="row">
@@ -155,13 +143,6 @@
               <button class="toggle-btn step-btn" id="scan-level-dec" type="button" title="Weaker scan" aria-label="Weaker scan">&minus;</button>
               <output class="level" id="scan-level" title="Scan impact, 1 to 5">3</output>
               <button class="toggle-btn step-btn" id="scan-level-inc" type="button" title="Stronger scan" aria-label="Stronger scan">+</button>
-            </div>
-          </div>
-          <div class="row">
-            <span class="row-label">STYLE</span>
-            <div class="seg">
-              <button class="mode-btn active" data-travel="swarm">SWARM</button>
-              <button class="mode-btn" data-travel="melt" disabled title="Not in the web build">MELT</button>
             </div>
           </div>
           <div class="row">
