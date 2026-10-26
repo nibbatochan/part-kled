@@ -922,5 +922,3 @@ body.dragging .dropzone-box {
 
 /* Pan icon: visible without a border; no focus ring on mouse clicks */
 .round-btn:focus:not(:focus-visible) { outline: none; }
-.pan-dot span { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); display: block; }
-.pan-dot { opacity: 0.85; }
