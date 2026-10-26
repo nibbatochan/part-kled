@@ -906,29 +906,16 @@ body.dragging .dropzone-box {
 
 .stage-tools { position: absolute; left: 14px; bottom: 12px; z-index: 6; display: flex; align-items: flex-end; gap: 8px; }
 .stage-pan { position: relative; left: auto; top: auto; bottom: auto; transform: none; }
-.round-btn { width: 36px; height: 36px; border: none; border-radius: 50%; background: rgba(5, 6, 7, 0.75); color: var(--ink-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: color var(--t) var(--ease), background-color var(--t) var(--ease); }
-.round-btn:hover, .round-btn[aria-expanded='true'] { color: var(--ink); background: rgba(233, 236, 238, 0.14); }
-.round-btn.on { color: #050607; background: var(--accent); }
+.round-btn { width: 30px; height: 30px; border: none; border-radius: 50%; background: none; color: var(--ink-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: color var(--t) var(--ease), background-color var(--t) var(--ease); }
+.round-btn:hover, .round-btn[aria-expanded='true'] { color: var(--ink); }
+.round-btn.on { color: var(--ink); background: none; }
 .pan-panel { left: 0; bottom: calc(100% + 10px); top: auto; transform: none; width: 250px; }
 .pan-group { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .pan-float { padding-top: 8px; }
 
 /* Sidebar: larger text across the tools */
-.console { font-size: 12px; }
-.console .app-title { font-size: 15px; }
-.console .meta { font-size: 11px; }
-.console .box h2 { font-size: 12px; }
-.console .box h2 i { font-size: 11px; }
-.console .row-label { font-size: 11px; letter-spacing: 0.08em; }
-.console .toggle-btn, .console .mode-btn { font-size: 12px; height: 26px; padding: 0 8px; }
-.console .pair .slider-group label, .console .pan-panel .slider-group label, .console .fx-slider label { font-size: 11px; letter-spacing: 0.04em; }
-.console .slider-group output { font-size: 11px; }
+.console .row-label { letter-spacing: 0.08em; }
+.console .toggle-btn, .console .mode-btn { height: 26px; padding: 0 8px; }
+.console .pair .slider-group label, .console .pan-panel .slider-group label, .console .fx-slider label { letter-spacing: 0.04em; }
 .console .pair .slider-group { grid-template-columns: 74px 1fr 40px; }
-.console .subhead { font-size: 11px; }
-.console .cmd { font-size: 11px; }
-.console .level { font-size: 14px; }
-.console .dial-fields label, .console .drift-fields label { font-size: 11px; }
-.console .dial-fields input[type='number'], .console .drift-fields input[type='number'] { font-size: 13px; }
-.console .mini { font-size: 11px; height: 22px; }
-.console .pan-hint { font-size: 10.5px; }
-.pan-panel .row-label { font-size: 11px; }
+.console .mini { height: 22px; }
