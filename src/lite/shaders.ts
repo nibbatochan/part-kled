@@ -115,7 +115,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
-    alpha *= 1.0 - smoothstep(0.2, 0.42, length(dir * reach * ease));
+    // Streaks fade only far out, so drifting particles can travel past the canvas edges
+    alpha *= 1.0 - smoothstep(1.6, 2.6, length(dir * reach * ease));
     // DIM: the drift paths are dimmed procedurally, in soft bands, so the dots read better
     alpha *= mix(1.0, 0.4, uDim * (0.5 + 0.5 * sin(s * 7.0 + r4 * 6.2831853)));
     streaming = smoothstep(0.0, 0.12, s); // 0 on the picture, 1 once drifting (smooth, so colour blends)

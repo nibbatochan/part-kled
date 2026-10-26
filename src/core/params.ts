@@ -126,15 +126,28 @@ export const presets: Record<string, Partial<Params>> = {
 };
 
 /**
- * Light start: flow, drift strength and every trail setting go back to their low defaults.
- * Applied on every page load and whenever a new picture is added, so the first frames stay cheap.
+ * Start settings: applied on every page load and to every new picture. Values are the studio's
+ * starting look (flow, direction, particles, trail, interaction, toggles).
  */
 export function withLightStart(p: Params): Params {
   return {
     ...p,
-    drift: defaults.drift,
-    line: { ...p.line, length: defaults.line.length },
-    trail: { ...defaults.trail },
+    drift: 0.7,                       // FLOW: slightly high
+    depth: 0.5,                       // DEPTH 50%
+    lean: 0,
+    line: { angle: (31 * Math.PI) / 180, length: 0.55 }, // ANGLE 31 degrees (top right), STRENGTH 55
+    randomness: 0.1,                  // RANDOM 10%
+    trailSize: 0.45,                  // PARTICLE SIZE 0.45
+    pSat: 1,                          // PART SAT 1
+    trailAngle: 0,                    // TRAIL DIR 0
+    trail: { ...defaults.trail, amount: 0.55, length: 0.3 }, // TRAIL AMT 0.55, TRAIL LEN inside the particles
+    track: false,                     // HOVER off
+    scan: true,                       // SCANNER on, BURST
+    scanMode: 5,
+    panMode: true,                    // CURSOR on
+    panAmount: 0.25,                  // AMOUNT 25%
+    floatOn: false,
+    threeD: false,
   };
 }
 
