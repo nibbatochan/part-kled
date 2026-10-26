@@ -10,23 +10,30 @@ precision highp int;
 `;
 
 const DECLS = `
-layout(location = 0) in vec3 aHome;  // world x, y (height = 1), z depth -0.5..0.5
-layout(location = 1) in vec4 aMeta;  // rgb colour, a = density gain / 5 (undoes importance-sampling bias)
+layout(location = 0) in vec3 aHome;   // world x, y (height = 1), z depth -0.5..0.5
+layout(location = 1) in vec4 aMeta;   // rgb colour, a = density gain / 5 (undoes importance-sampling bias)
+layout(location = 2) in vec3 aHome2;  // MORPH: the arriving picture's home (same particle index)
+layout(location = 3) in vec4 aMeta2;  // MORPH: the arriving picture's colour
 
 uniform vec2 uView;       // drawing buffer size, px
 uniform float uScale;     // px per world unit
 uniform vec2 uOffset;     // px, picture centre relative to canvas centre (y up)
 uniform float uTime;
-uniform float uDrift;     // 0..1
-uniform float uDepth;     // 0..1
+uniform float uDrift;     // FLOW: 0..1
+uniform float uDepth;     // RELIEF: 0..1
 uniform float uSpeed;     // 1 = default
 uniform vec2 uDir;        // drift direction (unit) * strength factor
 uniform float uLean;      // -1..1 which side of the picture the streamers come from
 uniform float uHalfW;     // half the picture width in world units
-uniform vec2 uLook;       // PAN: cursor tilt, already scaled by the pan amount
+uniform float uRandom;    // 0..1 randomness of the path (direction and distance per particle)
+uniform float uDim;       // 0..1 procedural dimming along the drift paths
+uniform float uPSat;      // particle saturation, 1 = as sampled
+uniform vec2 uLook;       // PAN: cursor tilt, already scaled by the pan amount and style
 uniform vec2 uSway;       // idle camera sway, not affected by PAN
 uniform vec2 uPtr;        // pointer in world units
-uniform float uPtrOn;
+uniform float uPtrOn;     // TRACK on and the cursor is over the stage
+uniform vec2 uPtrVel;     // pointer velocity, world units per second (clamped on the CPU)
+uniform float uTrackOld;  // 1 = OLD track (repel + follow the motion), 0 = SOFT track (gentle push)
 uniform vec4 uBurst;      // click burst: x, y (world), age (s), amplitude (0 when done)
 uniform float uCover;     // expected dots per pixel over the subject
 uniform float uPointPx;
@@ -40,11 +47,11 @@ uniform float uLightOn;
 uniform float uScanOn;
 uniform float uScan;        // 0..1 position of the band
 uniform float uScanMode;    // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH
-uniform vec2 uScanCenter;
+uniform vec2 uScanCenter;   // where the user last clicked
 uniform float uZScale;
 uniform float uOpacity;     // picture only, trails are not dimmed
-uniform float uMorph;       // 0..1 pixel shift between two pictures
-uniform float uRole;        // 0 normal, 1 leaving picture, 2 arriving picture
+uniform float uMorph;       // 0..1 progress of the morph into the next picture
+uniform float uRole;        // 0 normal, 3 morphing
 
 out vec3 vCol;
 
@@ -65,6 +72,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float r1 = rnd(id, 2u);
   float r2 = rnd(id, 3u);
   float r3 = rnd(id, 4u);
+  float r4 = rnd(id, 8u); // path randomness: direction
 
   // LEAN: the chance to stream depends on where the particle sits across the picture.
   // Lean right: most streamers come from the right side; lean left: from the left. A floor keeps
@@ -89,28 +97,41 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
 
-    // Drift distance: the drift direction sets the way, this sets how far each one goes
-    float reach = (0.16 + 0.5 * uDrift) * (0.45 + 1.1 * r3);
-    vec2 perp = vec2(-uDir.y, uDir.x);
-    pos += uDir * reach * ease;
+    // PATH RANDOMNESS: each streamer turns a little off the drift direction and goes its own distance
+    float ang = (r4 - 0.5) * uRandom * 1.2;
+    float ca = cos(ang), sa = sin(ang);
+    vec2 dir = vec2(uDir.x * ca - uDir.y * sa, uDir.x * sa + uDir.y * ca);
+    // FLOW: the reach doubled against the first version (maximum now about 1.8 world units)
+    float reach = (0.32 + 1.0 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
+    vec2 perp = vec2(-dir.y, dir.x);
+    pos += dir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
     float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * 0.25;
     pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
     // Streaks fade out before they leave the picture's neighbourhood
-    alpha *= 1.0 - smoothstep(0.2, 0.42, length(uDir * reach * ease));
+    alpha *= 1.0 - smoothstep(0.2, 0.42, length(dir * reach * ease));
+    // DIM: the drift paths are dimmed procedurally, in soft bands, so the dots read better
+    alpha *= mix(1.0, 0.4, uDim * (0.5 + 0.5 * sin(s * 7.0 + r4 * 6.2831853)));
     streaming = step(0.001, s);
   }
 
   // Tiny shimmer so the held picture is alive
   pos += 0.0015 * (0.3 + uDrift) * vec2(sin(uTime * 0.9 + r1 * 40.0), cos(uTime * 0.7 + r2 * 40.0));
 
-  // Soft cursor push (TRACK)
+  // TRACK. OLD: repel from the cursor and follow its motion (the earlier behaviour).
+  // SOFT: a gentle push (the later behaviour).
   vec2 dq = pos - uPtr;
   float dl = length(dq);
-  float f = uPtrOn * smoothstep(0.14, 0.0, dl);
-  pos += dq / max(dl, 1e-4) * f * f * 0.03;
+  vec2 away = dq / max(dl, 1e-4);
+  if (uTrackOld > 0.5) {
+    float fall = uPtrOn * exp(-(dl * dl) / 0.0625);
+    pos += away * fall * 0.06 + clamp(uPtrVel, -2.0, 2.0) * fall * 0.05;
+  } else {
+    float f = uPtrOn * smoothstep(0.14, 0.0, dl);
+    pos += away * f * f * 0.03;
+  }
 
   // Click burst (BURST scan style): a ring that travels outward and pushes what it passes
   vec2 bq = pos - uBurst.xy;
@@ -169,27 +190,27 @@ vec3 effects(vec3 c) {
 
 const POINTS = `
 void main() {
-  // Pixel shift between two pictures: each dot has its own moment to leave or arrive
-  float rr = rnd(uint(gl_VertexID), 7u);
-  if ((uRole > 0.5 && uRole < 1.5 && rr <= uMorph) || (uRole > 1.5 && rr > uMorph)) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    vCol = vec3(0.0);
-    return;
-  }
+  // MORPH: the dot moves from its place in the old picture to its place in the new one.
+  // Same rule as the studio: a per-particle phase offset, then smoothstep.
+  uint id = uint(gl_VertexID);
+  float morphing = step(2.5, uRole);
+  float e = clamp(uMorph + (rnd(id, 9u) - 0.5) * 0.4, 0.0, 1.0);
+  e = smoothstep(0.0, 1.0, e) * morphing;
+  vec3 home = mix(aHome, aHome2, e);
+  vec3 mc = mix(aMeta.rgb, aMeta2.rgb, e);
 
   float alpha, streaming;
-  vec2 w = place(uint(gl_VertexID), aHome, luma(aMeta.rgb), 0.0, 1.0, alpha, streaming);
-  float shift = uRole > 0.5 ? sin(uMorph * 3.14159265) : 0.0;
-  w += vec2(cos(rr * 6.2831853), sin(rr * 6.2831853)) * 0.06 * shift;
-  gl_Position = toClip(w, aHome.z);
+  vec2 w = place(id, home, luma(mc), 0.0, 1.0, alpha, streaming);
+  gl_Position = toClip(w, home.z);
   gl_PointSize = streaming > 0.5 ? max(1.0, uPointPx) : uPointPx;
 
-  vec3 c = effects(aMeta.rgb);
+  vec3 c = effects(mc);
   c = tint(c);
+  c = clamp(mix(vec3(luma(c)), c, uPSat), 0.0, 1.0); // particle saturation
   float lum = luma(c);
   if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
-    float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, aHome.z, uZScale, lum);
+    float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, home.z, uZScale, lum);
     c += (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * g * (0.12 + 0.4 * lum);
   }
 

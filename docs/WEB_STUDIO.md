@@ -62,3 +62,15 @@ Budget from device tiers (`pointBudget()`): 200k low, 300k default, 450k strong.
 - `STUDIO_URL=http://localhost:5173/ node scripts/verify-web-studio.mjs`: loads, switches picture, turns
   the scan on, reads back pixels and GL errors, fails on any console error.
 - Not measured on a real low-end laptop yet.
+
+## UI revamp (latest)
+
+- Console compacted: boxes 22 px headers, sliders two per line in MOTION and EFFECTS, dial 72 px.
+- TINT row removed. Light tint is off in the web build.
+- MOTION: FLOW (reach doubled), RELIEF, LENGTH (moved from Effects, same field `trail.length`), RANDOM (`randomness`: per-particle direction and distance), LEAN, DIM (`dim`: procedural dimming along drift paths).
+- PAN section: PAN on/off, FLOAT (gentle hover), STYLE CURSOR or 3D (orbit, larger turn), AMOUNT slider.
+- MODES: TRACK on/off plus OLD (repel and follow the cursor's motion, the earlier behaviour) or SOFT (gentle push, the later behaviour). Default OLD.
+- Scan starts at the last click and restarts its sweep there. It no longer follows the cursor.
+- New picture morphs in from the picture on screen, same particle index, per-particle delay, 1.6 s (the studio's morph rule).
+- EFFECTS: PARTICLE SAT (`pSat`) saturates the dots themselves.
+- Not done: NEAR direction (unclear what it should control).

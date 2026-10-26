@@ -9,16 +9,6 @@ import type { Params } from '../core/params';
 /** Scan style index of BURST in the web build (after SWEEP, RING, RADAR, LINES, DEPTH). */
 export const BURST_MODE = 5;
 
-const LIGHT_RGB: Record<Params['light'], [number, number, number] | null> = {
-  cream: [0.95, 0.9, 0.79],
-  ice: [0.75, 0.88, 1],
-  orange: [1, 0.6, 0.24],
-  red: [1, 0.29, 0.24],
-  green: [0.25, 0.88, 0.69],
-  violet: [0.56, 0.42, 1],
-  off: null,
-};
-
 /** Studio settings in, light renderer settings out. */
 export function toLiteParams(p: Params): Partial<LiteParams> {
   const bursting = p.scanMode === BURST_MODE;
@@ -29,7 +19,13 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     lean: p.lean,
     depth: p.depth,
     pan: p.panMode ? p.panAmount : 0,
+    panOrbit: p.panStyle === 'orbit',
+    floatOn: p.floatOn,
+    randomness: p.randomness,
+    dim: p.dim,
+    pSat: p.pSat,
     track: p.track,
+    trackOld: p.trackStyle === 'old',
     // BURST scan style: the click shock, its strength set by the scanner level (3 = studio strength)
     burst: bursting ? p.scanLevel / 3 : 0,
     trails: true, // trails are off when TRAIL AMOUNT is 0
@@ -40,7 +36,7 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     opacity: p.fx.opacity,
     bw: p.colorMode === 'bw',
     fx: { ...p.fx },
-    light: p.lightOn ? LIGHT_RGB[p.light] : null,
+    light: null, // no tint control in the web build (the TINT row is removed)
     scan: p.scan && !bursting,
     scanMode: p.scanMode,
     scanLevel: p.scanLevel,

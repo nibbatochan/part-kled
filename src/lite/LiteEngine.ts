@@ -1,6 +1,6 @@
 // src/lite/LiteEngine.ts
-// Raw WebGL2, no three.js, no framebuffers. Points and optional trail lines, plus a short pixel-shift
-// when a new picture comes in (two buffers at once, each dot leaving or arriving at its own moment).
+// Raw WebGL2, no three.js, no framebuffers. Points and optional trail lines. A new picture morphs in
+// from the picture on screen (same particle index, same rule as the studio's morph).
 import { FRAG_SRC, POINT_VERT, TRAIL_VERT } from './shaders';
 import type { LiteSample } from './sample';
 
@@ -14,28 +14,34 @@ export interface LiteFx {
 }
 
 export interface LiteParams {
-  drift: number;        // 0..1 how many particles drift and how far (FLOW)
+  drift: number;        // FLOW: 0..1 how many particles drift and how far
   angle: number;        // radians, counter-clockwise from +x
-  length: number;       // 0.25..1 drift strength
+  length: number;       // 0.25..1 drift strength (dial)
   lean: number;         // -1..1 side of the picture the streamers come from (0 = centred)
-  depth: number;        // 0..1 relief
+  depth: number;        // RELIEF: 0..1
+  randomness: number;   // 0..1 path randomness (direction and distance per particle)
   speed: number;        // 1 = default
   sway: number;         // 0..1 idle camera drift (always on, not PAN)
-  pan: number;          // 0..1 cursor tilt amount; 0 = PAN off
-  track: boolean;       // cursor pushes the picture
+  pan: number;          // 0..1 tilt amount; 0 = PAN off
+  panOrbit: boolean;    // PAN style: false = CURSOR tilt, true = 3D orbit
+  floatOn: boolean;     // FLOAT: the picture hovers gently
+  track: boolean;       // cursor acts on the particles
+  trackOld: boolean;    // TRACK style: true = OLD (repel + follow motion), false = SOFT (gentle push)
   burst: number;        // 0..1 click burst strength (BURST scan style)
-  trails: boolean;
+  trails: boolean;      // trail lines on
   trailAmount: number;  // 0..1 share of streaks kept
-  trailLength: number;  // 0.3..2
+  trailLength: number;  // PARTICLE LENGTH: 0.3..2
   trailStrength: number;// 0..2
   trailDetail: number;  // 0..1
+  dim: number;          // 0..1 procedural dimming along the drift paths
+  pSat: number;         // 0..2 particle saturation, 1 = as sampled
   brightness: number;   // 1 = as the source
   opacity: number;      // 0..1 picture only
   bw: boolean;
   fx: LiteFx;
-  light: [number, number, number] | null; // tint colour, null = LIGHT off
+  light: [number, number, number] | null; // tint colour, null = no tint
   scan: boolean;
-  scanMode: number;     // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH
+  scanMode: number;     // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH, (5 BURST is the click shock)
   scanLevel: number;    // 1..5, 3 = studio strength
 }
 
@@ -45,16 +51,22 @@ export const liteDefaults: LiteParams = {
   length: 0.5,
   lean: 0,
   depth: 0.5,
+  randomness: 0.3,
   speed: 1,
   sway: 0.6,
   pan: 0.5,
+  panOrbit: false,
+  floatOn: false,
   track: true,
+  trackOld: false,
   burst: 0,
   trails: true,
   trailAmount: 0.35,
   trailLength: 0.6,
   trailStrength: 0.5,
   trailDetail: 0.25,
+  dim: 0.3,
+  pSat: 1.2,
   brightness: 1.15,
   opacity: 1,
   bw: false,
@@ -78,7 +90,7 @@ const TRAIL_STRIDE = 2;
 const MIN_DRAWN = 40000;
 const SCAN_RATE = 0.155; // the studio's scan speed: one pass about every 6.5 s
 const BURST_LIFE = 1.1;  // seconds, the studio's burst lifetime
-const MORPH_S = 1.1;     // seconds for the pixel shift between two pictures
+const MORPH_S = 1.6;     // seconds, the studio's morph time
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
   const sh = gl.createShader(type)!;
@@ -103,9 +115,10 @@ function program(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
 
 const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
-  'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uBurst', 'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain',
-  'uTrailAmount', 'uTrailDetail', 'uLightCol', 'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter',
-  'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uScanLevel', 'uFx1', 'uFx2', 'uBW',
+  'uRandom', 'uDim', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
+  'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
+  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
+  'uScanLevel', 'uFx1', 'uFx2', 'uBW',
 ];
 
 interface Slot {
@@ -125,12 +138,14 @@ export class LiteEngine {
   private trailProg: WebGLProgram;
   private pointU: Record<string, WebGLUniformLocation | null> = {};
   private trailU: Record<string, WebGLUniformLocation | null> = {};
-  // Two buffer slots: the picture on screen and the one arriving (or leaving) during a pixel shift
+  // Two buffer slots: the picture on screen and the one arriving during a morph
   private slots: Slot[] = [];
   private cur = 0;
+  private morphFrom = 0;
   private morphing = false;
   private morphT = 0;
-  private morphFrom = 0;
+  private morphVao: WebGLVertexArrayObject;
+  private morphCount = 0;
 
   private sample: LiteSample | null = null;
   private drawn = 0;
@@ -144,12 +159,18 @@ export class LiteEngine {
 
   private time = 0;
   private ptr = { x: 0, y: 0, on: 0, targetOn: 0 };
+  private prevPtr = { x: 0, y: 0 };
+  private ptrVel = { x: 0, y: 0 };
   private look = { x: 0, y: 0 };
   private lookTarget = { x: 0, y: 0 };
   private sway = { x: 0, y: 0 };
   private burstX = 0;
   private burstY = 0;
   private burstAge = BURST_LIFE;
+  // Click: the scan starts from here and restarts its sweep
+  private clickX = 0;
+  private clickY = 0;
+  private clickT = 0;
 
   // adaptive quality
   private ema = 16;
@@ -180,6 +201,7 @@ export class LiteEngine {
       this.trailU[n] = gl.getUniformLocation(this.trailProg, n);
     }
     this.slots = [this.createSlot(), this.createSlot()];
+    this.morphVao = gl.createVertexArray()!;
 
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
@@ -222,7 +244,7 @@ export class LiteEngine {
     slot.count = s.count;
   }
 
-  /** Show this picture at once, no transition. */
+  /** Show this picture at once, no morph. */
   setSample(s: LiteSample): void {
     this.upload(this.slots[this.cur], s);
     this.sample = s;
@@ -231,13 +253,35 @@ export class LiteEngine {
     this.relayout();
   }
 
-  /** Pixel shift: the picture on screen leaves and this one arrives over about a second. */
+  /**
+   * Morph from the picture on screen into this one. Particle i goes from its place in the old picture
+   * to its place in the new one, with a short per-particle delay (the studio's morph, same rule).
+   */
   transitionTo(s: LiteSample): void {
+    const gl = this.gl;
     this.morphFrom = this.cur;
     this.cur = 1 - this.cur;
     this.upload(this.slots[this.cur], s);
     this.sample = s;
     this.drawn = s.count;
+    this.morphCount = Math.min(this.slots[this.morphFrom].count, s.count);
+
+    // Attributes 0-1 read the old picture, 2-3 the new one, both from the same index
+    const from = this.slots[this.morphFrom];
+    const to = this.slots[this.cur];
+    gl.bindVertexArray(this.morphVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, from.vbo);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, true, 16, 12);
+    gl.bindBuffer(gl.ARRAY_BUFFER, to.vbo);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, true, 16, 12);
+    gl.bindVertexArray(null);
+
     this.morphing = true;
     this.morphT = 0;
     this.relayout();
@@ -274,10 +318,12 @@ export class LiteEngine {
     this.lookTarget.y = -(y / this.cssH - 0.5) * 2;
   }
 
-  /** Click burst from a canvas CSS-px point. */
+  /** Click: the burst and the scan both start here. */
   burst(x: number, y: number): void {
     [this.burstX, this.burstY] = this.toWorld(x, y);
     this.burstAge = 0;
+    [this.clickX, this.clickY] = [this.burstX, this.burstY];
+    this.clickT = this.time;
   }
 
   private toWorld(x: number, y: number): [number, number] {
@@ -329,6 +375,12 @@ export class LiteEngine {
     this.burstAge = Math.min(BURST_LIFE, this.burstAge + dt);
     const k = 1 - Math.exp(-dt * 5);
     this.ptr.on += (this.ptr.targetOn - this.ptr.on) * k;
+    // Pointer velocity for OLD track: smoothed, in world units per second
+    const dtp = Math.max(dt, 1e-3);
+    this.ptrVel.x += ((this.ptr.x - this.prevPtr.x) / dtp - this.ptrVel.x) * k;
+    this.ptrVel.y += ((this.ptr.y - this.prevPtr.y) / dtp - this.ptrVel.y) * k;
+    this.prevPtr.x = this.ptr.x;
+    this.prevPtr.y = this.ptr.y;
     if (this.morphing) {
       this.morphT += dt / MORPH_S;
       if (this.morphT >= 1) this.morphing = false;
@@ -336,12 +388,16 @@ export class LiteEngine {
     const t = this.time;
     const p = this.params;
 
-    // PAN: the cursor tilt, scaled by the pan amount (0 = off). Idle sway is separate and always on.
-    this.look.x += (this.lookTarget.x * p.pan - this.look.x) * k;
-    this.look.y += (this.lookTarget.y * p.pan - this.look.y) * k;
+    // PAN: cursor tilt scaled by the amount. CURSOR style tilts; ORBIT style turns the picture further.
+    const panScale = p.pan * (p.panOrbit ? 2 : 1);
+    this.look.x += (this.lookTarget.x * panScale - this.look.x) * k;
+    this.look.y += (this.lookTarget.y * panScale - this.look.y) * k;
+    // Idle sway is separate and always on
     const sw = p.sway;
     this.sway.x = (Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.11 + 1.3) * 0.4) * sw;
     this.sway.y = (Math.sin(t * 0.17 + 0.6) * 0.6 + Math.sin(t * 0.09) * 0.4) * sw * 0.6;
+    // FLOAT: the whole picture hovers up and down, slowly
+    const floatY = p.floatOn ? (Math.sin(t * 0.7) * 0.012 + Math.sin(t * 0.37 + 1) * 0.006) * this.scale : 0;
 
     const base = Math.max(1, Math.round(this.dpr));
     const pointPx = base; // fine grain: one device pixel per point (studio dots are this size)
@@ -352,15 +408,18 @@ export class LiteEngine {
     const light = p.light ?? [0, 0, 0];
     const fx = p.fx;
     const hue = (fx.hue * Math.PI) / 180;
-    const scanCenter = this.ptr.on > 0.5 ? [this.ptr.x, this.ptr.y] : [0, 0];
+    // SCAN starts where the user clicked and restarts its sweep there
+    const scanPhase = ((t - this.clickT) * SCAN_RATE) % 1;
     const scanOn = p.scan && p.scanMode < 4.5; // BURST is not a band; it is the click shock
+    const velX = Math.max(-2, Math.min(2, this.ptrVel.x));
+    const velY = Math.max(-2, Math.min(2, this.ptrVel.y));
 
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const setU = (U: Record<string, WebGLUniformLocation | null>, role: number, morph: number, cover: number) => {
       gl.uniform2f(U.uView, this.canvas.width, this.canvas.height);
       gl.uniform1f(U.uScale, this.scale);
-      gl.uniform2f(U.uOffset, this.offX, this.offY);
+      gl.uniform2f(U.uOffset, this.offX, this.offY + floatY);
       gl.uniform1f(U.uTime, t);
       gl.uniform1f(U.uDrift, p.drift);
       gl.uniform1f(U.uDepth, p.depth);
@@ -368,10 +427,15 @@ export class LiteEngine {
       gl.uniform2f(U.uDir, dx, dy);
       gl.uniform1f(U.uLean, p.lean);
       gl.uniform1f(U.uHalfW, s.aspect / 2);
+      gl.uniform1f(U.uRandom, p.randomness);
+      gl.uniform1f(U.uDim, p.dim);
+      gl.uniform1f(U.uPSat, p.pSat);
       gl.uniform2f(U.uLook, this.look.x, this.look.y);
       gl.uniform2f(U.uSway, this.sway.x, this.sway.y);
       gl.uniform2f(U.uPtr, this.ptr.x, this.ptr.y);
       gl.uniform1f(U.uPtrOn, p.track ? this.ptr.on : 0);
+      gl.uniform2f(U.uPtrVel, velX, velY);
+      gl.uniform1f(U.uTrackOld, p.trackOld ? 1 : 0);
       gl.uniform4f(U.uBurst, this.burstX, this.burstY, this.burstAge, burstW);
       gl.uniform1f(U.uCover, cover);
       gl.uniform1f(U.uPointPx, pointPx);
@@ -383,9 +447,9 @@ export class LiteEngine {
       gl.uniform3f(U.uLightCol, light[0], light[1], light[2]);
       gl.uniform1f(U.uLightOn, p.light ? 1 : 0);
       gl.uniform1f(U.uScanOn, scanOn ? 1 : 0);
-      gl.uniform1f(U.uScan, (t * SCAN_RATE) % 1);
+      gl.uniform1f(U.uScan, scanPhase);
       gl.uniform1f(U.uScanMode, p.scanMode);
-      gl.uniform2f(U.uScanCenter, scanCenter[0], scanCenter[1]);
+      gl.uniform2f(U.uScanCenter, this.clickX, this.clickY);
       gl.uniform1f(U.uZScale, p.depth * 0.275);
       gl.uniform1f(U.uOpacity, p.opacity);
       gl.uniform1f(U.uMorph, morph);
@@ -399,23 +463,20 @@ export class LiteEngine {
     const cover = this.cover(pointPx);
     gl.useProgram(this.pointProg);
     if (this.morphing) {
-      const old = this.slots[this.morphFrom];
-      setU(this.pointU, 1, this.morphT, cover);
-      gl.bindVertexArray(old.vaoPoints);
-      gl.drawArrays(gl.POINTS, 0, Math.min(old.count, this.drawn));
-      setU(this.pointU, 2, this.morphT, cover);
+      setU(this.pointU, 3, this.morphT, cover);
+      gl.bindVertexArray(this.morphVao);
+      gl.drawArrays(gl.POINTS, 0, Math.min(this.morphCount, this.drawn));
     } else {
       setU(this.pointU, 0, 0, cover);
+      gl.bindVertexArray(this.slots[this.cur].vaoPoints);
+      gl.drawArrays(gl.POINTS, 0, this.drawn);
     }
-    const now = this.slots[this.cur];
-    gl.bindVertexArray(now.vaoPoints);
-    gl.drawArrays(gl.POINTS, 0, this.drawn);
 
-    // Trails are not drawn during the pixel shift; they come back when it ends
+    // Trails are not drawn during the morph; they come back when it ends
     if (!this.morphing && p.trails && this.trailsAllowed && p.drift > 0.02) {
       gl.useProgram(this.trailProg);
       setU(this.trailU, 0, 0, cover);
-      gl.bindVertexArray(now.vaoTrails);
+      gl.bindVertexArray(this.slots[this.cur].vaoTrails);
       gl.drawArraysInstanced(gl.LINES, 0, 2, Math.floor(this.drawn / TRAIL_STRIDE));
     }
     gl.bindVertexArray(null);
@@ -464,6 +525,7 @@ export class LiteEngine {
       gl.deleteVertexArray(slot.vaoPoints);
       gl.deleteVertexArray(slot.vaoTrails);
     }
+    gl.deleteVertexArray(this.morphVao);
     gl.deleteProgram(this.pointProg);
     gl.deleteProgram(this.trailProg);
     gl.getExtension('WEBGL_lose_context')?.loseContext();

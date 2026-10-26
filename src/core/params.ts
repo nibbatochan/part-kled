@@ -30,8 +30,14 @@ export interface Params {
   draw: boolean;    // paint flow strokes
   track: boolean;   // pointer repel
   scanMode: number; // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH, 5 BURST (web build)
-  panMode: boolean; // PAN: the picture tilts toward the cursor
+  panMode: boolean; // PAN on/off
   panAmount: number; // 0..1 how far PAN tilts
+  panStyle: 'cursor' | 'orbit'; // PAN style: tilt toward the cursor, or a fuller 3D orbit
+  floatOn: boolean; // FLOAT: the picture hovers gently
+  randomness: number; // 0..1 randomness of the particle path
+  dim: number; // 0..1 procedural dimming along the drift paths
+  pSat: number; // 0..2 particle saturation
+  trackStyle: 'old' | 'soft'; // TRACK style: OLD repels and follows the motion, SOFT is a gentle push
   scan: boolean;    // sweep line
   scanLevel: number; // 1..5 scan impact (3 = the original strength)
   trails: boolean;  // fading streaks
@@ -64,6 +70,12 @@ export const defaults: Params = {
   scanMode: 0,
   panMode: true,
   panAmount: 0.5,
+  panStyle: 'cursor',
+  floatOn: false,
+  randomness: 0.3,
+  dim: 0.3,
+  pSat: 1.2,
+  trackStyle: 'old',
   scanLevel: 3,
   trails: true,
 

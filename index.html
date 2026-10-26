@@ -34,14 +34,11 @@
         </div>
       </main>
 
-      <!-- Right: the console. Boxed sections on a grid, about a quarter of the window. -->
+      <!-- Right: the console. Compact boxed sections on a grid. -->
       <aside id="ui-layer" class="console">
         <header class="con-head">
           <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
-          <dl class="meta">
-            <dt>MODEL</dt><dd>DEPTH ANYTHING V2</dd>
-            <dt>AUTHOR</dt><dd>SUMANTH REDDY</dd>
-          </dl>
+          <span class="meta">DEPTH ANYTHING V2 · SUMANTH REDDY</span>
         </header>
 
         <section class="box">
@@ -60,34 +57,46 @@
             </button>
             <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
           </div>
-          <div class="btn-grid">
+          <div class="btn-row">
             <button id="btn-next" class="cmd"><span class="symbol">▶</span> NEXT <span class="kbd-hint">SPACE</span></button>
-            <button id="btn-add-pictures" class="cmd">+ ADD PICTURES</button>
-            <button id="fullscreen-btn" class="cmd" title="Fullscreen (F)">⛶ FULLSCREEN <span class="kbd-hint">F</span></button>
+            <button id="btn-add-pictures" class="cmd">+ ADD</button>
+            <button id="fullscreen-btn" class="cmd" title="Fullscreen (F)">⛶ FULL <span class="kbd-hint">F</span></button>
           </div>
         </section>
 
         <section class="box">
           <h2><i>02</i> MOTION</h2>
-          <div class="slider-group" data-param="drift">
-            <label for="sl-drift">FLOW</label>
-            <input type="range" id="sl-drift" min="0" max="1" step="0.01" value="0.80" />
-            <output></output>
-          </div>
-          <div class="slider-group" data-param="depth">
-            <label for="sl-depth">RELIEF</label>
-            <input type="range" id="sl-depth" min="0" max="1" step="0.01" value="0.80" />
-            <output></output>
-          </div>
-          <div class="slider-group" data-param="lean">
-            <label for="sl-lean" title="Which side of the picture the particles come from. Centre = all sides. Drift direction sets where they go.">LEAN</label>
-            <input type="range" id="sl-lean" min="-1" max="1" step="0.01" value="0" />
-            <output></output>
-          </div>
-          <div class="slider-group" data-param="panAmount">
-            <label for="sl-pan" title="How far the picture tilts toward the cursor (PAN must be on)">PAN AMT</label>
-            <input type="range" id="sl-pan" min="0" max="1" step="0.01" value="0.50" />
-            <output></output>
+          <div class="pair">
+            <div class="slider-group" data-param="drift">
+              <label for="sl-drift">FLOW</label>
+              <input type="range" id="sl-drift" data-path="drift" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="depth">
+              <label for="sl-depth">RELIEF</label>
+              <input type="range" id="sl-depth" data-path="depth" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="trail.length">
+              <label for="sl-length" title="How long each particle's streak is">LENGTH</label>
+              <input type="range" id="sl-length" data-path="trail.length" min="0.3" max="2" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="randomness">
+              <label for="sl-random" title="How much each particle's path differs: direction and distance">RANDOM</label>
+              <input type="range" id="sl-random" data-path="randomness" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="lean">
+              <label for="sl-lean" title="Which side of the picture the particles come from. Centre = all sides.">LEAN</label>
+              <input type="range" id="sl-lean" data-path="lean" min="-1" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="dim">
+              <label for="sl-dim" title="Dims the drift paths in soft bands so the dots read better">DIM</label>
+              <input type="range" id="sl-dim" data-path="dim" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
           </div>
         </section>
 
@@ -96,7 +105,7 @@
           <div class="dial-row">
             <div id="line-widget" class="line-widget-box" role="slider" tabindex="0"
                  aria-label="Drift direction" title="Drag to aim the drift. Distance from centre sets strength. Double-click to reset.">
-              <svg id="line-svg" width="88" height="88" viewBox="0 0 88 88">
+              <svg id="line-svg" width="72" height="72" viewBox="0 0 88 88">
                 <circle class="dial-ring" cx="44" cy="44" r="40" />
                 <g class="dial-ticks">
                   <line x1="44" y1="4" x2="44" y2="9" />
@@ -111,7 +120,6 @@
               </svg>
             </div>
             <div class="dial-info">
-              <span class="dial-cap">ANGLE · STRENGTH</span>
               <span id="line-readout" class="line-readout">0&deg; &middot; 90%</span>
               <div class="dial-fields">
                 <label for="in-angle">ANGLE</label>
@@ -121,18 +129,43 @@
                 <input type="number" id="in-strength" min="25" max="100" step="1" value="90" />
                 <span class="unit">%</span>
               </div>
-              <span class="dial-hint">DRAG THE DIAL. DOUBLE-CLICK RESETS.</span>
             </div>
           </div>
         </section>
 
         <section class="box">
-          <h2><i>04</i> MODES</h2>
+          <h2><i>04</i> PAN</h2>
           <div class="row">
-            <span class="row-label">FEATURES</span>
+            <span class="row-label">ON</span>
             <div class="seg">
-              <button class="toggle-btn active" data-toggle="track">TRACK</button>
-              <button class="toggle-btn" data-toggle="panMode" title="3D pan that follows the cursor. Amount in MOTION.">PAN</button>
+              <button class="toggle-btn" data-toggle="panMode" title="Tilt the picture with the cursor">PAN</button>
+              <button class="toggle-btn" data-toggle="floatOn" title="The picture hovers gently">FLOAT</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">STYLE</span>
+            <div class="seg">
+              <button class="mode-btn" data-panstyle="cursor" title="Tilt toward the cursor">CURSOR</button>
+              <button class="mode-btn" data-panstyle="orbit" title="Fuller 3D turn that follows the cursor">3D</button>
+            </div>
+          </div>
+          <div class="pair single">
+            <div class="slider-group" data-param="panAmount">
+              <label for="sl-pan">AMOUNT</label>
+              <input type="range" id="sl-pan" data-path="panAmount" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2><i>05</i> MODES</h2>
+          <div class="row">
+            <span class="row-label">TRACK</span>
+            <div class="seg">
+              <button class="toggle-btn" data-toggle="track">ON</button>
+              <button class="mode-btn" data-trackstyle="old" title="Repels and follows the cursor's motion">OLD</button>
+              <button class="mode-btn" data-trackstyle="soft" title="Gentle push away from the cursor">SOFT</button>
             </div>
           </div>
           <div class="row">
@@ -152,81 +185,66 @@
               <button class="mode-btn active" data-colormode="true">TRUE</button>
             </div>
           </div>
-          <div class="row">
-            <span class="row-label">TINT</span>
-            <div class="swatches-row">
-              <button class="swatch-btn active" data-light="cream" style="--c: var(--light-cream)" title="Cream"></button>
-              <button class="swatch-btn" data-light="ice" style="--c: var(--light-ice)" title="Ice Blue"></button>
-              <button class="swatch-btn" data-light="orange" style="--c: var(--light-orange)" title="Orange"></button>
-              <button class="swatch-btn" data-light="red" style="--c: var(--light-red)" title="Red"></button>
-              <button class="swatch-btn" data-light="green" style="--c: var(--light-green)" title="Green"></button>
-              <button class="swatch-btn" data-light="violet" style="--c: var(--light-violet)" title="Violet"></button>
-              <button class="swatch-btn dotted" data-light="off" title="Light Off"></button>
-            </div>
-          </div>
         </section>
 
         <section id="fx-panel" class="box">
-          <h2><i>05</i> EFFECTS <button id="fx-reset" class="mini" type="button">RESET</button></h2>
-          <span class="seg-label">IMAGE</span>
-          <div class="slider-group fx-slider" data-path="fx.opacity">
-            <label for="fx-fx-opacity">OPACITY</label>
-            <input type="range" id="fx-fx-opacity" data-path="fx.opacity" min="0" max="1" step="0.01" />
-            <output></output>
-          </div>
-          <span class="seg-label">LEVELS</span>
-          <div class="slider-group fx-slider" data-path="fx.black">
-            <label for="fx-fx-black">BLACK</label>
-            <input type="range" id="fx-fx-black" data-path="fx.black" min="0" max="0.5" step="0.005" />
-            <output></output>
-          </div>
-          <div class="slider-group fx-slider" data-path="fx.white">
-            <label for="fx-fx-white">WHITE</label>
-            <input type="range" id="fx-fx-white" data-path="fx.white" min="0.5" max="1" step="0.005" />
-            <output></output>
-          </div>
-          <div class="slider-group fx-slider" data-path="fx.gamma">
-            <label for="fx-fx-gamma">GAMMA</label>
-            <input type="range" id="fx-fx-gamma" data-path="fx.gamma" min="0.4" max="2.2" step="0.01" />
-            <output></output>
-          </div>
-          <span class="seg-label">CURVE</span>
-          <div class="slider-group fx-slider" data-path="fx.contrast">
-            <label for="fx-fx-contrast">CONTRAST</label>
-            <input type="range" id="fx-fx-contrast" data-path="fx.contrast" min="-1" max="1" step="0.01" />
-            <output></output>
-          </div>
-          <span class="seg-label">COLOUR</span>
-          <div class="slider-group fx-slider" data-path="fx.hue">
-            <label for="fx-fx-hue">HUE</label>
-            <input type="range" id="fx-fx-hue" data-path="fx.hue" min="-180" max="180" step="1" />
-            <output></output>
-          </div>
-          <div class="slider-group fx-slider" data-path="fx.saturation">
-            <label for="fx-fx-saturation">SATURATION</label>
-            <input type="range" id="fx-fx-saturation" data-path="fx.saturation" min="0" max="2" step="0.01" />
-            <output></output>
-          </div>
-          <span class="seg-label">TRAILS</span>
-          <div class="slider-group fx-slider" data-path="trail.amount">
-            <label for="fx-trail-amount">AMOUNT</label>
-            <input type="range" id="fx-trail-amount" data-path="trail.amount" min="0" max="1" step="0.01" />
-            <output></output>
-          </div>
-          <div class="slider-group fx-slider" data-path="trail.strength">
-            <label for="fx-trail-strength">STRENGTH</label>
-            <input type="range" id="fx-trail-strength" data-path="trail.strength" min="0" max="2" step="0.01" />
-            <output></output>
-          </div>
-          <div class="slider-group fx-slider" data-path="trail.length">
-            <label for="fx-trail-length">LENGTH</label>
-            <input type="range" id="fx-trail-length" data-path="trail.length" min="0.3" max="2" step="0.01" />
-            <output></output>
-          </div>
-          <div class="slider-group fx-slider" data-path="trail.detail">
-            <label for="fx-trail-detail">DETAIL</label>
-            <input type="range" id="fx-trail-detail" data-path="trail.detail" min="0" max="1" step="0.01" />
-            <output></output>
+          <h2><i>06</i> EFFECTS <button id="fx-reset" class="mini" type="button">RESET</button></h2>
+          <div class="pair">
+            <div class="slider-group fx-slider" data-path="fx.opacity">
+              <label for="fx-fx-opacity">OPACITY</label>
+              <input type="range" id="fx-fx-opacity" data-path="fx.opacity" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="fx.black">
+              <label for="fx-fx-black">BLACK</label>
+              <input type="range" id="fx-fx-black" data-path="fx.black" min="0" max="0.5" step="0.005" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="fx.white">
+              <label for="fx-fx-white">WHITE</label>
+              <input type="range" id="fx-fx-white" data-path="fx.white" min="0.5" max="1" step="0.005" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="fx.gamma">
+              <label for="fx-fx-gamma">GAMMA</label>
+              <input type="range" id="fx-fx-gamma" data-path="fx.gamma" min="0.4" max="2.2" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="fx.contrast">
+              <label for="fx-fx-contrast">CONTRAST</label>
+              <input type="range" id="fx-fx-contrast" data-path="fx.contrast" min="-1" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="fx.hue">
+              <label for="fx-fx-hue">HUE</label>
+              <input type="range" id="fx-fx-hue" data-path="fx.hue" min="-180" max="180" step="1" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="fx.saturation">
+              <label for="fx-fx-saturation">SATURATION</label>
+              <input type="range" id="fx-fx-saturation" data-path="fx.saturation" min="0" max="2" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="pSat">
+              <label for="fx-psat" title="Saturation of the particles themselves">PARTICLE SAT</label>
+              <input type="range" id="fx-psat" data-path="pSat" min="0" max="2" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="trail.amount">
+              <label for="fx-trail-amount">TRAIL AMT</label>
+              <input type="range" id="fx-trail-amount" data-path="trail.amount" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="trail.strength">
+              <label for="fx-trail-strength">TRAIL STR</label>
+              <input type="range" id="fx-trail-strength" data-path="trail.strength" min="0" max="2" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group fx-slider" data-path="trail.detail">
+              <label for="fx-trail-detail">DETAIL</label>
+              <input type="range" id="fx-trail-detail" data-path="trail.detail" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
           </div>
         </section>
       </aside>

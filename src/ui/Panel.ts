@@ -32,7 +32,6 @@ export class Panel {
     });
     this.lineWidget.setValue(this.params.line);
 
-    this.bindSliders();
     this.bindDirectionInputs();
     this.bindEffects();
     this.bindToggles();
@@ -65,27 +64,6 @@ export class Panel {
     const btn = document.getElementById('btn-light');
     btn?.classList.toggle('active', this.params.lightOn);
     this.onParamsChangeCb(this.params);
-  }
-
-  private bindSliders(): void {
-    const sliderDefs: { id: string; key: keyof Params }[] = [
-      { id: 'sl-drift', key: 'drift' },
-      { id: 'sl-depth', key: 'depth' },
-      { id: 'sl-lean', key: 'lean' },
-      { id: 'sl-pan', key: 'panAmount' },
-    ];
-
-    sliderDefs.forEach(({ id, key }) => {
-      const input = document.getElementById(id) as HTMLInputElement;
-      if (!input) return;
-      input.value = this.params[key].toString();
-      this.updatePercent(input);
-      input.addEventListener('input', () => {
-        (this.params[key] as number) = parseFloat(input.value);
-        this.updatePercent(input);
-        this.onParamsChangeCb(this.params);
-      });
-    });
   }
 
   /** Typed angle (degrees) and strength (%) beside the dial; the dial and the numbers stay in step. */
@@ -133,29 +111,60 @@ export class Panel {
       this.onParamsChangeCb(this.params);
     });
 
-    document.querySelectorAll<HTMLInputElement>('#fx-panel input[type="range"][data-path]').forEach((input) => {
+    this.pathSliders().forEach((input) => {
       input.addEventListener('input', () => {
-        const [group, key] = (input.dataset.path ?? '').split('.') as ['fx' | 'trail', string];
-        const bag = this.params[group] as unknown as Record<string, number>;
-        bag[key] = parseFloat(input.value);
-        this.updateFxOutput(input);
+        this.setPath(input.dataset.path ?? '', parseFloat(input.value));
+        this.updateSliderOutput(input);
         this.onParamsChangeCb(this.params);
       });
     });
   }
 
-  private updateFxOutput(input: HTMLInputElement): void {
+  /** Every range slider with a data-path writes one Params field: "fx.black", "trail.length" or a top-level key. */
+  private pathSliders(): HTMLInputElement[] {
+    return Array.from(document.querySelectorAll<HTMLInputElement>('input[type="range"][data-path]'));
+  }
+
+  private setPath(path: string, value: number): void {
+    const [a, b] = path.split('.');
+    if (b === undefined) (this.params as unknown as Record<string, number>)[a] = value;
+    else (this.params[a as 'fx' | 'trail'] as unknown as Record<string, number>)[b] = value;
+  }
+
+  private getPath(path: string): number {
+    const [a, b] = path.split('.');
+    if (b === undefined) return (this.params as unknown as Record<string, number>)[a];
+    return (this.params[a as 'fx' | 'trail'] as unknown as Record<string, number>)[b];
+  }
+
+  /** Shows the value beside the slider: percent when data-format="pct", else the step's decimals. */
+  private updateSliderOutput(input: HTMLInputElement): void {
     const out = input.parentElement?.querySelector('output');
+    if (!out) return;
+    if (input.dataset.format === 'pct') {
+      out.textContent = `${Math.round(parseFloat(input.value) * 100)}%`;
+      return;
+    }
     const decimals = input.step.includes('.') ? (input.step.split('.')[1]?.length ?? 2) : 0;
-    if (out) out.textContent = Number(input.value).toFixed(decimals);
+    out.textContent = Number(input.value).toFixed(decimals);
+  }
+
+  /** A row of buttons that set one string field: data-<attr>="value". */
+  private bindSegment(attr: 'trackstyle' | 'panstyle', key: 'trackStyle' | 'panStyle'): void {
+    const btns = document.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`);
+    btns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        (this.params as unknown as Record<string, string>)[key] = btn.dataset[attr] ?? '';
+        btns.forEach((b) => b.classList.toggle('active', b === btn));
+        this.onParamsChangeCb(this.params);
+      });
+    });
   }
 
   private syncEffects(): void {
-    document.querySelectorAll<HTMLInputElement>('#fx-panel input[type="range"][data-path]').forEach((input) => {
-      const [group, key] = (input.dataset.path ?? '').split('.') as ['fx' | 'trail', string];
-      const bag = this.params[group] as unknown as Record<string, number>;
-      input.value = String(bag[key]);
-      this.updateFxOutput(input);
+    this.pathSliders().forEach((input) => {
+      input.value = String(this.getPath(input.dataset.path ?? ''));
+      this.updateSliderOutput(input);
     });
   }
 
@@ -198,6 +207,8 @@ export class Panel {
   }
 
   private bindModes(): void {
+    this.bindSegment('trackstyle', 'trackStyle');
+    this.bindSegment('panstyle', 'panStyle');
     // Travel: SWARM / MELT
     const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');
     travelBtns.forEach((btn) => {
@@ -263,17 +274,8 @@ export class Panel {
   }
 
   private syncUiToParams(): void {
-    // Sliders
-    const sliders: [string, keyof Params][] = [['sl-drift', 'drift'], ['sl-depth', 'depth'], ['sl-lean', 'lean'], ['sl-pan', 'panAmount']];
-    sliders.forEach(([id, key]) => {
-      const el = document.getElementById(id) as HTMLInputElement | null;
-      if (!el) return;
-      el.value = (this.params[key] as number).toString();
-      this.updatePercent(el);
-    });
-
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
@@ -283,6 +285,9 @@ export class Panel {
 
     const levelEl = document.getElementById('scan-level');
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);
+
+    document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => b.classList.toggle('active', b.dataset.trackstyle === this.params.trackStyle));
+    document.querySelectorAll<HTMLButtonElement>('[data-panstyle]').forEach((b) => b.classList.toggle('active', b.dataset.panstyle === this.params.panStyle));
 
     // Scan style label
     const scanLabel = document.getElementById('scan-mode-label');
