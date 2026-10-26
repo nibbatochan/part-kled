@@ -372,7 +372,8 @@ export class LiteEngine {
     const s = this.sample;
     if (!s) return;
 
-    const dt = Math.min(dtSec, 0.05);
+    // Clamp both ends: a frame timestamp earlier than the last one gives a negative step, which made the smoothing diverge
+    const dt = Math.max(0, Math.min(dtSec, 0.05));
     this.time += dt;
     this.burstAge = Math.min(BURST_LIFE, this.burstAge + dt);
     const k = 1 - Math.exp(-dt * 5);
@@ -391,8 +392,9 @@ export class LiteEngine {
     const p = this.params;
 
     // PAN: cursor tilt scaled by the amount. CURSOR style tilts; ORBIT style turns the picture further.
-    const tgtX = this.lookTarget.x * p.pan * 0.3;
-    const tgtY = this.lookTarget.y * p.pan * 0.18;
+    // Cursor turn: at the edge of the stage the picture turns by about 26 degrees at amount 0.5
+    const tgtX = this.lookTarget.x * p.pan * 0.9;
+    const tgtY = this.lookTarget.y * p.pan * 0.5;
     this.look.x += (tgtX - this.look.x) * k;
     this.look.y += (tgtY - this.look.y) * k;
     // Idle sway is separate and always on

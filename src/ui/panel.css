@@ -894,3 +894,9 @@ body.dragging .dropzone-box {
 .seg button:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .mini svg { vertical-align: -1px; margin-right: 3px; }
+
+/* Pan: bottom left of the canvas, hand icon, opens upward */
+.stage-pan { left: 14px; top: auto; bottom: 12px; transform: none; }
+.pan-icon.on { color: var(--ink); border-color: var(--ink); }
+.pan-panel { left: 0; top: auto; bottom: calc(100% + 8px); transform: none; width: 230px; }
+.pan-hint { font-size: 8.5px; line-height: 1.5; letter-spacing: 0.06em; color: var(--ink-dim); text-transform: none; }

@@ -305,6 +305,8 @@ export class Panel {
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);
 
     document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => b.classList.toggle('active', b.dataset.trackstyle === this.params.trackStyle));
+    // PAN icon shows when the cursor turn is on
+    document.getElementById('pan-icon')?.classList.toggle('on', this.params.panMode && this.params.panAmount > 0);
     // HOVER off disables HARSH and SOFT
     document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => (b.disabled = !this.params.track));
 
