@@ -14,7 +14,7 @@ export interface FxParams {
 export interface TrailParams {
   amount: number;   // 0..1 share of trail lines drawn
   strength: number; // 0..2 brightness of trails
-  length: number;   // 0.3..2 trail length multiplier
+  length: number;   // -1..1 trail length: positive trails back, negative trails forward
   detail: number;   // 0..1 0 = soft full-length glow, 1 = crisp tapered tails
 }
 
