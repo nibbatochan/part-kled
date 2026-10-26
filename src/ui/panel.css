@@ -781,3 +781,9 @@ body.dragging .dropzone-box {
     border-bottom: 1px solid var(--line-strong);
   }
 }
+
+/* Web build: controls that the light renderer does not carry */
+:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

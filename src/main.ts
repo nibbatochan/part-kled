@@ -1,7 +1,7 @@
 // src/main.ts
 import { defaults, loadFromStorage, saveToStorage, withLightStart, type Params } from './core/params';
-import { Engine } from './core/Engine';
-import { sampleImageParticles, type SamplePointData } from './core/Sampler';
+import { WebEngine, pointBudget } from './web/WebEngine';
+import { sampleLite, type LiteSample } from './lite/sample';
 import { DepthEstimator } from './depth/DepthEstimator';
 import { Dropzone } from './ui/Dropzone';
 import { Frame } from './ui/Frame';
@@ -13,12 +13,12 @@ import { setupKeyboardShortcuts } from './utils/keys';
 interface CachedSample {
   image: ProcessedImage;
   depth: Float32Array;
-  sampleData: SamplePointData;
+  sampleData: LiteSample;
 }
 
 class App {
   private params: Params;
-  public engine!: Engine;
+  public engine!: WebEngine;
   private frame!: Frame;
   private thumbs!: Thumbs;
   private dropzone!: Dropzone;
@@ -37,7 +37,7 @@ class App {
     if (!stageCanvas) throw new Error('Stage canvas missing');
 
     // 1. Initialize Engine
-    this.engine = new Engine(stageCanvas, this.params.pointCount);
+    this.engine = new WebEngine(stageCanvas);
     this.engine.setParams(this.params);
     this.engine.setHasActiveImage(false);
 
@@ -199,9 +199,9 @@ class App {
       requestAnimationFrame(() => setTimeout(r, 0));
       setTimeout(r, 80);
     });
-    let sampleData: SamplePointData;
+    let sampleData: LiteSample;
     try {
-      sampleData = sampleImageParticles(img.canvas, depthArr);
+      sampleData = sampleLite(img.canvas, depthArr, pointBudget());
     } finally {
       this.setProgress(false);
     }
@@ -261,6 +261,8 @@ class App {
 
     const currentCached = await this.getSampleDataForImage(currentImg);
     const nextCached = await this.getSampleDataForImage(nextImg);
+    // A later switch may have started while these awaited: never load a picture that is no longer active
+    if (this.activeIndex !== index) return;
 
     this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
     this.frame.setReadout(index + 1, this.images.length, nextImg.hash);
