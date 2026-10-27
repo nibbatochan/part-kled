@@ -199,6 +199,13 @@ export class ExportPanel {
     const still = this.kind === 'image';
     (document.getElementById('ex-fps-row') as HTMLElement).style.display = still ? 'none' : '';
     (document.getElementById('ex-len-row') as HTMLElement).style.display = still ? 'none' : '';
+    (document.getElementById('ex-loop-note') as HTMLElement).style.display = this.kind === 'loop' ? '' : 'none';
+    // A loop of 2 s would make every drifting stream cycle 2.5 to 5 times faster than the live view
+    this.len.min = this.kind === 'loop' ? '4' : '2';
+    if (this.seconds < Number(this.len.min)) {
+      this.seconds = Number(this.len.min);
+      this.len.value = String(this.seconds);
+    }
     const formats: string[] = still ? IMAGE_FORMATS : VIDEO_FORMATS;
     const current = still ? this.imageFormat : this.videoFormat;
     this.formatBox.textContent = '';
@@ -322,7 +329,7 @@ export class ExportPanel {
     canvas.style.height = `${ch}px`;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     applyFrame(engine, snap, this.frame);
-    engine.setOutput(Math.max(2, Math.round(cw * dpr)), Math.max(2, Math.round(ch * dpr)), snap.liveScaleCss);
+    engine.setOutput(Math.max(2, Math.round(cw * dpr)), Math.max(2, Math.round(ch * dpr)), snap.liveScaleCss, snap.liveDpr);
   }
 
   private applyToPreview(): void {

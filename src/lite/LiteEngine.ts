@@ -49,6 +49,8 @@ export interface LiteParams {
   style: number;        // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
   cell: number;         // cell size of the cell looks, css px
   styleSet: StyleValues; // per-look settings (see core/styles.ts)
+  emitOn: boolean;      // EMITTERS panel on
+  emit: Record<string, number>; // r0..r8 region weights, spots, scatter, lenRand, turn
   colorMode: number;    // cell looks: 0 SOURCE colour, 1 MONO ink, 2 DUO ink on paper
   invert: boolean;      // cell looks: swap light and dark
   autoLevels: boolean;  // cell looks: stretch the picture's brightness range to fill the look
@@ -90,6 +92,8 @@ export const liteDefaults: LiteParams = {
   style: 0,
   cell: 8,
   styleSet: defaultStyleValues(),
+  emitOn: true,
+  emit: { r0: 1, r1: 1, r2: 1, r3: 1, r4: 1, r5: 1, r6: 1, r7: 1, r8: 1, spots: 0, scatter: 0.35, lenRand: 1, turn: 0.3 },
   colorMode: 0,
   invert: false,
   autoLevels: true,
@@ -148,7 +152,7 @@ const UNIFORMS = [
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
-  'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uGridA', 'uAtlas',
+  'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   // cell looks
   'uImg', 'uImg2', 'uGrid', 'uGridAng', 'uLayer', 'uTexSize', 'uLv', 'uColorMode', 'uInk', 'uPaper', 'uInvert',
   'uStyle', 'uSP', 'uSP2',
@@ -227,6 +231,7 @@ export class LiteEngine {
   /** Export: device px per css px of the live view, so dots and cells keep their look at any output size. */
   private fixedScale: number | null = null;
   private refScale: number | null = null;
+  private refDpr = 1;
   /** Export loop length in seconds, 0 = not looping. */
   private loopT = 0;
 
@@ -333,8 +338,9 @@ export class LiteEngine {
    * Export: draw at exactly w x h pixels (no DPR). refScaleCss is the live view's getScaleCss(): dots and
    * cells are scaled by this view's px per world unit over it, so the look matches the live one. Call renderAt().
    */
-  setOutput(w: number, h: number, refScaleCss: number): void {
+  setOutput(w: number, h: number, refScaleCss: number, refDpr = 1): void {
     this.refScale = refScaleCss;
+    this.refDpr = Math.max(1, refDpr);
     this.canvas.width = w;
     this.canvas.height = h;
     this.gl.viewport(0, 0, w, h);
@@ -516,6 +522,10 @@ export class LiteEngine {
     if (this.refScale) this.fixedScale = this.scale / this.refScale;
   }
 
+  getDpr(): number {
+    return this.dpr;
+  }
+
   /** Css px per world unit of this view (the live view's reference for the export). */
   getScaleCss(): number {
     return this.scale / this.dpr;
@@ -595,6 +605,10 @@ export class LiteEngine {
 
     const setU = (U: Record<string, WebGLUniformLocation | null>, role: number, morph: number, cover: number) => {
       gl.uniform1f(U.uLoop, this.loopT);
+      const em = p.emit;
+      gl.uniform1fv(U.uEmitW, [em.r0, em.r1, em.r2, em.r3, em.r4, em.r5, em.r6, em.r7, em.r8]);
+      gl.uniform4f(U.uEmitX, em.spots, em.scatter, em.lenRand, em.turn);
+      gl.uniform1f(U.uEmitOn, p.emitOn ? 1 : 0);
       gl.uniform2f(U.uView, this.canvas.width, this.canvas.height);
       gl.uniform1f(U.uScale, this.scale);
       gl.uniform2f(U.uOffset, this.offX, this.offY + floatY);
@@ -656,12 +670,19 @@ export class LiteEngine {
       gl.drawArrays(gl.POINTS, 0, this.drawn);
     }
 
-    // Trails are not drawn during the morph; they come back when it ends
-    if (!this.morphing && p.trails && this.trailsAllowed && p.drift > 0.02 && !styled) {
+    // Trails fade in during the morph, so they do not pop in when it ends
+    if (p.trails && this.trailsAllowed && p.drift > 0.02 && !styled) {
       gl.useProgram(this.trailProg);
       setU(this.trailU, 0, 0, cover);
+      // Live, a trail is a 1 px line. An export is drawn at a larger size, so its trail is as many px wide as
+      // the live line is, scaled with the picture (the same rule as the dots).
+      const lineW = this.fixedScale !== null ? this.fixedScale / this.refDpr : 1;
+      gl.uniform1f(this.trailU.uLineW, lineW);
+      const m = Math.min(1, Math.max(0, (this.morphT - 0.35) / 0.65));
+      gl.uniform1f(this.trailU.uTrailFade, this.morphing ? m * m * (3 - 2 * m) : 1);
       gl.bindVertexArray(this.slots[this.cur].vaoTrails);
-      gl.drawArraysInstanced(gl.LINES, 0, 2, Math.floor(this.drawn / TRAIL_STRIDE));
+      if (lineW > 1.25) gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, Math.floor(this.drawn / TRAIL_STRIDE));
+      else gl.drawArraysInstanced(gl.LINES, 0, 2, Math.floor(this.drawn / TRAIL_STRIDE));
     }
     gl.bindVertexArray(null);
 

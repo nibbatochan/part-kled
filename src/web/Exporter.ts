@@ -43,7 +43,7 @@ export function makeEngine(
   engine.setParams(snap.params);
   applyFrame(engine, snap, frame);
   engine.setView(snap.view);
-  engine.setOutput(size.w, size.h, snap.liveScaleCss);
+  engine.setOutput(size.w, size.h, snap.liveScaleCss, snap.liveDpr);
   const gl = engine.gl;
   if (gl.drawingBufferWidth < size.w || gl.drawingBufferHeight < size.h) {
     engine.dispose();

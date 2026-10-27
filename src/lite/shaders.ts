@@ -55,9 +55,24 @@ uniform float uMorph;       // 0..1 progress of the morph into the next picture
 uniform float uRole;        // 0 normal, 3 morphing
 uniform float uDolly;       // 3D: move through the picture (camera distance)
 uniform float uLoop;        // export loop length in s, 0 = not looping
+uniform float uTrailFade;   // 0..1 trails fade in while a new picture morphs in
+uniform float uLineW;      // trail width in px: 1 = plain GL lines, wider = quads (export at a larger size)
+uniform float uEmitW[9];   // EMITTERS: how much each region of the picture sheds (3 x 3, top left first)
+uniform vec4 uEmitX;       // EMITTERS: spots, scatter, length variety, turn
+uniform float uEmitOn;
 uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
 
 out vec3 vCol;
+
+// EMITTERS: the 3 x 3 region weights, blended smoothly across the picture so there are no visible blocks
+float regionWeight(vec2 h) {
+  vec2 g = vec2(clamp(h.x / max(uHalfW, 1e-3) * 0.5 + 0.5, 0.0, 1.0), clamp(0.5 - h.y, 0.0, 1.0)) * 2.0;
+  int x0 = int(min(floor(g.x), 1.0));
+  int y0 = int(min(floor(g.y), 1.0));
+  vec2 f = g - vec2(float(x0), float(y0));
+  int i = y0 * 3 + x0;
+  return mix(mix(uEmitW[i], uEmitW[i + 1], f.x), mix(uEmitW[i + 3], uEmitW[i + 4], f.x), f.y);
+}
 
 // LOOP: an angular frequency snapped to whole cycles per loop, so frame 0 and frame T match
 float tw(float w, float minCycles) {
@@ -95,7 +110,15 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   // Bright parts of the picture shed more particles: light weighting
   float lc = min(light, 0.7); // the brightest specks (eyes) do not get to shed more
   float lw = 0.2 + 1.6 * lc * lc;
-  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul * origin, 0.0, 0.95);
+  float emitK = 1.0;
+  if (uEmitOn > 0.5) {
+    emitK = regionWeight(home.xy);
+    // SPOTS: a few small patches of the picture shed far more, the brighter the patch the more
+    ivec2 gc = ivec2(floor(home.xy * 18.0));
+    float spot = step(0.88, rnd(uint(gc.x) * 73856093u ^ uint(gc.y) * 19349663u, 21u));
+    emitK *= 1.0 + uEmitX.x * 8.0 * spot * smoothstep(0.35, 0.8, light);
+  }
+  float share = clamp((0.02 + 0.55 * uDrift) * lw * 0.5 * shareMul * origin * emitK, 0.0, 0.95);
   bool streamer = r0 < share;
 
   vec2 pos = home.xy;
@@ -118,6 +141,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     float reach = (0.4 + 1.6 * uDrift) * mix(1.0, 0.45 + 1.1 * r3, uRandom);
     vec2 perp = vec2(-dir.y, dir.x);
     pos += dir * reach * ease;
+    // SCATTER: the start of the path is not the exact pixel; each particle leaves from a slightly different place
+    pos += (vec2(rnd(id, 13u), rnd(id, 14u)) - 0.5) * uEmitX.y * 0.05 * ease * step(0.5, uEmitOn);
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
     float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * tw(0.25, 0.0);
     pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
@@ -227,28 +252,31 @@ void main() {
   if (uScanOn > 0.5 && uScanMode > 5.5) {
     float dz = home.z + 0.5;
     pulse = pow(0.5 + 0.5 * sin(uTime * tw(2.4, 1.0) - dz * 6.0), 4.0) * (uScanLevel / 3.0);
-    c = clamp(c + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.25 + 0.5 * lum), 0.0, 1.0);
+    c = clamp(c + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.12 + 0.25 * lum), 0.0, 1.0);
   } else if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
     float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, home.z, uZScale, lum);
     c += (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * g * (0.12 + 0.4 * lum);
   }
   // TRAIL SIZE: drifting dots are sized by it. The pulse makes the lit dots bigger.
-  gl_PointSize = mix(uPointPx, max(1.0, uPointPx * uTrailSize), streaming) + pulse * 1.5;
+  gl_PointSize = mix(uPointPx, max(1.0, uPointPx * uTrailSize), streaming) + pulse * 0.8;
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
   vec3 cb = clamp(c * uBright, 0.0, 1.0);
   vec3 o = 1.0 - pow(1.0 - cb, vec3(aMeta.a * 5.0 / max(uCover, 0.25)));
   float opacity = mix(uOpacity, 1.0, streaming); // OPACITY is for the image only
-  vCol = o * alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.8);
+  vCol = o * alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.3);
 }
 `;
 
 const TRAILS = `
 void main() {
-  // One line per particle. Vertex 0 is the head, vertex 1 the tail: a fixed length back along the
-  // drift direction, so trails show at any FLOW, not only near the maximum.
-  bool tail = gl_VertexID == 1;
+  // One trail per particle: a fixed length back along the drift direction, so trails show at any FLOW,
+  // not only near the maximum. Live they are GL lines (always 1 px). An export at a larger size draws them
+  // as quads uLineW wide, so the trails grow with the picture like the dots do (4 vertices: head, head, tail, tail).
+  bool strip = uLineW > 1.25;
+  bool tail = strip ? gl_VertexID >= 2 : gl_VertexID == 1;
+  float side = (gl_VertexID & 1) == 0 ? -1.0 : 1.0;
   uint id = uint(gl_InstanceID);
   // TRAIL AMOUNT: 0..2, where 1 keeps half of the particles
   if (rnd(id, 6u) > uTrailAmount * 0.5) {
@@ -256,7 +284,8 @@ void main() {
     vCol = vec3(0.0);
     return;
   }
-  float lenVar = 0.4 + rnd(id, 5u); // no two streaks the same length
+  // LENGTH VARIETY (EMITTERS): 1 = no two streaks the same length, 0 = all the same
+  float lenVar = mix(1.0, 0.4 + rnd(id, 5u), uEmitOn > 0.5 ? uEmitX.z : 1.0);
   float luminance = luma(aMeta.rgb);
 
   float alpha, streaming;
@@ -267,21 +296,30 @@ void main() {
     vCol = vec3(0.0);
     return;
   }
-  vec2 w = head;
-  if (tail) {
-    // TRAIL DIRECTION: turn the tail away from the drift path by uTrailAngle
-    // Positive: the tail runs back along the particle's own path and stops at its home pixel.
-    // Negative: the tail runs forward along the drift direction.
-    float L = uTrailLen * lenVar;
-    vec2 disp = head - aHome.xy;
-    vec2 back = L >= 0.0 ? -normalize(disp + vec2(1e-6)) * min(L, length(disp)) : -dirT * L;
-    float ca = cos(uTrailAngle), sa = sin(uTrailAngle);
-    w = head + vec2(back.x * ca - back.y * sa, back.x * sa + back.y * ca);
+  // TRAIL DIRECTION: turn the tail away from the drift path by uTrailAngle
+  // Positive length: the tail runs back along the particle's own path and stops at its home pixel.
+  // Negative length: the tail runs forward along the drift direction.
+  float L = uTrailLen * lenVar;
+  vec2 disp = head - aHome.xy;
+  vec2 back = L >= 0.0 ? -normalize(disp + vec2(1e-6)) * min(L, length(disp)) : -dirT * L;
+  // TURN (EMITTERS): each trail leans a tiny random angle off the common direction
+  float turn = uEmitOn > 0.5 ? (rnd(id, 12u) - 0.5) * uEmitX.w * 0.35 : 0.0;
+  float ca = cos(uTrailAngle + turn), sa = sin(uTrailAngle + turn);
+  vec2 tailW = head + vec2(back.x * ca - back.y * sa, back.x * sa + back.y * ca);
+  gl_Position = toClip(tail ? tailW : head, aHome.z);
+  if (strip) {
+    // Push the two vertices of each end apart, across the trail, by half the width in px
+    vec2 a = toClip(head, aHome.z).xy * uView * 0.5;
+    vec2 b = toClip(tailW, aHome.z).xy * uView * 0.5;
+    vec2 d = b - a;
+    vec2 dir = d / max(length(d), 1e-4);
+    gl_Position.xy += vec2(-dir.y, dir.x) * side * (uLineW * 0.43) / (uView * 0.5); // 0.43 = half of 0.86: matches a 1 px GL line's coverage
   }
-  gl_Position = toClip(w, aHome.z);
   // Trails carry no Effects: only particle saturation and the light tint. Head bright, tail tapers with detail.
+  // Thinner than 1.25 px they stay 1 px lines, so the brightness drops with the width instead.
   float tailK = mix(0.22, 0.04, uTrailDetail);
-  vCol = tint(partSat(aMeta.rgb)) * alpha * (tail ? tailK : 0.3) * uTrailGain;
+  float gain = strip ? 1.0 : min(uLineW, 1.25);
+  vCol = tint(partSat(aMeta.rgb)) * alpha * (tail ? tailK : 0.3) * uTrailGain * gain * uTrailFade;
 }
 `;
 
@@ -373,7 +411,7 @@ void main() {
   if (uScanOn > 0.5 && uScanMode > 5.5) {
     float dz = z + 0.5;
     pulse = pow(0.5 + 0.5 * sin(uTime * tw(2.4, 1.0) - dz * 6.0), 4.0) * (uScanLevel / 3.0);
-    col = clamp(col + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.25 + 0.5 * lum), 0.0, 1.0);
+    col = clamp(col + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.12 + 0.25 * lum), 0.0, 1.0);
   } else if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
     float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, z, uZScale, lum);
@@ -382,7 +420,7 @@ void main() {
   vec3 cb = clamp(col * uBright, 0.0, 1.0);
   float tone = toneOf(col);
   float opacity = mix(uOpacity, 1.0, streaming);
-  vFade = alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.8);
+  vFade = alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.3);
   vTone = tone;
 
   // Ink: the cell's colour at full value (the shape carries the brightness), or the chosen ink

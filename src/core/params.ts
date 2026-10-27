@@ -45,6 +45,8 @@ export interface Params {
   style: number; // particle look: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES (web build)
   cell: number; // 4..24 cell size of the cell looks, css px
   ss: Record<string, number>; // settings of each look (core/styles.ts)
+  emitOn: boolean; // EMITTERS panel: region weights, spots, scatter, trail variety
+  emit: Record<string, number>; // r0..r8 (3 x 3 regions, top left first, 0..2), spots, scatter, lenRand, turn
   styleColor: number; // cell looks: 0 SOURCE colour, 1 MONO ink, 2 DUO ink on paper
   styleInvert: boolean; // cell looks: swap light and dark
   autoLevels: boolean; // cell looks: stretch the picture's brightness to fill the look
@@ -93,6 +95,8 @@ export const defaults: Params = {
   style: 0,
   cell: 8,
   ss: defaultStyleValues(),
+  emitOn: true,
+  emit: { r0: 1, r1: 1, r2: 1, r3: 1, r4: 1, r5: 1, r6: 1, r7: 1, r8: 1, spots: 0, scatter: 0.35, lenRand: 1, turn: 0.3 },
   styleColor: 0,
   styleInvert: false,
   autoLevels: true,
@@ -184,6 +188,7 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
       },
       fx: { ...fallback.fx, ...(parsed.fx || {}) },
       ss: { ...fallback.ss, ...(parsed.ss || {}) },
+      emit: { ...fallback.emit, ...(parsed.emit || {}) },
       trail: { ...fallback.trail, ...(parsed.trail || {}) },
     };
   } catch {

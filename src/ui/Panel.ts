@@ -372,9 +372,17 @@ export class Panel {
           const newVal = !this.params[key];
           (this.params[key] as boolean) = newVal;
           btn.classList.toggle('active', newVal);
+          this.syncEmitUi();
           this.onParamsChangeCb(this.params);
         }
       });
+    });
+  }
+
+  /** EMITTERS off greys out its sliders. */
+  private syncEmitUi(): void {
+    document.querySelectorAll<HTMLInputElement>('#emit-panel input[type="range"]').forEach((i) => {
+      i.disabled = !this.params.emitOn;
     });
   }
 
@@ -489,7 +497,7 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'styleInvert', 'autoLevels'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'styleInvert', 'autoLevels', 'emitOn'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
@@ -497,6 +505,7 @@ export class Panel {
 
     this.syncEffects();
     this.syncStyleUi();
+    this.syncEmitUi();
 
     const levelEl = document.getElementById('scan-level');
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);

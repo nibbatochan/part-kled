@@ -15,6 +15,8 @@ export interface ExportSnapshot {
   time: number;
   /** Css px per world unit of the live view: the reference that keeps dot and cell size right at any export size */
   liveScaleCss: number;
+  /** Device px per css px of the live view: its trails are 1 device px wide */
+  liveDpr: number;
 }
 
 /** Scan style index of BURST in the web build (after SWEEP, RING, RADAR, LINES, DEPTH). */
@@ -39,6 +41,8 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     style: p.style,
     cell: p.cell,
     styleSet: { ...p.ss },
+    emitOn: p.emitOn,
+    emit: { ...p.emit },
     colorMode: p.styleColor,
     invert: p.styleInvert,
     autoLevels: p.autoLevels,
@@ -131,6 +135,7 @@ export class WebEngine {
       view: this.lite.getView(),
       time: this.lite.getTime(),
       liveScaleCss: Math.max(1, this.lite.getScaleCss()),
+      liveDpr: this.lite.getDpr(),
     };
   }
 

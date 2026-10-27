@@ -255,8 +255,46 @@
           </div>
         </section>
 
+        <section class="box" id="emit-panel">
+          <h2><i>06</i> EMITTERS <button class="toggle-btn mini-toggle" type="button" data-toggle="emitOn" title="Where particles leave the picture from. Off = by brightness only.">ON</button></h2>
+          <p class="emit-cap">SHED BY REGION OF THE PICTURE</p>
+          <div class="emit-grid" role="group" aria-label="Emission by region of the picture">
+            <input type="range" id="em-r0" data-path="emit.r0" min="0" max="2" step="0.01" title="TOP LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP LEFT" />
+            <input type="range" id="em-r1" data-path="emit.r1" min="0" max="2" step="0.01" title="TOP: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP" />
+            <input type="range" id="em-r2" data-path="emit.r2" min="0" max="2" step="0.01" title="TOP RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP RIGHT" />
+            <input type="range" id="em-r3" data-path="emit.r3" min="0" max="2" step="0.01" title="LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="LEFT" />
+            <input type="range" id="em-r4" data-path="emit.r4" min="0" max="2" step="0.01" title="CENTRE: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="CENTRE" />
+            <input type="range" id="em-r5" data-path="emit.r5" min="0" max="2" step="0.01" title="RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="RIGHT" />
+            <input type="range" id="em-r6" data-path="emit.r6" min="0" max="2" step="0.01" title="BOTTOM LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM LEFT" />
+            <input type="range" id="em-r7" data-path="emit.r7" min="0" max="2" step="0.01" title="BOTTOM: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM" />
+            <input type="range" id="em-r8" data-path="emit.r8" min="0" max="2" step="0.01" title="BOTTOM RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM RIGHT" />
+          </div>
+          <div class="pair">
+            <div class="slider-group" data-param="emit.spots">
+              <label for="em-spots" title="Some small bright patches shed many more particles">SPOTS</label>
+              <input type="range" id="em-spots" data-path="emit.spots" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="emit.scatter">
+              <label for="em-scatter" title="Where each trail starts is moved a little, so it is not the exact pixel">SCATTER</label>
+              <input type="range" id="em-scatter" data-path="emit.scatter" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="emit.lenRand">
+              <label for="em-len" title="How different the trail lengths are. 0 = all the same.">LEN VARY</label>
+              <input type="range" id="em-len" data-path="emit.lenRand" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="emit.turn">
+              <label for="em-turn" title="Each trail leans a tiny random angle off the common direction">TURN</label>
+              <input type="range" id="em-turn" data-path="emit.turn" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+        </section>
+
         <section id="fx-panel" class="box">
-          <h2><i>06</i> EFFECTS - IMAGE <button id="fx-reset" class="mini" type="button" title="Reset effects"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
+          <h2><i>07</i> EFFECTS - IMAGE <button id="fx-reset" class="mini" type="button" title="Reset effects"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
           <div class="pair">
             <div class="slider-group fx-slider" data-path="fx.opacity">
               <label for="fx-fx-opacity">OPACITY</label>
@@ -391,6 +429,7 @@
                 <output></output>
               </div>
             </div>
+            <p class="ex-note" id="ex-loop-note">A loop is one cycle. It repeats with no jump, so a player set to repeat shows it forever. Longer loops keep the live speed closer.</p>
           </section>
 
           <div class="ex-actions">
