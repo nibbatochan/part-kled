@@ -26,7 +26,10 @@ export class Panel {
     onOpenAdd: () => void
   ) {
     this.params = { ...initialParams, background: 'dark' }; // light/dark toggle removed: always dark
-    this.onParamsChangeCb = onParamsChange;
+    this.onParamsChangeCb = (p) => {
+      onParamsChange(p);
+      this.updateSummaries();
+    };
 
     const layer = document.getElementById('ui-layer');
     if (!layer) throw new Error('UI layer element not found');
@@ -40,6 +43,7 @@ export class Panel {
     });
     this.lineWidget.setValue(this.params.line);
 
+    this.buildCollapsibles();
     this.bindDirectionInputs();
     this.buildStyleSettings(); // before the sliders are bound, so they get the number boxes too
     this.bindEffects();
@@ -119,7 +123,6 @@ export class Panel {
   private bindEffects(): void {
     document.getElementById('fx-reset')?.addEventListener('click', () => {
       this.params.fx = { ...defaults.fx };
-      this.params.trail = { ...defaults.trail };
       this.syncUiToParams();
       this.onParamsChangeCb(this.params);
     });
@@ -321,7 +324,11 @@ export class Panel {
       b.classList.toggle('active', Number(b.dataset.style) === st);
     });
     const cell = document.getElementById('sl-cell') as HTMLInputElement | null;
-    if (cell) cell.disabled = st === 0;
+    if (cell) {
+      cell.disabled = st === 0;
+      const row = cell.closest<HTMLElement>('.pair');
+      if (row) row.style.display = st === 0 ? 'none' : '';
+    }
     // Shared controls only for the cell looks; ink and paper only when the colour mode uses them
     const show = (el: HTMLElement | null, on: boolean) => {
       if (el) el.style.display = on ? '' : 'none';
@@ -377,6 +384,92 @@ export class Panel {
         }
       });
     });
+  }
+
+  // ---- collapsible sections: closed ones show a one-line summary of their state ----
+
+  private sections = new Map<string, { sec: HTMLElement; summary: HTMLElement }>();
+  private static readonly OPEN_KEY = 'pds_sections_open_v1';
+
+  private loadOpen(): Record<string, boolean> {
+    try {
+      return JSON.parse(localStorage.getItem(Panel.OPEN_KEY) ?? '{}') as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  }
+
+  private saveOpen(): void {
+    const state: Record<string, boolean> = {};
+    this.sections.forEach((v, k) => (state[k] = v.sec.classList.contains('is-open')));
+    try {
+      localStorage.setItem(Panel.OPEN_KEY, JSON.stringify(state));
+    } catch {
+      /* private window: the state just is not remembered */
+    }
+  }
+
+  /** The heading becomes a button (aria-expanded), everything after it the panel it controls. */
+  private buildCollapsibles(): void {
+    const saved = this.loadOpen();
+    document.querySelectorAll<HTMLElement>('section.box[data-collapse]').forEach((sec) => {
+      const key = sec.dataset.collapse ?? '';
+      const h2 = sec.querySelector('h2');
+      if (!h2) return;
+      const body = document.createElement('div');
+      body.className = 'sec-body';
+      body.id = `sec-body-${key}`;
+      while (h2.nextSibling) body.appendChild(h2.nextSibling);
+      sec.appendChild(body);
+
+      const title: ChildNode[] = [];
+      for (const n of Array.from(h2.childNodes)) {
+        if (n instanceof HTMLButtonElement) break;
+        title.push(n);
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sec-head-btn';
+      btn.setAttribute('aria-controls', body.id);
+      const caret = document.createElement('span');
+      caret.className = 'sec-caret';
+      caret.setAttribute('aria-hidden', 'true');
+      btn.append(caret, ...title);
+      const summary = document.createElement('span');
+      summary.className = 'sec-summary';
+      h2.insertBefore(btn, h2.firstChild);
+      btn.after(summary);
+
+      const set = (open: boolean) => {
+        sec.classList.toggle('is-open', open);
+        btn.setAttribute('aria-expanded', String(open));
+        body.hidden = !open;
+      };
+      set(saved[key] ?? false);
+      btn.addEventListener('click', () => {
+        set(!sec.classList.contains('is-open'));
+        this.saveOpen();
+      });
+      this.sections.set(key, { sec, summary });
+    });
+  }
+
+  /** What a closed section holds, in a few words, so nothing is hidden without a hint. */
+  private updateSummaries(): void {
+    const p = this.params;
+    const set = (key: string, text: string) => {
+      const s = this.sections.get(key);
+      if (s) s.summary.textContent = text;
+    };
+    const sweep = p.scan ? (SCAN_CYCLE.find((c) => c.id === p.scanMode)?.name ?? 'SWEEP') : 'OFF';
+    const push = p.track ? (p.trackStyle === 'old' ? 'STRONG' : 'GENTLE') : 'OFF';
+    set('reactions', `SWEEP ${sweep} · PUSH ${push}`);
+    set('particles', `SIZE ${p.trailSize.toFixed(2)} · TRAILS ${Math.round(p.trail.amount * 100)}%`);
+    const fx = p.fx as unknown as Record<string, number>;
+    const base = defaults.fx as unknown as Record<string, number>;
+    set('tone', Object.keys(base).some((k) => fx[k] !== base[k]) ? 'ADJUSTED' : 'ORIGINAL');
+    const even = [0, 1, 2, 3, 4, 5, 6, 7, 8].every((i) => p.emit[`r${i}`] === 1) && p.emit.spots === 0;
+    set('emitters', !p.emitOn ? 'OFF' : even ? 'EVEN' : 'CUSTOM MAP');
   }
 
   /** EMITTERS off greys out its sliders. */
@@ -506,6 +599,7 @@ export class Panel {
     this.syncEffects();
     this.syncStyleUi();
     this.syncEmitUi();
+    this.updateSummaries();
 
     const levelEl = document.getElementById('scan-level');
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);

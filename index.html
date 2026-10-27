@@ -24,7 +24,7 @@
             <div id="pan-panel" class="pan-panel hidden">
               <div class="pan-group">
                 <div class="row">
-                  <span class="row-label" title="The picture turns in 3D toward the mouse">CURSOR</span>
+                  <span class="row-label" title="The picture turns in 3D toward the mouse">TILT</span>
                   <div class="seg">
                     <button class="toggle-btn" data-toggle="panMode">ON</button>
                   </div>
@@ -74,7 +74,7 @@
           </div>
           <div class="drift-col">
             <div class="drift-fields">
-              <label for="in-angle">ANGLE</label>
+              <label for="in-angle">DIRECTION</label>
               <input type="number" id="in-angle" min="-180" max="180" step="1" value="0" />
             </div>
             <div class="drift-fields">
@@ -108,7 +108,8 @@
             <span class="meta">DEPTH ANYTHING V2 · SUMANTH REDDY</span>
           </div>
           <button id="export-btn" class="round-btn head-btn" type="button" title="Export image or video" aria-label="Export" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+            <span>EXPORT</span>
           </button>
         </header>
 
@@ -118,7 +119,7 @@
         </div>
 
         <section class="box" id="source-box">
-          <h2><i>01</i> SOURCE</h2>
+          <h2><i>01</i> PICTURE</h2>
           <div class="strip" id="thumbnail-strip">
             <div class="thumb-slot active" data-index="0">
               <span class="slot-num">1</span>
@@ -151,7 +152,7 @@
         </section>
 
         <section class="box">
-          <h2><i>02</i> STYLE</h2>
+          <h2><i>02</i> LOOK</h2>
           <div class="style-grid" id="style-grid">
             <button class="mode-btn" type="button" data-style="0" title="Soft dots, the default look">DOTS</button>
             <button class="mode-btn" type="button" data-style="1" title="Dot size follows brightness, on a turned grid">HALFTONE</button>
@@ -163,25 +164,25 @@
           </div>
           <div class="pair single">
             <div class="slider-group" data-param="cell">
-              <label for="sl-cell" title="Size of one cell, in pixels">CELL</label>
+              <label for="sl-cell" title="Size of one cell, in pixels">CELL SIZE</label>
               <input type="range" id="sl-cell" data-path="cell" min="4" max="24" step="1" />
               <output></output>
             </div>
           </div>
           <div id="style-more" class="style-more">
             <div class="row">
-              <span class="row-label">COLOUR</span>
+              <span class="row-label">COLOURS</span>
               <div class="seg" id="style-color">
-                <button class="mode-btn" type="button" data-scolor="0" title="Each cell keeps the picture's colour">SOURCE</button>
-                <button class="mode-btn" type="button" data-scolor="1" title="One ink colour">MONO</button>
-                <button class="mode-btn" type="button" data-scolor="2" title="Ink on a paper colour">DUO</button>
+                <button class="mode-btn" type="button" data-scolor="0" title="Each cell keeps the picture's colour">ORIGINAL</button>
+                <button class="mode-btn" type="button" data-scolor="1" title="One ink colour">ONE INK</button>
+                <button class="mode-btn" type="button" data-scolor="2" title="Ink on a paper colour">INK+PAPER</button>
               </div>
             </div>
             <div class="row" id="ink-row">
               <span class="row-label">INK</span>
               <div class="ink-fields">
                 <input type="color" id="in-ink" value="#ffffff" aria-label="Ink colour" />
-                <span id="paper-field"><span class="row-label">PAPER</span>
+                <span id="paper-field"><span class="row-label">BACKGROUND</span>
                 <input type="color" id="in-paper" value="#000000" aria-label="Paper colour" /></span>
               </div>
             </div>
@@ -189,7 +190,7 @@
               <span class="row-label">TONE</span>
               <div class="seg">
                 <button class="toggle-btn" type="button" data-toggle="styleInvert" title="Swap light and dark">INVERT</button>
-                <button class="toggle-btn" type="button" data-toggle="autoLevels" title="Stretch the picture's brightness to fill the look">AUTO LEVELS</button>
+                <button class="toggle-btn" type="button" data-toggle="autoLevels" title="Stretch the picture's brightness to fill the look">AUTO CONTRAST</button>
               </div>
             </div>
           </div>
@@ -200,35 +201,35 @@
           <h2><i>03</i> MOTION</h2>
           <div class="pair">
             <div class="slider-group" data-param="drift">
-              <label for="sl-drift">FLOW</label>
+              <label for="sl-drift">MOVEMENT</label>
               <input type="range" id="sl-drift" data-path="drift" data-format="pct" min="0" max="1" step="0.01" />
               <output></output>
             </div>
             <div class="slider-group" data-param="depth">
-              <label for="sl-depth">DEPTH</label>
+              <label for="sl-depth">3D DEPTH</label>
               <input type="range" id="sl-depth" data-path="depth" data-format="pct" min="0" max="1" step="0.01" />
               <output></output>
             </div>
             <div class="slider-group" data-param="lean">
-              <label for="sl-lean" title="Which side of the picture the particles come from. Centre = all sides.">LEAN</label>
+              <label for="sl-lean" title="Which side of the picture the particles come from. Centre = all sides.">SIDE BIAS</label>
               <input type="range" id="sl-lean" data-path="lean" min="-1" max="1" step="0.01" />
               <output></output>
             </div>
           </div>
         </section>
 
-        <section class="box">
-          <h2><i>04</i> MODES</h2>
+        <section data-collapse="reactions" class="box">
+          <h2>REACTIONS</h2>
           <div class="row">
-            <span class="row-label">HOVER</span>
+            <span class="row-label">CURSOR PUSH</span>
             <div class="seg">
               <button class="toggle-btn" data-toggle="track">ON</button>
-              <button class="mode-btn" data-trackstyle="old" title="Harsh: repels and follows the cursor's motion">HARSH</button>
-              <button class="mode-btn" data-trackstyle="soft" title="Gentle push away from the cursor">SOFT</button>
+              <button class="mode-btn" data-trackstyle="old" title="Harsh: repels and follows the cursor's motion">STRONG</button>
+              <button class="mode-btn" data-trackstyle="soft" title="Gentle push away from the cursor">GENTLE</button>
             </div>
           </div>
           <div class="row">
-            <span class="row-label">SCANNER</span>
+            <span class="row-label">LIGHT SWEEP</span>
             <div class="seg">
               <button class="toggle-btn" data-toggle="scan">ON</button>
               <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
@@ -239,82 +240,44 @@
           </div>
         </section>
 
-        <section class="box">
-          <h2><i>05</i> PARTICLES</h2>
+        <section data-collapse="particles" class="box">
+          <h2>PARTICLES AND TRAILS</h2>
           <div class="pair">
             <div class="slider-group" data-param="randomness">
-              <label for="sl-random" title="How much each particle's path differs: direction and distance">RANDOM</label>
+              <label for="sl-random" title="How much each particle's path differs: direction and distance">VARIETY</label>
               <input type="range" id="sl-random" data-path="randomness" data-format="pct" min="0" max="1" step="0.01" />
               <output></output>
             </div>
             <div class="slider-group" data-param="pSat">
-              <label for="sl-psat" title="Saturation of the drifting particles">PART SAT</label>
+              <label for="sl-psat" title="Saturation of the drifting particles">PARTICLE COLOUR</label>
               <input type="range" id="sl-psat" data-path="pSat" min="0" max="2" step="0.01" />
               <output></output>
             </div>
             <div class="slider-group" data-param="trailSize">
-              <label for="sl-tsize" title="Dot size of the drifting particles">SIZE</label>
+              <label for="sl-tsize" title="Dot size of the drifting particles">PARTICLE SIZE</label>
               <input type="range" id="sl-tsize" data-path="trailSize" min="0.2" max="3" step="0.01" />
               <output></output>
             </div>
             <div class="slider-group" data-param="trailAngle">
-              <label for="sl-tangle" title="Turns the trails away from the drift path, in degrees">TRAIL DIR</label>
+              <label for="sl-tangle" title="Turns the trails away from the drift path, in degrees">TRAIL BEND</label>
               <input type="range" id="sl-tangle" data-path="trailAngle" min="-60" max="60" step="1" />
               <output></output>
             </div>
             <div class="slider-group" data-param="trail.length">
-              <label for="sl-length" title="How long each particle's trail is">TRAIL LEN</label>
+              <label for="sl-length" title="How long each particle's trail is">TRAIL LENGTH</label>
               <input type="range" id="sl-length" data-path="trail.length" min="-1" max="1" step="0.01" />
               <output></output>
             </div>
             <div class="slider-group" data-param="trail.amount">
-              <label for="sl-tamount" title="How many particles leave a trail">TRAIL AMT</label>
+              <label for="sl-tamount" title="How many particles leave a trail">TRAILS</label>
               <input type="range" id="sl-tamount" data-path="trail.amount" min="0" max="2" step="0.01" />
               <output></output>
             </div>
           </div>
         </section>
 
-        <section class="box" id="emit-panel">
-          <h2><i>06</i> EMITTERS <button class="toggle-btn mini-toggle" type="button" data-toggle="emitOn" title="Where particles leave the picture from. Off = by brightness only.">ON</button></h2>
-          <p class="emit-cap">SHED BY REGION OF THE PICTURE</p>
-          <div class="emit-grid" role="group" aria-label="Emission by region of the picture">
-            <input type="range" id="em-r0" data-path="emit.r0" min="0" max="2" step="0.01" title="TOP LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP LEFT" />
-            <input type="range" id="em-r1" data-path="emit.r1" min="0" max="2" step="0.01" title="TOP: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP" />
-            <input type="range" id="em-r2" data-path="emit.r2" min="0" max="2" step="0.01" title="TOP RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP RIGHT" />
-            <input type="range" id="em-r3" data-path="emit.r3" min="0" max="2" step="0.01" title="LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="LEFT" />
-            <input type="range" id="em-r4" data-path="emit.r4" min="0" max="2" step="0.01" title="CENTRE: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="CENTRE" />
-            <input type="range" id="em-r5" data-path="emit.r5" min="0" max="2" step="0.01" title="RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="RIGHT" />
-            <input type="range" id="em-r6" data-path="emit.r6" min="0" max="2" step="0.01" title="BOTTOM LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM LEFT" />
-            <input type="range" id="em-r7" data-path="emit.r7" min="0" max="2" step="0.01" title="BOTTOM: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM" />
-            <input type="range" id="em-r8" data-path="emit.r8" min="0" max="2" step="0.01" title="BOTTOM RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM RIGHT" />
-          </div>
-          <div class="pair">
-            <div class="slider-group" data-param="emit.spots">
-              <label for="em-spots" title="Some small bright patches shed many more particles">SPOTS</label>
-              <input type="range" id="em-spots" data-path="emit.spots" data-format="pct" min="0" max="1" step="0.01" />
-              <output></output>
-            </div>
-            <div class="slider-group" data-param="emit.scatter">
-              <label for="em-scatter" title="Where each trail starts is moved a little, so it is not the exact pixel">SCATTER</label>
-              <input type="range" id="em-scatter" data-path="emit.scatter" data-format="pct" min="0" max="1" step="0.01" />
-              <output></output>
-            </div>
-            <div class="slider-group" data-param="emit.lenRand">
-              <label for="em-len" title="How different the trail lengths are. 0 = all the same.">LEN VARY</label>
-              <input type="range" id="em-len" data-path="emit.lenRand" data-format="pct" min="0" max="1" step="0.01" />
-              <output></output>
-            </div>
-            <div class="slider-group" data-param="emit.turn">
-              <label for="em-turn" title="Each trail leans a tiny random angle off the common direction">TURN</label>
-              <input type="range" id="em-turn" data-path="emit.turn" data-format="pct" min="0" max="1" step="0.01" />
-              <output></output>
-            </div>
-          </div>
-        </section>
-
-        <section id="fx-panel" class="box">
-          <h2><i>07</i> EFFECTS - IMAGE <button id="fx-reset" class="mini" type="button" title="Reset effects"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
+        <section data-collapse="tone" id="fx-panel" class="box">
+          <h2>COLOUR AND TONE <button id="fx-reset" class="mini" type="button" title="Reset colour and tone only"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
           <div class="pair">
             <div class="slider-group fx-slider" data-path="fx.opacity">
               <label for="fx-fx-opacity">OPACITY</label>
@@ -322,17 +285,17 @@
               <output></output>
             </div>
             <div class="slider-group fx-slider" data-path="fx.black">
-              <label for="fx-fx-black">BLACK</label>
+              <label for="fx-fx-black">SHADOWS</label>
               <input type="range" id="fx-fx-black" data-path="fx.black" min="0" max="0.5" step="0.005" />
               <output></output>
             </div>
             <div class="slider-group fx-slider" data-path="fx.white">
-              <label for="fx-fx-white">WHITE</label>
+              <label for="fx-fx-white">HIGHLIGHTS</label>
               <input type="range" id="fx-fx-white" data-path="fx.white" min="0.5" max="1" step="0.005" />
               <output></output>
             </div>
             <div class="slider-group fx-slider" data-path="fx.gamma">
-              <label for="fx-fx-gamma">GAMMA</label>
+              <label for="fx-fx-gamma">MIDTONES</label>
               <input type="range" id="fx-fx-gamma" data-path="fx.gamma" min="0.4" max="2.2" step="0.01" />
               <output></output>
             </div>
@@ -349,6 +312,44 @@
             <div class="slider-group fx-slider" data-path="fx.saturation">
               <label for="fx-fx-saturation">SATURATION</label>
               <input type="range" id="fx-fx-saturation" data-path="fx.saturation" min="0" max="2" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+        </section>
+
+        <section data-collapse="emitters" class="box" id="emit-panel">
+          <h2>EMITTERS <button class="toggle-btn mini-toggle" type="button" data-toggle="emitOn" title="Where particles leave the picture from. Off = by brightness only.">ON</button></h2>
+          <p class="emit-cap">SHED BY REGION OF THE PICTURE</p>
+          <div class="emit-grid" role="group" aria-label="Emission by region of the picture">
+            <label class="emit-cell"><span>TOP LEFT</span><input type="range" id="em-r0" data-path="emit.r0" min="0" max="2" step="0.01" title="TOP LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP LEFT" /></label>
+            <label class="emit-cell"><span>TOP</span><input type="range" id="em-r1" data-path="emit.r1" min="0" max="2" step="0.01" title="TOP: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP" /></label>
+            <label class="emit-cell"><span>TOP RIGHT</span><input type="range" id="em-r2" data-path="emit.r2" min="0" max="2" step="0.01" title="TOP RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP RIGHT" /></label>
+            <label class="emit-cell"><span>LEFT</span><input type="range" id="em-r3" data-path="emit.r3" min="0" max="2" step="0.01" title="LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="LEFT" /></label>
+            <label class="emit-cell"><span>CENTRE</span><input type="range" id="em-r4" data-path="emit.r4" min="0" max="2" step="0.01" title="CENTRE: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="CENTRE" /></label>
+            <label class="emit-cell"><span>RIGHT</span><input type="range" id="em-r5" data-path="emit.r5" min="0" max="2" step="0.01" title="RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="RIGHT" /></label>
+            <label class="emit-cell"><span>BOTTOM LEFT</span><input type="range" id="em-r6" data-path="emit.r6" min="0" max="2" step="0.01" title="BOTTOM LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM LEFT" /></label>
+            <label class="emit-cell"><span>BOTTOM</span><input type="range" id="em-r7" data-path="emit.r7" min="0" max="2" step="0.01" title="BOTTOM: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM" /></label>
+            <label class="emit-cell"><span>BOTTOM RIGHT</span><input type="range" id="em-r8" data-path="emit.r8" min="0" max="2" step="0.01" title="BOTTOM RIGHT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="BOTTOM RIGHT" /></label>
+          </div>
+          <div class="pair">
+            <div class="slider-group" data-param="emit.spots">
+              <label for="em-spots" title="Some small bright patches shed many more particles">HOT SPOTS</label>
+              <input type="range" id="em-spots" data-path="emit.spots" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="emit.scatter">
+              <label for="em-scatter" title="Where each trail starts is moved a little, so it is not the exact pixel">START JITTER</label>
+              <input type="range" id="em-scatter" data-path="emit.scatter" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="emit.lenRand">
+              <label for="em-len" title="How different the trail lengths are. 0 = all the same.">LENGTH VARIETY</label>
+              <input type="range" id="em-len" data-path="emit.lenRand" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group" data-param="emit.turn">
+              <label for="em-turn" title="Each trail leans a tiny random angle off the common direction">ANGLE VARIETY</label>
+              <input type="range" id="em-turn" data-path="emit.turn" data-format="pct" min="0" max="1" step="0.01" />
               <output></output>
             </div>
           </div>

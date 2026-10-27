@@ -33,6 +33,8 @@ const first = await lit();
 await page.click('.thumb-slot[data-index="1"] .slot-box');
 await page.waitForFunction(() => window.__app.activeIndex === 1);
 const second = await lit();
+// Sections 04 to 07 start closed: open them all, as a user would
+await page.evaluate(() => document.querySelectorAll('.sec-head-btn[aria-expanded="false"]').forEach((b) => b.click()));
 await page.click('[data-toggle="scan"]');
 await page.click('#scan-level-inc');
 const scanned = await page.evaluate(() => {
