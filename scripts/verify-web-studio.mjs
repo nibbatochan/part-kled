@@ -36,7 +36,7 @@ const second = await lit();
 // Sections 04 to 07 start closed: open them all, as a user would
 await page.evaluate(() => document.querySelectorAll('.sec-head-btn[aria-expanded="false"]').forEach((b) => b.click()));
 await page.click('[data-toggle="scan"]');
-await page.click('#scan-level-inc');
+await page.click('[data-slevel="4"]');
 const scanned = await page.evaluate(() => {
   const p = window.__app.panel.getParams();
   return { scan: p.scan, level: p.scanLevel };

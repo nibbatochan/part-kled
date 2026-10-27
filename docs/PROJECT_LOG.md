@@ -19,6 +19,7 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 ## 3. Timeline of major milestones
 
 ### 2026-10-28
+- **Sidebar Phase 2.** Motion presets (Calm, Flow, Storm; no chip lit when values are custom), sweep style and power as always-visible chips instead of a hidden cycle button and stepper, header switches for the light sweep and trails, and per-look settings behind a "More for this look" disclosure. Checked in a browser; the user test is still not run.
 - **Sidebar review and Phase 1 redesign.** A sourced UX review (`docs/RESEARCH_SIDEBAR_UX.md`) counted 94 controls in the app, 48 of them plain sliders, with 41 controls on screen at first load and every section open. Phase 1 changed structure only: the three sections a first-timer needs (Picture, Look, Motion) stay open; Reactions, Particles and trails, Colour and tone and Emitters start closed with a one-line live summary (for example "SIZE 0.45 · TRAILS 110%"); Emitters moved last as the advanced section; jargon labels renamed (LEAN to Side bias, PART SAT to Particle colour, TRAIL DIR to Trail bend, SCANNER to Light sweep, HOVER to Cursor push); label collisions removed (three different "ANGLE"s, two "PAPER"s, two "SIZE"s); labels sit above the sliders so longer names fit; the nine emitter sliders have visible names; Export is a labelled header button; CELL SIZE hides for the dots look. A real bug the review found was fixed: the colour-and-tone RESET also reset the trail sliders. Open state is remembered. Decision: collapse with `aria-expanded` headers and multiple sections open at once, because the research found accordions suit independent sections and warn against hiding what most people need. Evidence: the closed summaries and the reset fix were checked in a browser; the user test with five first-time users from the review plan has not been run yet.
 - **Video clips as a source with keyframe depth, and depth estimation moved to a worker** (`5fc9738`, `32b31a9`). Play, scrub and loop a clip while depth is estimated on keyframes; the model now runs off the main thread so the page stays responsive.
 - **PULSE scan rebuilt as light on a surface.** The old pulse was a wave through depth and read as a round shape. It is now a moving light that flashes where the depth map turns to face it and the picture is bright, plus a soft sheet of light over bright parts. Dark parts stay dark.
@@ -144,7 +145,7 @@ Each item: the decision, why, what was rejected, and what it cost.
 
 ## 8. Open directions
 
-- Sidebar Phases 2 and 3 (presets, switches, scan chips, look thumbnails, emitter region map); see `docs/RESEARCH_SIDEBAR_UX.md`.
+- Sidebar Phase 3 (look thumbnails, emitter region map, changed-from-default dots, per-group reset); see `docs/RESEARCH_SIDEBAR_UX.md`.
 - Scanner clean-up: drive the scan from image brightness, move burst out of the scanner into a "tap burst" toggle on the hover row.
 - Atkinson dither, shape-matching ASCII, Braille and LED looks.
 - Timeline editing for video clips (see `docs/RESEARCH_VIDEO_TIMELINE_EXPORT.md`).

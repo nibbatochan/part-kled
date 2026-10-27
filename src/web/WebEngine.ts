@@ -52,7 +52,7 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     trackOld: p.trackStyle === 'old',
     // BURST scan style: the click shock, its strength set by the scanner level (3 = studio strength)
     burst: bursting ? p.scanLevel / 3 : 0,
-    trails: true, // trails are off when TRAIL AMOUNT is 0
+    trails: p.trails, // the TRAILS switch; trails are also off when the trail amount is 0
     trailAmount: p.trail.amount,
     trailLength: p.trail.length,
     trailStrength: p.trail.strength,

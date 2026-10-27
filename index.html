@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="/src/ui/panel.css" />
   </head>
   <body data-mode="lab">
+    <!-- The video page is this app opened with ?view=video. Set before anything paints, so no picture UI flashes. -->
+    <script>if (new URLSearchParams(location.search).get('view') === 'video') document.body.dataset.mode = 'video';</script>
     <div id="app">
       <!-- Left: the stage. The canvas, its frame marks, the drop prompt, the loader, PAN and DRIFT live here. -->
       <main id="stage-wrap" class="stage-wrap">
@@ -107,16 +109,15 @@
             <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
             <span class="meta">DEPTH ANYTHING V2 · SUMANTH REDDY</span>
           </div>
-          <button id="export-btn" class="round-btn head-btn" type="button" title="Export image or video" aria-label="Export" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
-            <span>EXPORT</span>
-          </button>
+          <div class="head-actions">
+            <a id="to-video" class="round-btn head-btn" href="?view=video" title="Video: its own page, no pictures">VIDEO ↗</a>
+            <a id="to-lab" class="round-btn head-btn" href="./" title="Back to the picture lab">← LAB</a>
+            <button id="export-btn" class="round-btn head-btn" type="button" title="Export image or video" aria-label="Export" aria-haspopup="dialog">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+              <span>EXPORT</span>
+            </button>
+          </div>
         </header>
-
-        <div class="mode-switch" id="mode-switch" role="tablist" aria-label="Workspace">
-          <button class="mode-btn active" type="button" data-mode="lab" role="tab" aria-selected="true" title="Pictures: the lab">LAB</button>
-          <button class="mode-btn" type="button" data-mode="video" role="tab" aria-selected="false" title="Video clips: trim, prepare, play">VIDEO</button>
-        </div>
 
         <section class="box" id="source-box">
           <h2><i>01</i> PICTURE</h2>
@@ -137,18 +138,20 @@
         </section>
 
         <section class="box" id="clip-panel">
-          <h2><i>V</i> CLIP <span class="clip-len" id="clip-len">0.0 S</span></h2>
-          <div class="btn-row">
-            <button id="clip-in-btn" class="toggle-btn" type="button" title="Set the clip start to the playhead">SET IN</button>
-            <button id="clip-out-btn" class="toggle-btn" type="button" title="Set the clip end to the playhead (max 10 s)">SET OUT</button>
-            <button id="clip-play-btn" class="toggle-btn" type="button" title="Play or pause the clip">PLAY</button>
-          </div>
-          <input type="range" id="clip-scrub" class="clip-scrub" min="0" max="1" step="0.01" value="0" aria-label="Playhead" />
+          <h2><i>V</i> VIDEO <span class="clip-len" id="clip-len" title="Length of the part you picked">0.0 S</span></h2>
+          <p class="clip-steps">1 OPEN · 2 PICK THE PART (10 S MAX) · 3 BUILD DEPTH · 4 PLAY</p>
           <div class="btn-row clip-prep">
             <button id="clip-open-btn" class="toggle-btn" type="button" title="Choose a video file (mp4, webm, mov)">OPEN VIDEO</button>
-            <button id="clip-prepare-btn" class="toggle-btn" type="button" title="Estimate depth for each keyframe of the clip">PREPARE</button>
+            <button id="clip-prepare-btn" class="toggle-btn" type="button" title="Works out how far away each part of the picture is, once every half second of the part you picked. Needed before play. The first time it downloads the depth model.">BUILD DEPTH</button>
           </div>
-          <output class="clip-readout" id="clip-readout">LOAD A VIDEO TO START</output>
+          <div class="clip-time-row"><span class="row-label">PLAYHEAD</span><output id="clip-time">0.00 / 0.00 S</output></div>
+          <input type="range" id="clip-scrub" class="clip-scrub" min="0" max="1" step="0.01" value="0" aria-label="Playhead: drag to move through the video" />
+          <div class="btn-row">
+            <button id="clip-in-btn" class="toggle-btn" type="button" title="The part you pick starts at the playhead">START HERE</button>
+            <button id="clip-out-btn" class="toggle-btn" type="button" title="The part you pick ends at the playhead (10 s after the start at most)">END HERE</button>
+            <button id="clip-play-btn" class="toggle-btn" type="button" title="Play or pause the part you picked, on a loop">PLAY</button>
+          </div>
+          <output class="clip-readout" id="clip-readout">OPEN A VIDEO TO START</output>
         </section>
 
         <section class="box">
@@ -194,11 +197,16 @@
               </div>
             </div>
           </div>
-          <div id="style-settings"></div>
+          <button class="more-btn" id="style-more-btn" type="button" aria-expanded="false" aria-controls="style-settings"><span class="sec-caret" aria-hidden="true"></span> MORE FOR THIS LOOK</button>
+          <div id="style-settings" hidden></div>
         </section>
 
         <section class="box">
           <h2><i>03</i> MOTION</h2>
+          <div class="row">
+            <span class="row-label">PRESET</span>
+            <div class="seg" id="motion-presets"></div>
+          </div>
           <div class="pair">
             <div class="slider-group" data-param="drift">
               <label for="sl-drift">MOVEMENT</label>
@@ -219,7 +227,7 @@
         </section>
 
         <section data-collapse="reactions" class="box">
-          <h2>REACTIONS</h2>
+          <h2>REACTIONS <button class="toggle-btn mini-toggle" type="button" data-toggle="scan" title="A moving band of light passes over the picture">SWEEP</button></h2>
           <div class="row">
             <span class="row-label">CURSOR PUSH</span>
             <div class="seg">
@@ -229,19 +237,17 @@
             </div>
           </div>
           <div class="row">
-            <span class="row-label">LIGHT SWEEP</span>
-            <div class="seg">
-              <button class="toggle-btn" data-toggle="scan">ON</button>
-              <button class="toggle-btn scan-mode-btn" id="scan-mode-btn" type="button" title="Change scan style" aria-label="Change scan style">↻ <span id="scan-mode-label">SWEEP</span></button>
-              <button class="toggle-btn step-btn" id="scan-level-dec" type="button" title="Weaker scan" aria-label="Weaker scan">&minus;</button>
-              <output class="level" id="scan-level" title="Scan impact, 1 to 5">3</output>
-              <button class="toggle-btn step-btn" id="scan-level-inc" type="button" title="Stronger scan" aria-label="Stronger scan">+</button>
-            </div>
+            <span class="row-label">SWEEP STYLE</span>
+            <div class="seg seg-wrap" id="scan-modes"></div>
+          </div>
+          <div class="row">
+            <span class="row-label">SWEEP POWER</span>
+            <div class="seg" id="scan-levels"></div>
           </div>
         </section>
 
         <section data-collapse="particles" class="box">
-          <h2>PARTICLES AND TRAILS</h2>
+          <h2>PARTICLES AND TRAILS <button class="toggle-btn mini-toggle" type="button" data-toggle="trails" title="Streaks behind the drifting particles">TRAILS</button></h2>
           <div class="pair">
             <div class="slider-group" data-param="randomness">
               <label for="sl-random" title="How much each particle's path differs: direction and distance">VARIETY</label>

@@ -121,6 +121,13 @@ export const defaults: Params = {
   trail: { amount: 0.35, strength: 0.5, length: 0.6, detail: 0.25 },
 };
 
+/** MOTION presets: how much the picture moves. FLOW is the start look. */
+export const MOTION_PRESETS = [
+  { id: 'calm', label: 'CALM', title: 'Slow and quiet', drift: 0.12, depth: 0.4, randomness: 0.05, trailAmount: 0.6 },
+  { id: 'flow', label: 'FLOW', title: 'The start look', drift: 0.3, depth: 0.5, randomness: 0.1, trailAmount: 1.1 },
+  { id: 'storm', label: 'STORM', title: 'Fast and wild', drift: 0.85, depth: 0.8, randomness: 0.35, trailAmount: 1.6 },
+] as const;
+
 export const presets: Record<string, Partial<Params>> = {
   calm: {
     drift: 0.25,

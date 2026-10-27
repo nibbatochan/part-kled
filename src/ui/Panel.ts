@@ -1,5 +1,5 @@
 // src/ui/Panel.ts
-import { defaults, type Params } from '../core/params';
+import { MOTION_PRESETS, defaults, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
 import { STYLE_SETTINGS } from '../core/styles';
 
@@ -29,6 +29,7 @@ export class Panel {
     this.onParamsChangeCb = (p) => {
       onParamsChange(p);
       this.updateSummaries();
+      this.syncPresets();
     };
 
     const layer = document.getElementById('ui-layer');
@@ -51,6 +52,8 @@ export class Panel {
     this.bindToggles();
     this.bindScanMode();
     this.bindScanLevel();
+    this.bindPresets();
+    this.bindStyleMore();
     this.bindModes();
     this.bindSwatches();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
@@ -334,6 +337,7 @@ export class Panel {
       if (el) el.style.display = on ? '' : 'none';
     };
     show(document.getElementById('style-more'), st > 0);
+    show(document.getElementById('style-more-btn'), st > 0);
     show(document.getElementById('ink-row'), this.params.styleColor > 0);
     show(document.getElementById('paper-field'), this.params.styleColor === 2);
     document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((b) => {
@@ -480,27 +484,89 @@ export class Panel {
   }
 
   // Refresh button next to SCAN: cycles through the scan styles and turns scanning on
+  /** SWEEP STYLE: one chip per style, always visible. Picking one also turns the sweep on. */
   private bindScanMode(): void {
-    const btn = document.getElementById('scan-mode-btn');
-    btn?.addEventListener('click', () => {
-      const at = SCAN_CYCLE.findIndex((c) => c.id === this.params.scanMode);
-      this.params.scanMode = SCAN_CYCLE[(at + 1) % SCAN_CYCLE.length].id;
-      this.params.scan = true;
-      this.syncUiToParams();
-      this.onParamsChangeCb(this.params);
+    const host = document.getElementById('scan-modes');
+    if (!host) return;
+    for (const c of SCAN_CYCLE) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mode-btn';
+      b.textContent = c.name;
+      b.dataset.scanId = String(c.id);
+      b.addEventListener('click', () => {
+        this.params.scanMode = c.id;
+        this.params.scan = true;
+        this.syncUiToParams();
+        this.onParamsChangeCb(this.params);
+      });
+      host.appendChild(b);
+    }
+  }
+
+  /** SWEEP POWER: five chips, 1 to 5 (3 is the studio's strength). */
+  private bindScanLevel(): void {
+    const host = document.getElementById('scan-levels');
+    if (!host) return;
+    for (let n = 1; n <= 5; n++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mode-btn';
+      b.textContent = String(n);
+      b.dataset.slevel = String(n);
+      b.addEventListener('click', () => {
+        this.params.scanLevel = n;
+        this.params.scan = true;
+        this.syncUiToParams();
+        this.onParamsChangeCb(this.params);
+      });
+      host.appendChild(b);
+    }
+  }
+
+  /** MOTION presets set a few values at once. No chip is lit when the values match none of them (custom). */
+  private bindPresets(): void {
+    const host = document.getElementById('motion-presets');
+    if (!host) return;
+    for (const pr of MOTION_PRESETS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mode-btn';
+      b.textContent = pr.label;
+      b.title = pr.title;
+      b.dataset.preset = pr.id;
+      b.addEventListener('click', () => {
+        this.params.drift = pr.drift;
+        this.params.depth = pr.depth;
+        this.params.randomness = pr.randomness;
+        this.params.trail = { ...this.params.trail, amount: pr.trailAmount };
+        this.syncUiToParams();
+        this.onParamsChangeCb(this.params);
+      });
+      host.appendChild(b);
+    }
+  }
+
+  private syncPresets(): void {
+    const p = this.params;
+    const near = (a: number, b: number) => Math.abs(a - b) < 0.005;
+    document.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((b) => {
+      const pr = MOTION_PRESETS.find((x) => x.id === b.dataset.preset);
+      b.classList.toggle('active', !!pr && near(p.drift, pr.drift) && near(p.depth, pr.depth) &&
+        near(p.randomness, pr.randomness) && near(p.trail.amount, pr.trailAmount));
     });
   }
 
-  // Impact counter beside the scan style: 1 (faint) to 5 (strong)
-  private bindScanLevel(): void {
-    const step = (d: number) => {
-      this.params.scanLevel = Math.max(1, Math.min(5, this.params.scanLevel + d));
-      this.params.scan = true;
-      this.syncUiToParams();
-      this.onParamsChangeCb(this.params);
-    };
-    document.getElementById('scan-level-dec')?.addEventListener('click', () => step(-1));
-    document.getElementById('scan-level-inc')?.addEventListener('click', () => step(1));
+  /** MORE FOR THIS LOOK: the settings of the chosen look stay behind one click. */
+  private bindStyleMore(): void {
+    const btn = document.getElementById('style-more-btn');
+    const body = document.getElementById('style-settings');
+    if (!btn || !body) return;
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(open));
+      body.hidden = !open;
+    });
   }
 
   private bindModes(): void {
@@ -590,7 +656,7 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'styleInvert', 'autoLevels', 'emitOn'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'styleInvert', 'autoLevels', 'emitOn', 'trails'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
@@ -601,8 +667,10 @@ export class Panel {
     this.syncEmitUi();
     this.updateSummaries();
 
-    const levelEl = document.getElementById('scan-level');
-    if (levelEl) levelEl.textContent = String(this.params.scanLevel);
+    document.querySelectorAll<HTMLButtonElement>('[data-slevel]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.slevel) === this.params.scanLevel);
+    });
+    this.syncPresets();
 
     document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => b.classList.toggle('active', b.dataset.trackstyle === this.params.trackStyle));
     const threed = document.getElementById('threed-btn');
@@ -614,10 +682,11 @@ export class Panel {
     document.querySelectorAll<HTMLButtonElement>('[data-trackstyle]').forEach((b) => (b.disabled = !this.params.track));
 
     // Scan style label
-    const scanLabel = document.getElementById('scan-mode-label');
     // A saved RADAR or LINES style falls back to SWEEP
     if (!SCAN_CYCLE.some((c) => c.id === this.params.scanMode)) this.params.scanMode = 0;
-    if (scanLabel) scanLabel.textContent = SCAN_CYCLE.find((c) => c.id === this.params.scanMode)?.name ?? 'SWEEP';
+    document.querySelectorAll<HTMLButtonElement>('[data-scan-id]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.scanId) === this.params.scanMode);
+    });
 
     // Light toggle button
 
