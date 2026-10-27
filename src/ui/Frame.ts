@@ -15,7 +15,7 @@ export class Frame {
 
   public setReadout(current: number, total: number, hash: string): void {
     const pad = (n: number) => n.toString().padStart(2, '0');
-    this.readoutEl.textContent = `${pad(current)} / ${pad(total)}  ${hash}`;
+    this.readoutEl.textContent = hash ? `${pad(current)} / ${pad(total)}  ${hash}` : `${pad(current)} / ${pad(total)}`;
   }
 
   private buildSvg(): void {

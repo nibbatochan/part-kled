@@ -1,5 +1,5 @@
 // src/ui/Panel.ts
-import { MOTION_PRESETS, defaults, type Params } from '../core/params';
+import { MOTION_PRESETS, defaults, withLightStart, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
 import { STYLE_SETTINGS } from '../core/styles';
 
@@ -12,11 +12,29 @@ const SCAN_CYCLE = [
   { id: 6, name: 'PULSE' },
 ];
 
+// The params each collapsible section owns. Used for the changed dot and the section RESET.
+const GROUP_KEYS: Record<string, string[]> = {
+  reactions: ['track', 'trackStyle', 'scan', 'scanMode', 'scanLevel'],
+  particles: ['randomness', 'pSat', 'trailSize', 'trailAngle', 'trail.length', 'trail.amount', 'trails'],
+  tone: ['fx.opacity', 'fx.black', 'fx.white', 'fx.gamma', 'fx.contrast', 'fx.hue', 'fx.saturation'],
+  emitters: ['emitOn', 'emit.r0', 'emit.r1', 'emit.r2', 'emit.r3', 'emit.r4', 'emit.r5', 'emit.r6', 'emit.r7', 'emit.r8',
+    'emit.spots', 'emit.scatter', 'emit.lenRand', 'emit.turn'],
+};
+
+/** Reads "fx.black" or "trails" from a params object. */
+function readKey(obj: object, key: string): unknown {
+  const [a, b] = key.split('.');
+  const root = obj as Record<string, unknown>;
+  if (b === undefined) return root[a];
+  return (root[a] as Record<string, unknown>)[b];
+}
+
 export class Panel {
   private params: Params;
   private lineWidget: LineWidget;
   private uiLayer: HTMLElement;
   private onParamsChangeCb: (params: Params) => void;
+  private groups: { keys: string[]; dot: HTMLElement }[] = [];
 
   constructor(
     initialParams: Params,
@@ -55,7 +73,7 @@ export class Panel {
     this.bindPresets();
     this.bindStyleMore();
     this.bindModes();
-    this.bindSwatches();
+    this.bindHelp();
     this.bindActions(onNext, onToggleLight, onOpenAdd);
     this.bindFullscreen();
     this.bindPanIcon();
@@ -444,6 +462,26 @@ export class Panel {
       h2.insertBefore(btn, h2.firstChild);
       btn.after(summary);
 
+      const keys = GROUP_KEYS[key];
+      if (keys) {
+        const dot = document.createElement('span');
+        dot.className = 'chg-dot';
+        dot.title = 'Changed from the start look';
+        dot.setAttribute('aria-label', 'changed from the start look');
+        h2.append(dot);
+        // The tone section keeps its own RESET (it already resets colour and tone only)
+        if (key !== 'tone') {
+          const reset = document.createElement('button');
+          reset.type = 'button';
+          reset.className = 'mini';
+          reset.textContent = 'RESET';
+          reset.title = 'Put this section back to the start look';
+          reset.addEventListener('click', () => this.resetGroup(keys));
+          h2.append(reset);
+        }
+        this.groups.push({ keys, dot });
+      }
+
       const set = (open: boolean) => {
         sec.classList.toggle('is-open', open);
         btn.setAttribute('aria-expanded', String(open));
@@ -474,6 +512,38 @@ export class Panel {
     set('tone', Object.keys(base).some((k) => fx[k] !== base[k]) ? 'ADJUSTED' : 'ORIGINAL');
     const even = [0, 1, 2, 3, 4, 5, 6, 7, 8].every((i) => p.emit[`r${i}`] === 1) && p.emit.spots === 0;
     set('emitters', !p.emitOn ? 'OFF' : even ? 'EVEN' : 'CUSTOM MAP');
+    this.updateChangedDots();
+  }
+
+  /** The start look: what a section goes back to. */
+  private startLook(): Record<string, unknown> {
+    return withLightStart(defaults) as unknown as Record<string, unknown>;
+  }
+
+  private isChanged(keys: string[]): boolean {
+    const base = this.startLook();
+    return keys.some((k) => {
+      const cur = readKey(this.params, k);
+      const start = readKey(base, k);
+      return typeof cur === 'number' ? Math.abs(cur - (start as number)) > 1e-6 : cur !== start;
+    });
+  }
+
+  private updateChangedDots(): void {
+    for (const g of this.groups) g.dot.classList.toggle('on', this.isChanged(g.keys));
+  }
+
+  /** Puts one section's params back to the start look and redraws. */
+  private resetGroup(keys: string[]): void {
+    const base = this.startLook();
+    const root = this.params as unknown as Record<string, unknown>;
+    for (const k of keys) {
+      const [a, b] = k.split('.');
+      if (b === undefined) root[a] = base[a];
+      else root[a] = { ...(root[a] as object), [b]: (base[a] as Record<string, unknown>)[b] };
+    }
+    this.syncUiToParams();
+    this.onParamsChangeCb(this.params);
   }
 
   /** EMITTERS off greys out its sliders. */
@@ -571,45 +641,32 @@ export class Panel {
 
   private bindModes(): void {
     this.bindSegment('trackstyle', 'trackStyle');
-    // Travel: SWARM / MELT
-    const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');
-    travelBtns.forEach((btn) => {
+    // PICTURE: COLOUR / GREY (the picture's colour, or grey)
+    const colourBtns = document.querySelectorAll<HTMLButtonElement>('[data-cmode]');
+    colourBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
-        const val = btn.dataset.travel as 'swarm' | 'melt';
-        if (val) {
-          this.params.travel = val;
-          travelBtns.forEach((b) => b.classList.toggle('active', b === btn));
-          this.onParamsChangeCb(this.params);
-        }
+        this.params.colorMode = btn.dataset.cmode === 'bw' ? 'bw' : 'true';
+        this.syncUiToParams();
+        this.onParamsChangeCb(this.params);
       });
     });
-
-    // On white: NEGATIVE / TRUE
-    const colorModeBtns = document.querySelectorAll<HTMLButtonElement>('[data-colormode]');
-    colorModeBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const val = btn.dataset.colormode as 'true' | 'bw';
-        if (val) {
-          this.params.colorMode = val;
-          colorModeBtns.forEach((b) => b.classList.toggle('active', b === btn));
-          this.onParamsChangeCb(this.params);
-        }
-      });
-    });
-
   }
 
-  private bindSwatches(): void {
-    const swatches = document.querySelectorAll<HTMLButtonElement>('.swatch-btn');
-    swatches.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const light = btn.dataset.light as Params['light'];
-        if (light) {
-          this.params.light = light;
-          swatches.forEach((b) => b.classList.toggle('active', b === btn));
-          this.onParamsChangeCb(this.params);
-        }
-      });
+  /** Help popover: the keyboard shortcuts. Closes on a second click or a click outside it. */
+  private bindHelp(): void {
+    const btn = document.getElementById('help-btn');
+    const pop = document.getElementById('help-pop');
+    if (!btn || !pop) return;
+    const set = (open: boolean) => {
+      pop.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+    };
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      set(pop.hidden);
+    });
+    document.addEventListener('click', (e) => {
+      if (!pop.hidden && !pop.contains(e.target as Node)) set(false);
     });
   }
 
@@ -688,19 +745,9 @@ export class Panel {
       b.classList.toggle('active', Number(b.dataset.scanId) === this.params.scanMode);
     });
 
-    // Light toggle button
-
-    // Travel
-    const travelBtns = document.querySelectorAll<HTMLButtonElement>('[data-travel]');
-    travelBtns.forEach((b) => b.classList.toggle('active', b.dataset.travel === this.params.travel));
-
-    // Color mode
-    const colorModeBtns = document.querySelectorAll<HTMLButtonElement>('[data-colormode]');
-    colorModeBtns.forEach((b) => b.classList.toggle('active', b.dataset.colormode === this.params.colorMode));
-
-    // Swatches
-    const swatches = document.querySelectorAll<HTMLButtonElement>('.swatch-btn');
-    swatches.forEach((b) => b.classList.toggle('active', b.dataset.light === this.params.light));
+    document.querySelectorAll<HTMLButtonElement>('[data-cmode]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.cmode === this.params.colorMode);
+    });
 
     // Line widget
     this.lineWidget.setValue(this.params.line);

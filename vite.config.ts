@@ -15,4 +15,7 @@ export default defineConfig({
   build: {
     target: 'esnext',
   },
+  worker: {
+    format: 'es', // the depth worker code-splits, which the default iife format cannot do
+  },
 });

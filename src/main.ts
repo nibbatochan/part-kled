@@ -472,7 +472,7 @@ class App {
           nextCached = await this.getSampleDataForImage(this.images[1]);
         }
         this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
-        this.frame.setReadout(1, this.images.length, this.images[0].hash);
+        this.frame.setReadout(1, this.images.length, '');
       } else {
         this.frame.setReadout(0, 0, 'NO PICTURES');
         this.dropzone.showOverlay(true);
@@ -507,7 +507,7 @@ class App {
     if (this.activeIndex !== index) return;
 
     this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
-    this.frame.setReadout(index + 1, this.images.length, nextImg.hash);
+    this.frame.setReadout(index + 1, this.images.length, '');
     this.thumbs.setActiveIndex(index);
 
     if (prevIdx !== index) {

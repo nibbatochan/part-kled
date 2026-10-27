@@ -17,7 +17,7 @@
 
         <div id="frame-overlay" class="frame-overlay">
           <svg id="frame-svg" class="frame-svg" width="100%" height="100%"></svg>
-          <div id="frame-readout" class="frame-readout">01 / 01 &nbsp; 3B4E83186AA6E41A83DDEE</div>
+          <div id="frame-readout" class="frame-readout">01 / 01</div>
         </div>
 
         <!-- Bottom left of the canvas: PAN (hand), 3D, and FULL SCREEN -->
@@ -112,12 +112,22 @@
           <div class="head-actions">
             <a id="to-video" class="round-btn head-btn" href="?view=video" title="Video: its own page, no pictures">VIDEO ↗</a>
             <a id="to-lab" class="round-btn head-btn" href="./" title="Back to the picture lab">← LAB</a>
+            <button id="help-btn" class="round-btn head-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" aria-expanded="false" aria-controls="help-pop">?</button>
             <button id="export-btn" class="round-btn head-btn" type="button" title="Export image or video" aria-label="Export" aria-haspopup="dialog">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
               <span>EXPORT</span>
             </button>
           </div>
         </header>
+
+        <div id="help-pop" class="help-pop" hidden>
+          <div class="help-row"><kbd>SPACE</kbd> next picture</div>
+          <div class="help-row"><kbd>1</kbd>–<kbd>4</kbd> pick a picture</div>
+          <div class="help-row"><kbd>S</kbd> light on or off</div>
+          <div class="help-row"><kbd>F</kbd> full screen</div>
+          <div class="help-row"><kbd>H</kbd> hide the panel</div>
+          <div class="help-row">Drag the canvas in 3D to turn, wheel to move through</div>
+        </div>
 
         <section class="box" id="source-box">
           <h2><i>01</i> PICTURE</h2>
@@ -284,6 +294,13 @@
 
         <section data-collapse="tone" id="fx-panel" class="box">
           <h2>COLOUR AND TONE <button id="fx-reset" class="mini" type="button" title="Reset colour and tone only"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
+          <div class="row">
+            <span class="row-label" title="The picture in its own colour, or in grey">PICTURE</span>
+            <div class="seg">
+              <button class="mode-btn" type="button" data-cmode="true">COLOUR</button>
+              <button class="mode-btn" type="button" data-cmode="bw">GREY</button>
+            </div>
+          </div>
           <div class="pair">
             <div class="slider-group fx-slider" data-path="fx.opacity">
               <label for="fx-fx-opacity">OPACITY</label>
