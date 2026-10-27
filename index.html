@@ -103,8 +103,13 @@
       <!-- Right: the console. Compact boxed sections on a grid. -->
       <aside id="ui-layer" class="console">
         <header class="con-head">
-          <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
-          <span class="meta">DEPTH ANYTHING V2 · SUMANTH REDDY</span>
+          <div class="con-title">
+            <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
+            <span class="meta">DEPTH ANYTHING V2 · SUMANTH REDDY</span>
+          </div>
+          <button id="export-btn" class="round-btn head-btn" type="button" title="Export image or video" aria-label="Export" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+          </button>
         </header>
 
         <section class="box">
@@ -139,10 +144,36 @@
           <div class="pair single">
             <div class="slider-group" data-param="cell">
               <label for="sl-cell" title="Size of one cell, in pixels">CELL</label>
-              <input type="range" id="sl-cell" data-path="cell" min="4" max="16" step="1" />
+              <input type="range" id="sl-cell" data-path="cell" min="4" max="24" step="1" />
               <output></output>
             </div>
           </div>
+          <div id="style-more" class="style-more">
+            <div class="row">
+              <span class="row-label">COLOUR</span>
+              <div class="seg" id="style-color">
+                <button class="mode-btn" type="button" data-scolor="0" title="Each cell keeps the picture's colour">SOURCE</button>
+                <button class="mode-btn" type="button" data-scolor="1" title="One ink colour">MONO</button>
+                <button class="mode-btn" type="button" data-scolor="2" title="Ink on a paper colour">DUO</button>
+              </div>
+            </div>
+            <div class="row" id="ink-row">
+              <span class="row-label">INK</span>
+              <div class="ink-fields">
+                <input type="color" id="in-ink" value="#ffffff" aria-label="Ink colour" />
+                <span id="paper-field"><span class="row-label">PAPER</span>
+                <input type="color" id="in-paper" value="#000000" aria-label="Paper colour" /></span>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">TONE</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="styleInvert" title="Swap light and dark">INVERT</button>
+                <button class="toggle-btn" type="button" data-toggle="autoLevels" title="Stretch the picture's brightness to fill the look">AUTO LEVELS</button>
+              </div>
+            </div>
+          </div>
+          <div id="style-settings"></div>
         </section>
 
         <section class="box">
@@ -264,54 +295,112 @@
             </div>
           </div>
         </section>
-
-        <section class="box" id="export-panel">
-          <h2><i>07</i> EXPORT</h2>
-          <div class="row">
-            <span class="row-label">TYPE</span>
-            <div class="seg" id="ex-kind">
-              <button class="mode-btn active" type="button" data-kind="image" title="One picture, as you see it now">IMAGE</button>
-              <button class="mode-btn" type="button" data-kind="video" title="A video clip from now">VIDEO</button>
-              <button class="mode-btn" type="button" data-kind="loop" title="A clip whose last frame meets its first">LOOP</button>
-            </div>
-          </div>
-          <div class="row">
-            <span class="row-label">SIZE</span>
-            <div class="seg" id="ex-size">
-              <button class="mode-btn" type="button" data-size="480">480P</button>
-              <button class="mode-btn" type="button" data-size="720">720P</button>
-              <button class="mode-btn active" type="button" data-size="1080">1080P</button>
-              <button class="mode-btn" type="button" data-size="1440">2K</button>
-              <button class="mode-btn" type="button" data-size="2160">4K</button>
-            </div>
-          </div>
-          <div class="row">
-            <span class="row-label">FORMAT</span>
-            <div class="seg" id="ex-format"></div>
-          </div>
-          <div class="row" id="ex-fps-row">
-            <span class="row-label">FPS</span>
-            <div class="seg" id="ex-fps">
-              <button class="mode-btn active" type="button" data-fps="30">30</button>
-              <button class="mode-btn" type="button" data-fps="60">60</button>
-            </div>
-          </div>
-          <div class="pair single" id="ex-len-row">
-            <div class="slider-group">
-              <label for="ex-len" title="Clip length in seconds">LENGTH</label>
-              <input type="range" id="ex-len" min="2" max="20" step="1" value="8" />
-              <output></output>
-            </div>
-          </div>
-          <div class="row">
-            <button class="toggle-btn export-btn" id="ex-go" type="button">EXPORT</button>
-          </div>
-          <div class="export-bar" id="ex-bar" hidden><i id="ex-fill"></i></div>
-          <div class="export-status" id="ex-status" role="status"></div>
-        </section>
-
       </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>
-  </body>
+  
+  <!-- Export dialog: preview on the left, grouped options on the right -->
+  <div id="export-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ex-title">
+      <header class="modal-head">
+        <h2 id="ex-title">EXPORT</h2>
+        <button id="ex-close" class="round-btn" type="button" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M5 5l14 14M19 5L5 19"/></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div class="ex-view">
+          <div class="ex-stage" id="ex-stage"></div>
+          <div class="ex-viewbar">
+            <span id="ex-dims" class="ex-dims"></span>
+            <span class="ex-hint">DRAG TO MOVE · SCROLL TO ZOOM</span>
+          </div>
+        </div>
+        <div class="ex-options">
+          <section class="ex-group" aria-labelledby="exg-frame">
+            <h3 id="exg-frame">FRAME</h3>
+            <div class="ex-field">
+              <span class="row-label">RATIO</span>
+              <div class="ex-ratios" id="ex-ratios"></div>
+            </div>
+            <div class="ex-field">
+              <span class="row-label">CUSTOM</span>
+              <div class="ex-custom">
+                <input type="number" id="ex-rw" min="1" max="99" step="any" aria-label="Width" />
+                <span>:</span>
+                <input type="number" id="ex-rh" min="1" max="99" step="any" aria-label="Height" />
+                <button class="mode-btn" type="button" id="ex-screen" title="Match this screen's shape">THIS SCREEN</button>
+              </div>
+            </div>
+            <div class="ex-field">
+              <span class="row-label">SIZE</span>
+              <div class="seg" id="ex-size">
+                <button class="mode-btn" type="button" data-size="480">480P</button>
+                <button class="mode-btn" type="button" data-size="720">720P</button>
+                <button class="mode-btn active" type="button" data-size="1080">1080P</button>
+                <button class="mode-btn" type="button" data-size="1440">2K</button>
+                <button class="mode-btn" type="button" data-size="2160">4K</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="ex-group" aria-labelledby="exg-view">
+            <h3 id="exg-view">VIEW</h3>
+            <div class="ex-field">
+              <span class="row-label">ZOOM</span>
+              <div class="ex-zoom">
+                <input type="range" id="ex-zoom" min="0.3" max="6" step="0.01" value="1" aria-label="Zoom" />
+                <output id="ex-zoom-out">100%</output>
+              </div>
+            </div>
+            <div class="ex-field">
+              <span class="row-label">PICTURE</span>
+              <div class="seg">
+                <button class="mode-btn" type="button" id="ex-fit">FIT</button>
+                <button class="mode-btn" type="button" id="ex-fill">FILL</button>
+                <button class="mode-btn" type="button" id="ex-center" title="Back to the live view's size, centred">RESET</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="ex-group" aria-labelledby="exg-out">
+            <h3 id="exg-out">OUTPUT</h3>
+            <div class="ex-field">
+              <span class="row-label">TYPE</span>
+              <div class="seg" id="ex-kind">
+                <button class="mode-btn active" type="button" data-kind="image" title="One picture, as you see it now">IMAGE</button>
+                <button class="mode-btn" type="button" data-kind="video" title="A video clip from now">VIDEO</button>
+                <button class="mode-btn" type="button" data-kind="loop" title="A clip whose last frame meets its first">LOOP</button>
+              </div>
+            </div>
+            <div class="ex-field">
+              <span class="row-label">FORMAT</span>
+              <div class="seg" id="ex-format"></div>
+            </div>
+            <div class="ex-field" id="ex-fps-row">
+              <span class="row-label">FPS</span>
+              <div class="seg" id="ex-fps">
+                <button class="mode-btn active" type="button" data-fps="30">30</button>
+                <button class="mode-btn" type="button" data-fps="60">60</button>
+              </div>
+            </div>
+            <div class="ex-field" id="ex-len-row">
+              <span class="row-label">LENGTH</span>
+              <div class="ex-zoom">
+                <input type="range" id="ex-len" min="2" max="20" step="1" value="8" aria-label="Clip length in seconds" />
+                <output></output>
+              </div>
+            </div>
+          </section>
+
+          <div class="ex-actions">
+            <button class="toggle-btn export-btn" id="ex-go" type="button">EXPORT</button>
+            <div class="export-bar" id="ex-bar" hidden><i id="ex-fill-bar"></i></div>
+            <div class="export-status" id="ex-status" role="status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
 </html>

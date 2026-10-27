@@ -1,4 +1,6 @@
 // src/core/params.ts
+import { defaultStyleValues } from './styles';
+
 /** Colour levels / curve / hue / saturation applied to the final picture. */
 export interface FxParams {
   black: number;      // 0..0.5   levels: black point
@@ -17,6 +19,7 @@ export interface TrailParams {
   length: number;   // -1..1 trail length: positive trails back, negative trails forward
   detail: number;   // 0..1 0 = soft full-length glow, 1 = crisp tapered tails
 }
+
 
 export interface Params {
   // sliders, all 0..1
@@ -40,7 +43,13 @@ export interface Params {
   trailAngle: number; // degrees, trail direction turned away from the drift path
   pSat: number; // 0..2 particle saturation
   style: number; // particle look: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES (web build)
-  cell: number; // 4..16 cell size of the styled looks, css px
+  cell: number; // 4..24 cell size of the cell looks, css px
+  ss: Record<string, number>; // settings of each look (core/styles.ts)
+  styleColor: number; // cell looks: 0 SOURCE colour, 1 MONO ink, 2 DUO ink on paper
+  styleInvert: boolean; // cell looks: swap light and dark
+  autoLevels: boolean; // cell looks: stretch the picture's brightness to fill the look
+  ink: string; // hex colours of MONO and DUO
+  paper: string;
   trackStyle: 'old' | 'soft'; // TRACK style: OLD repels and follows the motion, SOFT is a gentle push
   scan: boolean;    // sweep line
   scanLevel: number; // 1..5 scan impact (3 = the original strength)
@@ -83,6 +92,12 @@ export const defaults: Params = {
   pSat: 1.2,
   style: 0,
   cell: 8,
+  ss: defaultStyleValues(),
+  styleColor: 0,
+  styleInvert: false,
+  autoLevels: true,
+  ink: '#ffffff',
+  paper: '#000000',
   trackStyle: 'old',
   scanLevel: 3,
   trails: true,
@@ -168,6 +183,7 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
         ...(parsed.line || {}),
       },
       fx: { ...fallback.fx, ...(parsed.fx || {}) },
+      ss: { ...fallback.ss, ...(parsed.ss || {}) },
       trail: { ...fallback.trail, ...(parsed.trail || {}) },
     };
   } catch {

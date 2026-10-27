@@ -55,13 +55,9 @@ uniform float uMorph;       // 0..1 progress of the morph into the next picture
 uniform float uRole;        // 0 normal, 3 morphing
 uniform float uDolly;       // 3D: move through the picture (camera distance)
 uniform float uLoop;        // export loop length in s, 0 = not looping
-uniform float uStyle;       // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
-uniform float uCell;        // cell size of the styled looks, device px
-uniform float uKeep;        // share of particles kept by the styled looks (fewer, bigger points)
+uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
 
 out vec3 vCol;
-out float vLum;             // brightness that shapes the dot, glyph or bar
-flat out int vStyle;
 
 // LOOP: an angular frequency snapped to whole cycles per loop, so frame 0 and frame T match
 float tw(float w, float minCycles) {
@@ -135,7 +131,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   }
 
   // Tiny shimmer so the held picture is alive
-  pos += 0.0015 * (0.3 + uDrift) * vec2(sin(uTime * tw(0.9, 1.0) + r1 * 40.0), cos(uTime * tw(0.7, 1.0) + r2 * 40.0));
+  pos += 0.0015 * (0.3 + uDrift) * (1.0 - uGridA) * vec2(sin(uTime * tw(0.9, 1.0) + r1 * 40.0), cos(uTime * tw(0.7, 1.0) + r2 * 40.0));
 
   // TRACK. OLD: repel from the cursor and follow its motion (the earlier behaviour).
   // SOFT: a gentle push (the later behaviour).
@@ -245,35 +241,6 @@ void main() {
   vec3 o = 1.0 - pow(1.0 - cb, vec3(aMeta.a * 5.0 / max(uCover, 0.25)));
   float opacity = mix(uOpacity, 1.0, streaming); // OPACITY is for the image only
   vCol = o * alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.8);
-
-  // STYLE: fewer, bigger points snapped to a grid; the fragment shapes each one (dot, glyph, bar, threshold)
-  vLum = clamp(lum, 0.0, 1.0);
-  vStyle = int(uStyle + 0.5);
-  if (vStyle != 0) {
-    float keep = uKeep;
-    if (vStyle == 5) keep = min(1.0, keep * 1.6 * pow(vLum, 0.6)); // STIPPLE: density carries the tone
-    if (rnd(id, 11u) > keep || (vStyle != 2 && vLum < 0.03)) {
-      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-      vCol = vec3(0.0);
-      return;
-    }
-    vec2 px = gl_Position.xy * uView * 0.5; // device px, origin at the canvas centre
-    if (vStyle == 1) {                       // HALFTONE: grid turned 45 degrees
-      const mat2 R = mat2(0.70710678, -0.70710678, 0.70710678, 0.70710678);
-      px = transpose(R) * ((floor((R * px) / uCell) + 0.5) * uCell);
-    } else if (vStyle == 6) {                // LINES: rows only
-      px.y = (floor(px.y / uCell) + 0.5) * uCell;
-    } else if (vStyle != 5) {                // MOSAIC, DITHER, ASCII
-      px = (floor(px / uCell) + 0.5) * uCell;
-    }
-    gl_Position.xy = px / (uView * 0.5);
-    gl_PointSize = vStyle == 5 ? max(2.0, uCell * 0.4) : uCell;
-    if (vStyle != 2) {
-      // The shape carries the brightness, so the ink is the colour at full value
-      vec3 hue = cb / max(max(cb.r, cb.g), max(cb.b, 1e-3));
-      vCol = hue * alpha * (1.0 - 0.3 * streaming) * opacity * 0.9;
-    }
-  }
 }
 `;
 
@@ -282,8 +249,6 @@ void main() {
   // One line per particle. Vertex 0 is the head, vertex 1 the tail: a fixed length back along the
   // drift direction, so trails show at any FLOW, not only near the maximum.
   bool tail = gl_VertexID == 1;
-  vLum = 0.0;
-  vStyle = 0;
   uint id = uint(gl_InstanceID);
   // TRAIL AMOUNT: 0..2, where 1 keeps half of the particles
   if (rnd(id, 6u) > uTrailAmount * 0.5) {
@@ -323,45 +288,239 @@ void main() {
 const FRAG = `#version 300 es
 precision mediump float;
 in vec3 vCol;
-in float vLum;
-flat in int vStyle;
-uniform sampler2D uAtlas;   // ASCII: ten glyphs in a row, thin to dense
+out vec4 o;
+void main() { o = vec4(vCol, 1.0); }
+`;
+
+// CELL LOOKS: one instance per grid cell (HALFTONE, MOSAIC, DITHER, ASCII, STIPPLE, LINES). A cell is treated as
+// a particle (place()), so flow, pointer, burst, scan and pulse all act on it, but its colour and tone come
+// from the picture under the whole cell, so every cell is one clean value.
+const CELLS = `
+uniform sampler2D uImg;     // the picture on screen (the one morphing away): rgb colour, a = depth
+uniform sampler2D uImg2;    // the picture arriving
+uniform vec4 uGrid;         // nx, ny, cell width, cell height (world units)
+uniform float uGridAng;     // radians, the grid turned about the picture centre
+uniform float uLayer;       // 0 the picture, 1 the cells that have drifted off it
+uniform vec2 uTexSize;      // picture texture size, px
+uniform vec2 uLv;           // AUTO LEVELS: brightness range stretched to 0..1
+uniform float uColorMode;   // 0 SOURCE, 1 MONO, 2 DUO
+uniform vec3 uInk;
+uniform vec3 uPaper;
+uniform float uInvert;
+uniform float uStyle;       // 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
+uniform vec4 uSP;           // settings of the look
+
+out vec2 vUv;               // 0..1 across the cell
+out vec3 vInk;
+out vec3 vBg;
+out float vTone;
+out float vFade;
+out vec4 vEdge;             // MOSAIC outline: left, right, bottom, top border a cell of another brightness
+out vec2 vTn;               // LINES: brightness of the cells to the left and right
+flat out ivec2 vCell;
+
+float toneOf(vec3 c) {
+  float t = clamp((luma(c) - uLv.x) / max(uLv.y - uLv.x, 0.05), 0.0, 1.0);
+  return mix(t, 1.0 - t, uInvert);
+}
+float toneAt(vec2 uv, float lod) { return toneOf(effects(textureLod(uImg2, uv, lod).rgb)); }
+
+void main() {
+  int nx = int(uGrid.x + 0.5);
+  int id = gl_InstanceID;
+  ivec2 ij = ivec2(id % nx, id / nx);
+  vec2 cw = uGrid.zw;
+  float ca = cos(uGridAng), sa = sin(uGridAng);
+  mat2 R = mat2(ca, sa, -sa, ca);
+  vec2 local = (vec2(ij) + 0.5 - 0.5 * uGrid.xy) * cw;
+  vec2 c = R * local;
+  float aspect = uHalfW * 2.0;
+  vCell = ij;
+  vUv = vec2(0.0);
+  vInk = vec3(0.0);
+  vBg = vec3(0.0);
+  vTone = 0.0;
+  vFade = 0.0;
+  vEdge = vec4(0.0);
+  vTn = vec2(0.0);
+
+  // Outside the picture
+  if (abs(c.x) > uHalfW + 0.5 * cw.x || abs(c.y) > 0.5 + 0.5 * cw.y) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
+  // The picture under the whole cell (mip level = cell size in texels), mixed old to new during a morph
+  vec2 uv = vec2(c.x / aspect + 0.5, 0.5 - c.y);
+  float lod = log2(max(0.5 * (cw.x + cw.y) * uTexSize.y, 1.0));
+  float morphing = step(2.5, uRole);
+  float e = smoothstep(0.0, 1.0, clamp(uMorph + (rnd(uint(id), 9u) - 0.5) * 0.4, 0.0, 1.0)) * morphing;
+  vec4 t = mix(textureLod(uImg, uv, lod), textureLod(uImg2, uv, lod), e);
+  vec3 mc = t.rgb;
+  float z = t.a - 0.5;
+
+  float alpha, streaming;
+  vec2 dirP;
+  vec2 w = place(uint(id), vec3(c, z), luma(mc), 0.0, uLayer, alpha, streaming, dirP);
+  if (uLayer > 0.5 && streaming < 0.02) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+
+  vec3 col = tint(mix(effects(mc), partSat(mc), streaming));
+  float lum = luma(col);
+  float pulse = 0.0;
+  if (uScanOn > 0.5 && uScanMode > 5.5) {
+    float dz = z + 0.5;
+    pulse = pow(0.5 + 0.5 * sin(uTime * tw(2.4, 1.0) - dz * 6.0), 4.0) * (uScanLevel / 3.0);
+    col = clamp(col + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.25 + 0.5 * lum), 0.0, 1.0);
+  } else if (uScanOn > 0.5) {
+    vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
+    float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, z, uZScale, lum);
+    col += (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * g * (0.12 + 0.4 * lum);
+  }
+  vec3 cb = clamp(col * uBright, 0.0, 1.0);
+  float tone = toneOf(col);
+  float opacity = mix(uOpacity, 1.0, streaming);
+  vFade = alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.8);
+  vTone = tone;
+
+  // Ink: the cell's colour at full value (the shape carries the brightness), or the chosen ink
+  vec3 hue = cb / max(max(cb.r, cb.g), max(cb.b, 1e-3));
+  vInk = uColorMode < 0.5 ? hue : uInk;
+  vBg = uColorMode > 1.5 ? uPaper : vec3(0.0);
+
+  int st = int(uStyle + 0.5);
+  if (st == 2) {
+    // MOSAIC: flat colour, optionally limited to a few levels per channel
+    float lv = uSP.x;
+    bool smooth_ = lv >= 31.5;
+    vec3 q = smooth_ ? cb : floor(cb * (lv - 1.0) + 0.5) / (lv - 1.0);
+    if (uInvert > 0.5) q = 1.0 - q;
+    float qt = smooth_ ? tone : floor(tone * (lv - 1.0) + 0.5) / (lv - 1.0);
+    vInk = uColorMode < 0.5 ? q : (uColorMode < 1.5 ? uInk * qt : mix(uPaper, uInk, qt));
+    if (uSP.w > 0.0) {
+      vec2 dx = R * vec2(cw.x, 0.0);
+      vec2 dy = R * vec2(0.0, cw.y);
+      vec2 ux = vec2(dx.x / aspect, -dx.y);
+      vec2 uy = vec2(dy.x / aspect, -dy.y);
+      vEdge = step(0.12, abs(vec4(toneAt(uv - ux, lod), toneAt(uv + ux, lod), toneAt(uv - uy, lod), toneAt(uv + uy, lod)) - tone));
+    }
+  } else if (st == 6) {
+    vec2 dx = R * vec2(cw.x, 0.0);
+    vec2 ux = vec2(dx.x / aspect, -dx.y);
+    vTn = vec2(toneAt(uv - ux, lod), toneAt(uv + ux, lod));
+  }
+
+  // Corners of the cell, a little oversize so neighbours overlap; the fragment keeps only its own cell
+  int v = gl_VertexID;
+  vec2 corner = vec2(float(v & 1), float(v >> 1));
+  vec2 q = (corner - 0.5) * 1.06;
+  vUv = q + 0.5;
+  gl_Position = toClip(w + R * (q * cw), z);
+}
+`;
+
+const CELL_FRAG = `#version 300 es
+precision highp float;
+precision highp int;
+in vec2 vUv;
+in vec3 vInk;
+in vec3 vBg;
+in float vTone;
+in float vFade;
+in vec4 vEdge;
+in vec2 vTn;
+flat in ivec2 vCell;
+uniform float uStyle;
+uniform float uColorMode;
+uniform vec4 uSP;
+uniform vec4 uSP2;
+uniform sampler2D uAtlas;   // ASCII glyphs: 16 columns, one row per ramp, each glyph 16 x 32 px
 out vec4 o;
 
-// Ordered dither threshold, 8x8 Bayer built from bits (no texture): rows y, columns x, M2 = [[0,2],[3,1]]/4
-float bayer8(vec2 fc) {
-  ivec2 p = ivec2(fc) & 7;
+float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+
+// Ordered dither threshold built from bits, no texture. Rows y, columns x, M2 = [[0,2],[3,1]]/4.
+float bayer(ivec2 cell, int n) {        // n = 2 gives 4x4, n = 3 gives 8x8
+  ivec2 p = cell & ((1 << n) - 1);
   int a = p.x ^ p.y;
   int v = 0;
   for (int k = 0; k < 3; k++) {
-    v += (((a >> k) & 1) << (2 * (2 - k) + 1)) + (((p.y >> k) & 1) << (2 * (2 - k)));
+    if (k < n) v += (((a >> k) & 1) << (2 * (n - 1 - k) + 1)) + (((p.y >> k) & 1) << (2 * (n - 1 - k)));
   }
-  return (float(v) + 0.5) / 64.0;
+  return (float(v) + 0.5) / float(1 << (2 * n));
 }
 
 void main() {
-  if (vStyle == 0 || vStyle == 2) { o = vec4(vCol, 1.0); return; }
-  vec2 pc = gl_PointCoord;           // 0..1, origin top left
-  vec2 d = pc - 0.5;
-  float a = 0.0;
-  if (vStyle == 1) {                 // HALFTONE: dot area follows brightness
-    float r = length(d) * 2.0;
-    float R = sqrt(vLum);
-    float w = max(fwidth(r), 1e-3);
-    a = 1.0 - smoothstep(R - w, R + w, r);
-  } else if (vStyle == 3) {          // DITHER: on where brightness beats the Bayer threshold
-    a = step(bayer8(gl_FragCoord.xy), vLum);
-  } else if (vStyle == 4) {          // ASCII: the glyph for this brightness
-    float idx = floor(clamp(pow(vLum, 0.6), 0.0, 0.999) * 10.0); // lift the dark end so dim parts still read
-    a = clamp(texture(uAtlas, vec2((idx + pc.x) / 10.0, pc.y)).r * 1.8, 0.0, 1.0);
-  } else if (vStyle == 5) {          // STIPPLE: small round dot
-    a = 1.0 - smoothstep(0.35, 0.5, length(d));
-  } else if (vStyle == 6) {          // LINES: bar thickness follows brightness
-    a = step(abs(d.y) * 2.0, vLum);
+  // The oversize quad overlaps its neighbours; each pixel belongs to exactly one cell
+  if (vUv.x < 0.0 || vUv.x >= 1.0 || vUv.y < 0.0 || vUv.y >= 1.0) discard;
+  vec2 fw = fwidth(vUv);
+  float aa = max(0.5 * (fw.x + fw.y), 1e-3);
+  float tone = vTone;
+  vec3 col = vBg;
+  int st = int(uStyle + 0.5);
+  vec2 p = vUv - 0.5;
+
+  if (st == 1) {                                   // HALFTONE
+    float area = pow(tone, 1.0 / (1.0 + uSP.y));
+    float sq = sqrt(area);
+    float m;
+    if (uSP.x < 0.5)      m = 1.0 - smoothstep(sq * 0.7072 - aa, sq * 0.7072 + aa, length(p));
+    else if (uSP.x < 1.5) m = 1.0 - smoothstep(sq * 0.5 - aa, sq * 0.5 + aa, max(abs(p.x), abs(p.y)));
+    else if (uSP.x < 2.5) m = 1.0 - smoothstep(sq * 0.7072 - aa, sq * 0.7072 + aa, abs(p.x) + abs(p.y));
+    else if (uSP.x < 3.5) m = (1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, min(abs(p.x), abs(p.y)))) * step(max(abs(p.x), abs(p.y)), 0.5);
+    else                  m = 1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, abs(p.y));
+    m *= step(0.003, area);
+    col = mix(col, vInk, m);
+  } else if (st == 2) {                            // MOSAIC
+    float half_ = 0.5 - uSP.y * 0.5;
+    float r = uSP.z * half_;
+    float d = length(max(abs(p) - (half_ - r), 0.0)) - r;
+    float m = 1.0 - smoothstep(0.0, aa, d);
+    float edge = max(max(vEdge.x * smoothstep(0.14, 0.0, vUv.x), vEdge.y * smoothstep(0.14, 0.0, 1.0 - vUv.x)),
+                     max(vEdge.z * smoothstep(0.14, 0.0, vUv.y), vEdge.w * smoothstep(0.14, 0.0, 1.0 - vUv.y)));
+    col = mix(col, vInk * (1.0 - uSP.w * 0.85 * edge), m);
+  } else if (st == 3) {                            // DITHER
+    float b = uSP.x < 0.5 ? bayer(vCell, 2) : (uSP.x < 1.5 ? bayer(vCell, 3) : ign(vec2(vCell)));
+    float L = uSP.y;
+    float tt = clamp(pow(tone, 0.75) + uSP.z, 0.0, 1.0); // a lift, so dark pictures keep their shape
+    float v = clamp(floor(tt * (L - 1.0) + b) / (L - 1.0), 0.0, 1.0);
+    col = mix(col, vInk, v);
+  } else if (st == 4) {                            // ASCII
+    float N = uSP2.x;
+    float idx = floor(clamp(pow(tone, 0.8), 0.0, 0.999) * N);
+    vec2 g = vec2((idx + mix(0.0625, 0.9375, vUv.x)) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - vUv.y)) / 3.0);
+    float m = smoothstep(0.2, 0.65, texture(uAtlas, g).r);
+    vec3 bg = uColorMode > 1.5 ? vBg : vInk * uSP.y * tone;
+    col = mix(bg, vInk, m);
+  } else if (st == 5) {                            // STIPPLE
+    float rmax = uSP.x;
+    float tl = pow(tone, 0.7);                       // a lift, so dark pictures keep their shape
+    float r = mix(rmax * 0.35, rmax, sqrt(tl));
+    float present = step(ign(vec2(vCell) * 1.7 + 3.1) * 0.9 + 0.05, tl * uSP.y);
+    vec2 jit = (vec2(hash21(vec2(vCell)), hash21(vec2(vCell).yx + 7.3)) - 0.5) * uSP.z * max(1.0 - 2.0 * r, 0.0);
+    float m = (1.0 - smoothstep(r - aa, r + aa, length(p - jit))) * present;
+    col = mix(col, vInk, m);
+  } else if (st == 6) {                            // LINES
+    float wgt = uSP.y;
+    float th = tone * wgt;
+    if (uSP.x < 0.5) th = (vUv.x < 0.5 ? mix(vTn.x, tone, vUv.x + 0.5) : mix(tone, vTn.y, vUv.x - 0.5)) * wgt;
+    th = clamp(th, 0.0, 1.0);
+    float m = (1.0 - smoothstep(th * 0.5 - aa, th * 0.5 + aa, abs(p.y))) * smoothstep(0.02, 0.08, th);
+    if (uSP.x > 1.5) {                              // CROSS-HATCH: columns come in with the darker parts
+      float tc = clamp((tone - 0.4) / 0.6 * wgt, 0.0, 1.0);
+      m = max(m, (1.0 - smoothstep(tc * 0.5 - aa, tc * 0.5 + aa, abs(p.x))) * smoothstep(0.02, 0.08, tc));
+    }
+    col = mix(col, vInk, m);
   }
-  o = vec4(vCol * a, 1.0);
+  o = vec4(clamp(col * vFade, 0.0, 1.0), 1.0);
 }
 `;
+
+export const CELL_VERT = VERSION + LIFECYCLE_GLSL + DECLS + FX + CELLS;
+export const CELL_FRAG_SRC = CELL_FRAG;
 
 // The studio's scan bands come from LIFECYCLE_GLSL (which also declares uScanLevel).
 export const POINT_VERT = VERSION + LIFECYCLE_GLSL + DECLS + FX + POINTS;

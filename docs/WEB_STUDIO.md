@@ -98,17 +98,19 @@ Budget from device tiers (`pointBudget()`): 200k low, 300k default, 450k strong.
 
 ## Styles and export
 
-Research and sources: `docs/RESEARCH_STYLES_AND_EXPORT.md`.
+Research and sources: `docs/RESEARCH_STYLES_AND_EXPORT.md` (first pass) and `docs/RESEARCH_STYLE_REFINEMENT.md` (the cell grid).
 
-**STYLE (box 02).** Seven looks, picked by `params.style`: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES. CELL (`params.cell`, 4 to 16 css px) sets the cell size and is off for DOTS.
-- Still stateless, no framebuffer. The vertex shader keeps about 2.5 particles per cell (`uKeep`), snaps them to the cell grid (HALFTONE on a 45 degree grid, LINES to rows only, STIPPLE not snapped) and sizes the point to the cell. The fragment shader shapes it from the particle's brightness: dot area (halftone), Bayer 8x8 threshold built from bits (dither), glyph from a 10-glyph atlas drawn with a 2D canvas (ascii), small round dot (stipple), bar thickness (lines). MOSAIC is solid squares in the source colour.
-- Shaped looks use the colour at full value and let the shape carry the brightness. Coverage for MOSAIC is points per cell, so brightness stays right.
-- Trails are hidden in the styled looks.
+**STYLE (box 02).** `params.style`: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES. DOTS is the original particle look. The other six are cell looks.
+- **Cell grid, not particles.** One instance per grid cell (`drawArraysInstanced`, no vertex attributes, `CELL_VERT` in `src/lite/shaders.ts`). The grid is glued to the picture in world units (`cell / live px per world unit`), so it tilts, zooms and exports with the picture and has the same cells at every output size. Each cell is treated as a particle (`place()`): flow, hover, burst, scan and pulse still act on it.
+- **Tone comes from the cell, not from a particle.** The sampler keeps the picture as an RGBA8 texture (rgb colour, alpha depth, mipmapped). A cell reads it with `textureLod` at the cell's mip level, which is the area average, so every cell is one clean colour and one brightness. AUTO LEVELS stretches the 2nd to 98th percentile of brightness to fill the look.
+- **Two layers.** Layer 0 is every cell at rest (the picture, no holes). Layer 1 is the same cells with the flow on, culled to the ones that have left, so cells peel off the picture and drift out in the same look. Trails are off in the cell looks.
+- **Cells tile.** The quad is 6 percent oversize and the fragment keeps only `0 <= uv < 1`, so neighbours leave no seam under tilt and each pixel belongs to one cell. Morph is a per-cell dissolve between the two pictures' textures.
+- **Settings.** Shared: CELL (4 to 24 css px), COLOUR (SOURCE, MONO, DUO with INK and PAPER), INVERT, AUTO LEVELS. Per look (2 to 4 each, one list in `src/core/styles.ts` that builds the panel): HALFTONE shape, angle, dot gain; MOSAIC colours, gap, round, outline; DITHER method (Bayer 4, Bayer 8, noise), levels, bias; ASCII ramp (classic, dense, binary), paper; STIPPLE dot size, density, jitter; LINES mode (scan, hatch, cross), angle, weight. ASCII cells are twice as tall as wide and the glyph ramp is measured from ink coverage (`src/lite/glyphs.ts`).
+- Not built yet from the research: error-diffusion dither (Atkinson), shape-matching ASCII, palette extraction for MOSAIC, Braille and LED looks, trails from cells.
 
-**EXPORT (box 07).** TYPE image, video or loop; SIZE 480p (854x480), 720p, 1080p, 2K (2560x1440), 4K (gated by the device's drawing buffer limit); FORMAT PNG, JPG, WEBP or MP4, WEBM; FPS 30 or 60; LENGTH 2 to 20 s.
-- Drawn on a second off-screen `LiteEngine` (`src/web/Exporter.ts`) at the exact output size, `renderAt(t, loop)` (no pointer, no smoothing, no quality ladder). Dot and cell sizes scale with output height over the live canvas height.
-- Video: WebCodecs through Mediabunny (MPL-2.0, loaded with a dynamic import so it is a separate 75 kB chunk), frame i at i / fps. MP4 with H.264 first, WebM when the browser cannot encode it. Bitrate at 30 fps: 480p 4, 720p 8, 1080p 12, 2K 24, 4K 50 Mbps (x1.5 at 60 fps).
-- LOOP: starts at t = 0 and snaps every time term (streamer cycles, shimmer, flow phase, sway, float, scan rate, pulse) to whole cycles per clip, so the last frame meets the first. Checked: frame 0 and frame T are pixel-identical for DOTS, HALFTONE and ASCII. Streamer speeds change by up to about a third at short lengths; longer clips change them less.
-- Image export draws the scene at the time on screen. A video starts from that time.
-
-Not verified: Firefox and Safari encoder support (the code falls back and says so), and 4K on devices whose drawing buffer is smaller.
+**EXPORT (icon in the header).** Opens a dialog: a live preview on the left, grouped options on the right.
+- FRAME: ratio (16:9, 9:16, 9:19.5 phone, 1:1, 4:5, 4:3, 3:4, 21:9), a custom ratio, THIS SCREEN (reads the real screen), and SIZE as the short side: 480p, 720p, 1080p, 2K, 4K (a phone video is 1080 x 1920). VIEW: zoom 30 to 600 percent, FIT, FILL, RESET; drag the preview to move the picture, scroll to zoom. OUTPUT: IMAGE (PNG, JPG, WEBP), VIDEO or LOOP (MP4, WEBM), fps 30 or 60, length 2 to 20 s.
+- Drawn on a second `LiteEngine` at the exact output size (`src/web/Exporter.ts`), `renderAt(t, loop)`: no pointer, no smoothing, no quality ladder. Dot and cell sizes follow the picture, not the pixels, so the file matches the preview. 4K is refused with a message when the device's drawing buffer is smaller.
+- Video: WebCodecs through Mediabunny (MPL-2.0, loaded with a dynamic import, a separate chunk). Frame i is the scene at i / fps. MP4 with H.264 first, WebM when the browser cannot encode it. Bitrate follows the pixel count: 12 Mbps at 1080p 16:9 and 30 fps, x1.5 at 60 fps (`src/web/frameSize.ts`).
+- LOOP: starts at t = 0 and snaps every time term to whole cycles per clip, so the last frame meets the first. Checked: frame 0 and frame T are pixel-identical for DOTS and every cell look. The preview plays the loop. Streamer speeds change by up to about a third on short clips.
+- Not verified: Firefox and Safari encoder support (the code falls back and says so).

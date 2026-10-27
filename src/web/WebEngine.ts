@@ -5,6 +5,7 @@
 import { LiteEngine, type LiteLayout, type LiteParams } from '../lite/LiteEngine';
 import type { LiteSample } from '../lite/sample';
 import type { Params } from '../core/params';
+import { hexToRgb } from '../core/styles';
 
 export interface ExportSnapshot {
   sample: LiteSample;
@@ -12,7 +13,8 @@ export interface ExportSnapshot {
   layout: LiteLayout;
   view: { lookX: number; lookY: number; dolly: number };
   time: number;
-  liveCssH: number;
+  /** Css px per world unit of the live view: the reference that keeps dot and cell size right at any export size */
+  liveScaleCss: number;
 }
 
 /** Scan style index of BURST in the web build (after SWEEP, RING, RADAR, LINES, DEPTH). */
@@ -36,6 +38,12 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     pSat: p.pSat,
     style: p.style,
     cell: p.cell,
+    styleSet: { ...p.ss },
+    colorMode: p.styleColor,
+    invert: p.styleInvert,
+    autoLevels: p.autoLevels,
+    ink: hexToRgb(p.ink),
+    paper: hexToRgb(p.paper),
     track: p.track,
     trackOld: p.trackStyle === 'old',
     // BURST scan style: the click shock, its strength set by the scanner level (3 = studio strength)
@@ -122,7 +130,7 @@ export class WebEngine {
       layout: { ...this.lite.layout },
       view: this.lite.getView(),
       time: this.lite.getTime(),
-      liveCssH: Math.max(1, this.canvas.clientHeight),
+      liveScaleCss: Math.max(1, this.lite.getScaleCss()),
     };
   }
 

@@ -1,6 +1,7 @@
 // src/ui/Panel.ts
 import { defaults, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
+import { STYLE_SETTINGS } from '../core/styles';
 
 // Scanner cycle: the shader's mode ids. RADAR and LINES are removed from the cycle.
 const SCAN_CYCLE = [
@@ -40,6 +41,7 @@ export class Panel {
     this.lineWidget.setValue(this.params.line);
 
     this.bindDirectionInputs();
+    this.buildStyleSettings(); // before the sliders are bound, so they get the number boxes too
     this.bindEffects();
     this.bindValueInputs();
     this.bindToggles();
@@ -138,14 +140,16 @@ export class Panel {
 
   private setPath(path: string, value: number): void {
     const [a, b] = path.split('.');
-    if (b === undefined) (this.params as unknown as Record<string, number>)[a] = value;
-    else (this.params[a as 'fx' | 'trail'] as unknown as Record<string, number>)[b] = value;
+    const root = this.params as unknown as Record<string, number | Record<string, number>>;
+    if (b === undefined) root[a] = value;
+    else (root[a] as Record<string, number>)[b] = value;
   }
 
   private getPath(path: string): number {
     const [a, b] = path.split('.');
-    if (b === undefined) return (this.params as unknown as Record<string, number>)[a];
-    return (this.params[a as 'fx' | 'trail'] as unknown as Record<string, number>)[b];
+    const root = this.params as unknown as Record<string, number | Record<string, number>>;
+    if (b === undefined) return root[a] as number;
+    return (root[a] as Record<string, number>)[b];
   }
 
   /** Shows the value beside the slider: percent when data-format="pct", else the step's decimals. */
@@ -218,24 +222,126 @@ export class Panel {
     });
   }
 
-  /** STYLE: one button per particle look (data-style = the look's number). CELL only matters for the styled looks. */
+  /** STYLE: one button per look (data-style = the look's number), the shared controls, and the settings of each look. */
   private bindStyle(): void {
-    const btns = document.querySelectorAll<HTMLButtonElement>('[data-style]');
-    btns.forEach((btn) => {
+    document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.params.style = Number(btn.dataset.style);
         this.syncStyleUi();
         this.onParamsChangeCb(this.params);
       });
     });
+    document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.params.styleColor = Number(btn.dataset.scolor);
+        this.syncStyleUi();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+    const color = (id: string, key: 'ink' | 'paper') => {
+      document.getElementById(id)?.addEventListener('input', (e) => {
+        this.params[key] = (e.target as HTMLInputElement).value;
+        this.onParamsChangeCb(this.params);
+      });
+    };
+    color('in-ink', 'ink');
+    color('in-paper', 'paper');
+    // Per-look choices (data-ssk = settings key, data-ssv = value)
+    document.querySelectorAll<HTMLButtonElement>('[data-ssk]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.params.ss[btn.dataset.ssk ?? ''] = Number(btn.dataset.ssv);
+        this.syncStyleUi();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+  }
+
+  /** The controls of every look, built from the one list in core/styles.ts. Only the chosen look's are shown. */
+  private buildStyleSettings(): void {
+    const host = document.getElementById('style-settings');
+    if (!host) return;
+    for (let style = 1; style <= 6; style++) {
+      const items = STYLE_SETTINGS.filter((s) => s.styles.includes(style));
+      if (!items.length) continue;
+      const wrap = document.createElement('div');
+      wrap.className = 'style-set';
+      wrap.dataset.styleSet = String(style);
+      for (const it of items) {
+        if (it.kind !== 'seg') continue;
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.title = it.title;
+        const label = document.createElement('span');
+        label.className = 'row-label';
+        label.textContent = it.label;
+        const seg = document.createElement('div');
+        seg.className = 'seg seg-wrap';
+        it.options.forEach((name, i) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'mode-btn';
+          b.textContent = name;
+          b.dataset.ssk = it.key;
+          b.dataset.ssv = String(i);
+          seg.appendChild(b);
+        });
+        row.append(label, seg);
+        wrap.appendChild(row);
+      }
+      const pair = document.createElement('div');
+      pair.className = 'pair';
+      for (const it of items) {
+        if (it.kind !== 'range') continue;
+        const g = document.createElement('div');
+        g.className = 'slider-group';
+        const id = 'ss-' + it.key;
+        const label = document.createElement('label');
+        label.htmlFor = id;
+        label.title = it.title;
+        label.textContent = it.label;
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.id = id;
+        input.dataset.path = 'ss.' + it.key;
+        input.min = String(it.min);
+        input.max = String(it.max);
+        input.step = String(it.step);
+        const out = document.createElement('output');
+        g.append(label, input, out);
+        pair.appendChild(g);
+      }
+      if (pair.children.length) wrap.appendChild(pair);
+      host.appendChild(wrap);
+    }
   }
 
   private syncStyleUi(): void {
+    const st = this.params.style;
     document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => {
-      b.classList.toggle('active', Number(b.dataset.style) === this.params.style);
+      b.classList.toggle('active', Number(b.dataset.style) === st);
     });
     const cell = document.getElementById('sl-cell') as HTMLInputElement | null;
-    if (cell) cell.disabled = this.params.style === 0;
+    if (cell) cell.disabled = st === 0;
+    // Shared controls only for the cell looks; ink and paper only when the colour mode uses them
+    const show = (el: HTMLElement | null, on: boolean) => {
+      if (el) el.style.display = on ? '' : 'none';
+    };
+    show(document.getElementById('style-more'), st > 0);
+    show(document.getElementById('ink-row'), this.params.styleColor > 0);
+    show(document.getElementById('paper-field'), this.params.styleColor === 2);
+    document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.scolor) === this.params.styleColor);
+    });
+    const ink = document.getElementById('in-ink') as HTMLInputElement | null;
+    const paper = document.getElementById('in-paper') as HTMLInputElement | null;
+    if (ink) ink.value = this.params.ink;
+    if (paper) paper.value = this.params.paper;
+    document.querySelectorAll<HTMLElement>('[data-style-set]').forEach((w) => {
+      w.style.display = Number(w.dataset.styleSet) === st ? '' : 'none';
+    });
+    document.querySelectorAll<HTMLButtonElement>('[data-ssk]').forEach((b) => {
+      b.classList.toggle('active', this.params.ss[b.dataset.ssk ?? ''] === Number(b.dataset.ssv));
+    });
   }
 
   /** A row of buttons that set one string field: data-<attr>="value". */
@@ -383,7 +489,7 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'styleInvert', 'autoLevels'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));

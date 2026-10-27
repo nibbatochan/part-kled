@@ -1,37 +1,23 @@
 // src/web/Exporter.ts
-// Stills and video from a second, off-screen LiteEngine at an exact pixel size. The scene is a pure
+// Stills and video from a second LiteEngine at an exact pixel size and frame shape. The scene is a pure
 // function of time, so frame i of a video is the scene at i / fps: no wall clock, no dropped frames.
 // Video uses WebCodecs through Mediabunny (loaded on demand, so visitors who never export never fetch it).
 import { LiteEngine } from '../lite/LiteEngine';
+import { bitrateFor, frameSize } from './frameSize';
 import type { ExportSnapshot } from './WebEngine';
 
 export type ExportKind = 'image' | 'video' | 'loop';
 export type ImageFormat = 'png' | 'jpg' | 'webp';
 export type VideoFormat = 'mp4' | 'webm';
 
-export interface ExportSize {
-  /** The short side in px, also the id used by the buttons */
-  h: number;
-  w: number;
+/** The frame being exported: its shape, size, and how the picture sits in it. */
+export interface ExportFrame {
+  aspect: number; // width / height
+  short: number;  // short side in px
+  zoom: number;   // 1 = the live view's picture size, scaled to the frame
+  panX: number;   // picture moved by this share of the frame height
+  panY: number;
 }
-
-/** 16:9 output sizes, all even (H.264 needs even sides). */
-export const EXPORT_SIZES: Record<number, ExportSize> = {
-  480: { w: 854, h: 480 },
-  720: { w: 1280, h: 720 },
-  1080: { w: 1920, h: 1080 },
-  1440: { w: 2560, h: 1440 },
-  2160: { w: 3840, h: 2160 },
-};
-
-/** Video bitrate at 30 fps. Particle frames are noisy, so these sit above common upload guides. */
-const BITRATE_30: Record<number, number> = {
-  480: 4_000_000,
-  720: 8_000_000,
-  1080: 12_000_000,
-  1440: 24_000_000,
-  2160: 50_000_000,
-};
 
 const MIME: Record<ImageFormat, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
 
@@ -41,15 +27,23 @@ export interface ExportResult {
   note?: string;
 }
 
-/** Everything the same, drawn on its own canvas at w x h. Throws when the device cannot make that size. */
-function makeEngine(snap: ExportSnapshot, size: ExportSize): { engine: LiteEngine; canvas: HTMLCanvasElement } {
-  const canvas = document.createElement('canvas');
-  const engine = new LiteEngine(canvas, { preserve: true });
+/**
+ * The scene on a canvas of this frame size. Pass a canvas to draw into it (the preview); otherwise a
+ * detached canvas is made. Throws when the device cannot make that size.
+ */
+export function makeEngine(
+  snap: ExportSnapshot,
+  frame: ExportFrame,
+  opts: { canvas?: HTMLCanvasElement; w?: number; h?: number; preserve?: boolean } = {},
+): { engine: LiteEngine; canvas: HTMLCanvasElement } {
+  const size = opts.w && opts.h ? { w: opts.w, h: opts.h } : frameSize(frame.aspect, frame.short);
+  const canvas = opts.canvas ?? document.createElement('canvas');
+  const engine = new LiteEngine(canvas, { preserve: opts.preserve ?? true });
   engine.setSample(snap.sample);
   engine.setParams(snap.params);
-  engine.setLayout(snap.layout);
+  applyFrame(engine, snap, frame);
   engine.setView(snap.view);
-  engine.setOutput(size.w, size.h, size.h / snap.liveCssH);
+  engine.setOutput(size.w, size.h, snap.liveScaleCss);
   const gl = engine.gl;
   if (gl.drawingBufferWidth < size.w || gl.drawingBufferHeight < size.h) {
     engine.dispose();
@@ -58,8 +52,13 @@ function makeEngine(snap: ExportSnapshot, size: ExportSize): { engine: LiteEngin
   return { engine, canvas };
 }
 
-export async function exportImage(snap: ExportSnapshot, size: ExportSize, format: ImageFormat): Promise<ExportResult> {
-  const { engine, canvas } = makeEngine(snap, size);
+/** The picture's place in the frame: the live fit, scaled by the user's zoom, moved by the user's drag. */
+export function applyFrame(engine: LiteEngine, snap: ExportSnapshot, frame: ExportFrame): void {
+  engine.setLayout({ ...snap.layout, zoom: snap.layout.zoom * frame.zoom, panX: frame.panX, panY: frame.panY });
+}
+
+export async function exportImage(snap: ExportSnapshot, frame: ExportFrame, format: ImageFormat): Promise<ExportResult> {
+  const { engine, canvas } = makeEngine(snap, frame);
   try {
     engine.renderAt(snap.time);
     // Read in the same task as the draw; preserveDrawingBuffer is on as well
@@ -89,14 +88,15 @@ export interface VideoOptions {
 
 export async function exportVideo(
   snap: ExportSnapshot,
-  size: ExportSize,
+  frame: ExportFrame,
   opts: VideoOptions,
   onProgress: (done: number) => void,
   signal: AbortSignal,
 ): Promise<ExportResult> {
   if (!videoSupported()) throw new Error('Video export needs a browser with WebCodecs (Chrome, Edge, or a current Firefox or Safari).');
   const mb = await import('mediabunny');
-  const bitrate = Math.round(BITRATE_30[size.h] * (opts.fps > 30 ? 1.5 : 1));
+  const size = frameSize(frame.aspect, frame.short);
+  const bitrate = bitrateFor(frame.short, size.w, size.h, opts.fps);
 
   // MP4 with H.264 first; fall back to WebM when the browser cannot encode it
   let format: VideoFormat = opts.format;
@@ -111,7 +111,7 @@ export async function exportVideo(
   }
   if (!codec) throw new Error(`This browser cannot encode ${size.w} x ${size.h} video. Pick a smaller size.`);
 
-  const { engine, canvas } = makeEngine(snap, size);
+  const { engine, canvas } = makeEngine(snap, frame);
   const target = new mb.BufferTarget();
   const output = new mb.Output({ format: format === 'mp4' ? new mb.Mp4OutputFormat() : new mb.WebMOutputFormat(), target });
   try {

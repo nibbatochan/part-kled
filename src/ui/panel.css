@@ -937,4 +937,55 @@ body.dragging .dropzone-box {
 .export-bar[hidden] { display: none; }
 .export-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
 .export-status { min-height: 12px; margin: 4px 10px 0; font-size: 9px; letter-spacing: 0.06em; color: var(--ink-dim); word-break: break-word; }
-#ex-size .mode-btn, #ex-kind .mode-btn, #ex-fps .mode-btn, #ex-format .mode-btn { padding: 0 4px; }
+
+/* Header: the title block on the left, the export icon on the right */
+.con-head { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+.con-title { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.head-btn { flex: none; border: 1px solid var(--line); border-radius: 0; width: 32px; height: 32px; }
+.head-btn:hover { border-color: var(--line-strong); }
+
+/* Export dialog */
+.modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(2, 3, 4, 0.78); }
+.modal[hidden] { display: none; }
+.modal-card { width: min(1040px, 100%); max-height: 100%; display: flex; flex-direction: column; border: 1px solid var(--line-strong); background: #07090a; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { font-size: 11px; font-weight: 500; letter-spacing: 0.22em; color: var(--ink); }
+.modal-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 0; overflow: hidden; }
+.ex-view { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--line); }
+.ex-stage { flex: none; height: clamp(300px, 62vh, 620px); display: flex; align-items: center; justify-content: center; padding: 14px; background-color: #030405; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 24px 24px; touch-action: none; overflow: hidden; }
+.ex-canvas { display: block; border: 1px solid var(--line-strong); background: #000; cursor: grab; }
+.ex-stage:active .ex-canvas { cursor: grabbing; }
+.ex-viewbar { display: flex; justify-content: space-between; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 9px; letter-spacing: 0.12em; color: var(--ink-dim); }
+.ex-dims { color: var(--ink); }
+.ex-options { display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow-y: auto; min-height: 0; }
+.ex-group { border: 1px solid var(--line); padding: 0 0 6px; }
+.ex-group h3 { height: 22px; display: flex; align-items: center; padding: 0 10px; margin-bottom: 6px; border-bottom: 1px solid var(--line); font-size: 9.5px; font-weight: 500; letter-spacing: 0.2em; color: var(--ink-dim); }
+.ex-field { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 10px; padding: 4px 10px; }
+.ex-ratios { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.ex-ratios .mode-btn { padding: 0; font-size: 9px; letter-spacing: 0.04em; }
+.ex-custom { display: flex; align-items: center; gap: 6px; }
+.ex-custom input { width: 46px; height: 26px; padding: 0 4px; border: 1px solid var(--line); background: rgba(5, 6, 7, 0.6); color: var(--ink); font-family: var(--font-mono); font-size: 10px; text-align: right; outline: none; -moz-appearance: textfield; appearance: textfield; }
+.ex-custom input:focus { border-color: var(--line-strong); }
+.ex-custom input::-webkit-inner-spin-button, .ex-custom input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ex-custom .mode-btn { flex: 1; padding: 0 4px; font-size: 9px; }
+.ex-zoom { display: grid; grid-template-columns: 1fr 44px; align-items: center; gap: 8px; }
+.ex-zoom input[type='range'] { width: 100%; }
+.ex-zoom output { font-size: 9.5px; text-align: right; color: var(--ink); }
+.ex-field .seg .mode-btn { padding: 0 4px; }
+.ex-actions { display: flex; flex-direction: column; gap: 4px; }
+.modal-open { overflow: hidden; }
+@media (max-width: 860px) {
+  .modal-body { grid-template-columns: 1fr; overflow-y: auto; }
+  .ex-view { border-right: none; border-bottom: 1px solid var(--line); }
+  .ex-stage { height: 44vh; }
+}
+
+/* Cell look settings */
+.style-more { padding-bottom: 2px; }
+.ink-fields { display: flex; align-items: center; gap: 10px; }
+.ink-fields input[type='color'] { width: 38px; height: 22px; padding: 0; border: 1px solid var(--line); background: none; cursor: pointer; }
+#paper-field { display: inline-flex; align-items: center; gap: 8px; }
+.seg-wrap { flex-wrap: wrap; }
+.seg-wrap .mode-btn { flex: 1 1 auto; padding: 0 6px; font-size: 9px; }
+.style-set { border-top: 1px solid var(--line); margin: 4px 6px 0; padding-top: 4px; }
+.style-set .row { padding-left: 4px; padding-right: 4px; }

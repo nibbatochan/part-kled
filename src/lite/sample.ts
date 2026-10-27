@@ -11,6 +11,11 @@ export interface LiteSample {
   aspect: number;
   /** Share of the picture area that holds the subject (0..1). */
   subjectFraction: number;
+  /**
+   * The picture at working size for the cell looks (HALFTONE, MOSAIC and the rest): rgb colour, alpha = depth.
+   * lo and hi are the 2nd and 98th percentile of brightness, used by AUTO LEVELS.
+   */
+  grid?: { w: number; h: number; rgba: Uint8Array; lo: number; hi: number };
 }
 
 const MAX_SIDE = 768;
@@ -104,5 +109,35 @@ export function sampleLite(
     u8[o + 3] = Math.round((gain / 5) * 255);
   }
 
-  return { buffer, count, aspect, subjectFraction: Math.max(0.05, activeCount / (w * h)) };
+  // Cell-look texture: colour from the picture, depth in alpha, plus the brightness range
+  const gridRgba = new Uint8Array(w * h * 4);
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < w * h; i++) {
+    const r = rgba[i * 4];
+    const g = rgba[i * 4 + 1];
+    const b = rgba[i * 4 + 2];
+    gridRgba[i * 4] = r;
+    gridRgba[i * 4 + 1] = g;
+    gridRgba[i * 4 + 2] = b;
+    gridRgba[i * 4 + 3] = Math.round(Math.min(1, Math.max(0, depth[i])) * 255);
+    hist[Math.min(255, Math.round(0.299 * r + 0.587 * g + 0.114 * b))]++;
+  }
+  const percentile = (q: number) => {
+    let acc = 0;
+    for (let v = 0; v < 256; v++) {
+      acc += hist[v];
+      if (acc >= q * w * h) return v / 255;
+    }
+    return 1;
+  };
+  const lo = percentile(0.02);
+  const hi = Math.max(lo + 0.1, percentile(0.98));
+
+  return {
+    buffer,
+    count,
+    aspect,
+    subjectFraction: Math.max(0.05, activeCount / (w * h)),
+    grid: { w, h, rgba: gridRgba, lo, hi },
+  };
 }
