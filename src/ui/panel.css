@@ -1007,3 +1007,10 @@ body.dragging .dropzone-box {
 .emit-grid input[type='range'] { width: 100%; }
 .mini-toggle { flex: none; height: 16px; margin-left: auto; padding: 0 8px; font-size: 8px; }
 .emit-cap { margin: 0 10px 2px; font-size: 8.5px; letter-spacing: 0.16em; color: var(--ink-dim); }
+
+/* CLIP: video source controls, shown only while a video is loaded */
+.clip-len { margin-left: auto; font-size: 8.5px; letter-spacing: 0.12em; color: var(--ink-dim); }
+.clip-prep { grid-template-columns: 1fr; margin-top: 4px; }
+.clip-readout { display: block; padding: 4px 10px 0; font-size: 8.5px; letter-spacing: 0.1em; color: var(--ink-dim); }
+#clip-panel.hidden { display: none; }
+.clip-scrub { width: calc(100% - 20px); margin: 6px 10px 0; }

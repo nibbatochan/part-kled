@@ -126,8 +126,22 @@
             <button id="add-slot-btn" class="thumb-slot add-slot" title="Add picture" aria-label="Add picture">
               <span class="slot-plus">+</span>
             </button>
-            <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
+            <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" multiple hidden />
           </div>
+        </section>
+
+        <section class="box hidden" id="clip-panel">
+          <h2><i>V</i> CLIP <span class="clip-len" id="clip-len">0.0 S</span></h2>
+          <div class="btn-row">
+            <button id="clip-in-btn" class="toggle-btn" type="button" title="Set the clip start to the playhead">SET IN</button>
+            <button id="clip-out-btn" class="toggle-btn" type="button" title="Set the clip end to the playhead (max 10 s)">SET OUT</button>
+            <button id="clip-play-btn" class="toggle-btn" type="button" title="Play or pause the clip">PLAY</button>
+          </div>
+          <input type="range" id="clip-scrub" class="clip-scrub" min="0" max="1" step="0.01" value="0" aria-label="Playhead" />
+          <div class="btn-row clip-prep">
+            <button id="clip-prepare-btn" class="toggle-btn" type="button" title="Estimate depth for each keyframe of the clip">PREPARE</button>
+          </div>
+          <output class="clip-readout" id="clip-readout">LOAD A VIDEO TO START</output>
         </section>
 
         <section class="box">

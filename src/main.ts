@@ -10,6 +10,7 @@ import { Panel } from './ui/Panel';
 import { MAX_IMAGES, Thumbs } from './ui/Thumbs';
 import { processImageFile, type ProcessedImage } from './utils/image';
 import { setupKeyboardShortcuts } from './utils/keys';
+import { ClipPlayer } from './video/ClipPlayer';
 
 /** Defaults for a picture that has no settings yet: the light start values, dark background. */
 function freshSettings(): Params {
@@ -41,6 +42,11 @@ class App {
   private settingsByImage: Map<string, Params> = new Map();
   public activeIndex: number = 0;
   private lastTime: number = performance.now();
+  // Video clip mode: null while the studio shows pictures
+  private clip: ClipPlayer | null = null;
+  private preparing = false;
+  private lastIdleDraw = 0;
+  private clipMessage = '';
 
   constructor() {
     this.params = withLightStart({ ...loadFromStorage(), background: 'dark' }); // no light mode any more
@@ -108,6 +114,7 @@ class App {
 
     this.bindPointer();
     this.bindResize();
+    this.bindClip();
 
     // Start render loop
     requestAnimationFrame((t) => this.loop(t));
@@ -154,10 +161,171 @@ class App {
     const dt = Math.min(0.05, (currentTime - this.lastTime) / 1000);
     this.lastTime = currentTime;
 
+    const clip = this.clip;
+    if (clip) {
+      const next = clip.nextSample();
+      if (next) this.engine.morphTo(next);
+      if (clip.playing) {
+        this.syncScrub();
+      } else {
+        // Paused clip: the picture is still, so draw at 10 Hz instead of every frame
+        if (currentTime - this.lastIdleDraw < 100) {
+          requestAnimationFrame((t) => this.loop(t));
+          return;
+        }
+        this.lastIdleDraw = currentTime;
+      }
+    }
+
     // Update 3D simulation and render
     this.engine.update(dt, currentTime / 1000);
 
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  private bindClip(): void {
+    const on = (id: string, fn: () => void) => document.getElementById(id)?.addEventListener('click', fn);
+    on('clip-in-btn', () => this.clipEdit((c) => c.setInHere()));
+    on('clip-out-btn', () => this.clipEdit((c) => c.setOutHere()));
+    on('clip-play-btn', () => this.togglePlay());
+    on('clip-prepare-btn', () => this.prepareClip());
+
+    // Scrubbing pauses the clip; the picture follows the playhead to the keyframe under it
+    document.getElementById('clip-scrub')?.addEventListener('input', (e) => {
+      const c = this.clip;
+      if (!c || this.preparing) return;
+      c.pause();
+      c.video.currentTime = Number((e.target as HTMLInputElement).value);
+    });
+  }
+
+  private clipEdit(edit: (c: ClipPlayer) => void): void {
+    if (!this.clip || this.preparing) return;
+    edit(this.clip);
+    this.clipMessage = '';
+    this.updateClipReadout();
+  }
+
+  private togglePlay(): void {
+    const c = this.clip;
+    if (!c || this.preparing) return;
+    if (!c.samples) {
+      this.clipMessage = 'PREPARE FIRST';
+    } else if (c.playing) {
+      c.pause();
+    } else {
+      c.play();
+    }
+    this.syncClipButtons();
+    this.updateClipReadout();
+  }
+
+  private async openClip(file: File): Promise<void> {
+    this.stopClip();
+    this.dropzone.showOverlay(false);
+    document.getElementById('clip-panel')?.classList.remove('hidden');
+    this.clipMessage = 'OPENING VIDEO...';
+    this.updateClipReadout();
+    try {
+      const c = await ClipPlayer.open(file);
+      this.clip = c;
+      this.clipMessage = '';
+      c.video.addEventListener('play', () => this.syncClipButtons());
+      c.video.addEventListener('pause', () => this.syncClipButtons());
+      const scrub = document.getElementById('clip-scrub') as HTMLInputElement | null;
+      if (scrub) {
+        scrub.max = String(c.duration);
+        scrub.value = '0';
+      }
+    } catch (e) {
+      console.warn('Clip open failed:', e);
+      this.clipMessage = (e as Error).message.toUpperCase();
+    }
+    this.syncClipButtons();
+    this.updateClipReadout();
+  }
+
+  private stopClip(): void {
+    if (!this.clip) return;
+    this.clip.cancelPrepare();
+    this.clip.dispose();
+    this.clip = null;
+    this.clipMessage = '';
+    this.preparing = false;
+    document.getElementById('clip-panel')?.classList.add('hidden');
+  }
+
+  private async prepareClip(): Promise<void> {
+    const c = this.clip;
+    if (!c) return;
+    if (this.preparing) {
+      c.cancelPrepare();
+      return;
+    }
+    if (!c.hasRange) {
+      this.clipMessage = 'SET IN AND OUT FIRST';
+      this.updateClipReadout();
+      return;
+    }
+
+    this.preparing = true;
+    c.pause();
+    this.setPrepareLabel('CANCEL');
+    this.syncClipButtons();
+    try {
+      const ok = await c.prepare(this.depthEstimator, pointBudget(), (p, text) => {
+        this.setProgress(true, text, p);
+      });
+      this.clipMessage = ok ? '' : 'PREPARE CANCELLED';
+      if (ok) c.play();
+    } catch (e) {
+      console.warn('Clip prepare failed:', e);
+      this.clipMessage = `PREPARE FAILED: ${(e as Error).message.toUpperCase()}`;
+    } finally {
+      this.preparing = false;
+      this.setProgress(false);
+      this.setPrepareLabel('PREPARE');
+      this.syncClipButtons();
+      this.updateClipReadout();
+    }
+  }
+
+  private setPrepareLabel(text: string): void {
+    const btn = document.getElementById('clip-prepare-btn');
+    if (btn) btn.textContent = text;
+  }
+
+  private syncClipButtons(): void {
+    const btn = document.getElementById('clip-play-btn');
+    const playing = !!this.clip?.playing;
+    if (btn) {
+      btn.textContent = playing ? 'PAUSE' : 'PLAY';
+      btn.classList.toggle('active', playing);
+    }
+  }
+
+  private syncScrub(): void {
+    const scrub = document.getElementById('clip-scrub') as HTMLInputElement | null;
+    if (scrub && this.clip) scrub.value = String(this.clip.video.currentTime);
+  }
+
+  private updateClipReadout(): void {
+    const c = this.clip;
+    const readout = document.getElementById('clip-readout');
+    const len = document.getElementById('clip-len');
+    if (!c) return;
+    const span = c.range.end - c.range.start;
+    if (len) len.textContent = `${span.toFixed(1)} S`;
+    let text = this.clipMessage;
+    if (!text) {
+      const range = `IN ${c.range.start.toFixed(2)} OUT ${c.range.end.toFixed(2)}`;
+      text = !c.hasRange
+        ? 'SET IN AND OUT, THEN PREPARE'
+        : c.samples
+          ? `${range} · ${c.samples.length} KEYFRAMES`
+          : `${range} · PREPARE TO PLAY`;
+    }
+    if (readout) readout.textContent = text;
   }
 
   private setProgress(show: boolean, text: string = '', pct: number = 0): void {
@@ -282,6 +450,7 @@ class App {
 
   public async switchImage(index: number): Promise<void> {
     if (index < 0 || index >= this.images.length) return;
+    this.stopClip();
     const prevIdx = this.activeIndex;
     if (prevIdx !== index && this.images[prevIdx]) {
       this.settingsByImage.set(this.images[prevIdx].id, clone(this.params));
@@ -336,6 +505,11 @@ class App {
   }
 
   public async handleFiles(files: File[]): Promise<void> {
+    const video = files.find((f) => f.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(f.name));
+    if (video) {
+      await this.openClip(video);
+      return;
+    }
     this.dropzone.showOverlay(false);
     for (const f of files) {
       if (this.images.length >= MAX_IMAGES) break;

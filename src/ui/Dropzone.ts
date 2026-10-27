@@ -66,6 +66,12 @@ export class Dropzone {
   }
 
   private handleFiles(files: File[]): void {
+    // One video at a time (clip mode); pictures keep their own path
+    const video = files.find(f => /^video\/(mp4|webm|quicktime)$/i.test(f.type) || /\.(mp4|webm|mov)$/i.test(f.name));
+    if (video) {
+      this.onFilesCb([video]);
+      return;
+    }
     const valid = files.filter(f => /^image\/(png|jpeg|webp)$/i.test(f.type) || /\.(png|jpe?g|webp)$/i.test(f.name));
     if (valid.length > 0) {
       this.onFilesCb(valid.slice(0, MAX_IMAGES));

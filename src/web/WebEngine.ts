@@ -156,6 +156,11 @@ export class WebEngine {
     onComplete?.();
   }
 
+  /** Morph from the picture on screen into the next keyframe of a video clip. */
+  morphTo(next: LiteSample): void {
+    this.lite.transitionTo(next);
+  }
+
   private local(clientX: number, clientY: number): [number, number] {
     const r = this.canvas.getBoundingClientRect();
     return [clientX - r.left, clientY - r.top];
