@@ -95,3 +95,20 @@ Budget from device tiers (`pointBudget()`): 200k low, 300k default, 450k strong.
 - PARTICLES: one section (RANDOM, DIM, PART SAT, SIZE, TRAIL DIR, TRAIL LEN, TRAIL AMT). TRAIL STRENGTH and DETAIL sliders removed; they stay at their defaults.
 - EFFECTS - IMAGE: section 05. RESET has an icon.
 - FLOW: reach raised again.
+
+## Styles and export
+
+Research and sources: `docs/RESEARCH_STYLES_AND_EXPORT.md`.
+
+**STYLE (box 02).** Seven looks, picked by `params.style`: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES. CELL (`params.cell`, 4 to 16 css px) sets the cell size and is off for DOTS.
+- Still stateless, no framebuffer. The vertex shader keeps about 2.5 particles per cell (`uKeep`), snaps them to the cell grid (HALFTONE on a 45 degree grid, LINES to rows only, STIPPLE not snapped) and sizes the point to the cell. The fragment shader shapes it from the particle's brightness: dot area (halftone), Bayer 8x8 threshold built from bits (dither), glyph from a 10-glyph atlas drawn with a 2D canvas (ascii), small round dot (stipple), bar thickness (lines). MOSAIC is solid squares in the source colour.
+- Shaped looks use the colour at full value and let the shape carry the brightness. Coverage for MOSAIC is points per cell, so brightness stays right.
+- Trails are hidden in the styled looks.
+
+**EXPORT (box 07).** TYPE image, video or loop; SIZE 480p (854x480), 720p, 1080p, 2K (2560x1440), 4K (gated by the device's drawing buffer limit); FORMAT PNG, JPG, WEBP or MP4, WEBM; FPS 30 or 60; LENGTH 2 to 20 s.
+- Drawn on a second off-screen `LiteEngine` (`src/web/Exporter.ts`) at the exact output size, `renderAt(t, loop)` (no pointer, no smoothing, no quality ladder). Dot and cell sizes scale with output height over the live canvas height.
+- Video: WebCodecs through Mediabunny (MPL-2.0, loaded with a dynamic import so it is a separate 75 kB chunk), frame i at i / fps. MP4 with H.264 first, WebM when the browser cannot encode it. Bitrate at 30 fps: 480p 4, 720p 8, 1080p 12, 2K 24, 4K 50 Mbps (x1.5 at 60 fps).
+- LOOP: starts at t = 0 and snaps every time term (streamer cycles, shimmer, flow phase, sway, float, scan rate, pulse) to whole cycles per clip, so the last frame meets the first. Checked: frame 0 and frame T are pixel-identical for DOTS, HALFTONE and ASCII. Streamer speeds change by up to about a third at short lengths; longer clips change them less.
+- Image export draws the scene at the time on screen. A video starts from that time.
+
+Not verified: Firefox and Safari encoder support (the code falls back and says so), and 4K on devices whose drawing buffer is smaller.

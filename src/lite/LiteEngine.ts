@@ -44,6 +44,8 @@ export interface LiteParams {
   scan: boolean;
   scanMode: number;     // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH, (5 BURST is the click shock)
   scanLevel: number;    // 1..5, 3 = studio strength
+  style: number;        // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
+  cell: number;         // 4..16 cell size of the styled looks, css px
 }
 
 export const liteDefaults: LiteParams = {
@@ -77,6 +79,8 @@ export const liteDefaults: LiteParams = {
   scan: false,
   scanMode: 0,
   scanLevel: 3,
+  style: 0,
+  cell: 8,
 };
 
 export interface LiteLayout {
@@ -93,6 +97,14 @@ const MIN_DRAWN = 40000;
 const SCAN_RATE = 0.155; // the studio's scan speed: one pass about every 6.5 s
 const BURST_LIFE = 1.1;  // seconds, the studio's burst lifetime
 const MORPH_S = 1.6;     // seconds, the studio's morph time
+const GLYPHS = ' .:-=+*#%@'; // ASCII style: thin to dense, one glyph per tenth of brightness
+
+/** LOOP: an angular frequency snapped to whole cycles per loop (same rule as tw() in the shader). */
+function loopFreq(w: number, loop: number, minCycles: number): number {
+  if (loop <= 0) return w;
+  const tau = Math.PI * 2;
+  return (tau * Math.max(minCycles, Math.floor((w * loop) / tau + 0.5))) / loop;
+}
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
   const sh = gl.createShader(type)!;
@@ -120,7 +132,7 @@ const UNIFORMS = [
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
-  'uScanLevel', 'uFx1', 'uFx2', 'uBW',
+  'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uStyle', 'uCell', 'uKeep', 'uAtlas',
 ];
 
 interface Slot {
@@ -185,15 +197,20 @@ export class LiteEngine {
   /** Set by the host to react to quality steps (for logging or tests). */
   onQuality?: (info: { drawn: number; dpr: number; trails: boolean }) => void;
   private trailsAllowed = true;
+  private atlas: WebGLTexture | null = null;
+  /** Export: device px per css px of the live view, so dots and cells keep their look at any output size. */
+  private fixedScale: number | null = null;
+  /** Export loop length in seconds, 0 = not looping. */
+  private loopT = 0;
 
-  constructor(canvas: HTMLCanvasElement, opts: { maxDpr?: number } = {}) {
+  constructor(canvas: HTMLCanvasElement, opts: { maxDpr?: number; preserve?: boolean } = {}) {
     const gl = canvas.getContext('webgl2', {
       alpha: false,
       antialias: false,
       depth: false,
       stencil: false,
       powerPreference: 'high-performance',
-      preserveDrawingBuffer: false,
+      preserveDrawingBuffer: opts.preserve ?? false,
     });
     if (!gl) throw new Error('WebGL2 unavailable');
     this.gl = gl;
@@ -208,6 +225,7 @@ export class LiteEngine {
     }
     this.slots = [this.createSlot(), this.createSlot()];
     this.morphVao = gl.createVertexArray()!;
+    this.atlas = this.createAtlas();
 
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
@@ -241,6 +259,74 @@ export class LiteEngine {
     gl.vertexAttribDivisor(1, 1);
     gl.bindVertexArray(null);
     return slot;
+  }
+
+  /** Glyph strip for the ASCII style: white on black, thin to dense, drawn once with a 2D canvas. */
+  private createAtlas(): WebGLTexture | null {
+    const gl = this.gl;
+    const G = 32;
+    const c = document.createElement('canvas');
+    c.width = G * GLYPHS.length;
+    c.height = G;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.round(G * 0.95)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    [...GLYPHS].forEach((ch, i) => ctx.fillText(ch, i * G + G / 2, G / 2 + 1));
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return tex;
+  }
+
+  getSample(): LiteSample | null {
+    return this.sample;
+  }
+
+  /** Seconds on the scene clock (what the export draws "as seen"). */
+  getTime(): number {
+    return this.time;
+  }
+
+  /** The turn the viewer has dragged or tilted to, so an export can show the same view. */
+  getView(): { lookX: number; lookY: number; dolly: number } {
+    return { lookX: this.look.x, lookY: this.look.y, dolly: this.dolly };
+  }
+
+  setView(v: { lookX: number; lookY: number; dolly: number }): void {
+    this.look.x = v.lookX;
+    this.look.y = v.lookY;
+    this.dolly = v.dolly;
+  }
+
+  /**
+   * Export: draw at exactly w x h pixels (no DPR), with dots and cells scaled by pxScale
+   * (output px per live css px). Call renderAt() to draw.
+   */
+  setOutput(w: number, h: number, pxScale: number): void {
+    this.fixedScale = pxScale;
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.gl.viewport(0, 0, w, h);
+    this.relayout();
+  }
+
+  /**
+   * Export: draw the scene at exactly time t. No smoothing, no pointer, no quality ladder, so the same
+   * t gives the same pixels. loop > 0 snaps every time term to whole cycles per loop (seamless loop).
+   */
+  renderAt(t: number, loop = 0): void {
+    this.loopT = loop;
+    this.frame(0, t);
   }
 
   private upload(slot: Slot, s: LiteSample): void {
@@ -397,14 +483,17 @@ export class LiteEngine {
     return (this.drawn * pointPx * pointPx) / Math.max(area, 1);
   }
 
-  frame(dtSec: number): void {
+  frame(dtSec: number, exactT?: number): void {
     const gl = this.gl;
     const s = this.sample;
     if (!s) return;
 
     // Clamp both ends: a frame timestamp earlier than the last one gives a negative step, which made the smoothing diverge
-    const dt = Math.max(0, Math.min(dtSec, 0.05));
-    this.time += dt;
+    // exactT (export): the clock is set, not stepped, and every smoothed state stays where it is
+    const exact = exactT !== undefined;
+    const dt = exact ? 0 : Math.max(0, Math.min(dtSec, 0.05));
+    if (exact) this.time = exactT;
+    else this.time += dt;
     this.burstAge = Math.min(BURST_LIFE, this.burstAge + dt);
     const k = 1 - Math.exp(-dt * 5);
     this.ptr.on += (this.ptr.targetOn - this.ptr.on) * k;
@@ -430,13 +519,18 @@ export class LiteEngine {
     this.look.y += (tgtY - this.look.y) * k;
     // Idle sway is separate and always on
     const sw = p.sway;
-    this.sway.x = (Math.sin(t * 0.23) * 0.6 + Math.sin(t * 0.11 + 1.3) * 0.4) * sw;
-    this.sway.y = (Math.sin(t * 0.17 + 0.6) * 0.6 + Math.sin(t * 0.09) * 0.4) * sw * 0.6;
+    // LOOP: while exporting a loop, every frequency is snapped to whole cycles per loop
+    const lf = (w: number, min: number) => loopFreq(w, this.loopT, min);
+    this.sway.x = (Math.sin(t * lf(0.23, 0)) * 0.6 + Math.sin(t * lf(0.11, 0) + 1.3) * 0.4) * sw;
+    this.sway.y = (Math.sin(t * lf(0.17, 0) + 0.6) * 0.6 + Math.sin(t * lf(0.09, 0)) * 0.4) * sw * 0.6;
     // FLOAT: the whole picture hovers up and down, slowly
-    const floatY = p.floatOn ? (Math.sin(t * 0.7) * 0.012 + Math.sin(t * 0.37 + 1) * 0.006) * this.scale : 0;
+    const floatY = p.floatOn ? (Math.sin(t * lf(0.7, 1)) * 0.012 + Math.sin(t * lf(0.37, 1) + 1) * 0.006) * this.scale : 0;
 
-    const base = Math.max(1, Math.round(this.dpr));
+    const ps = this.fixedScale ?? this.dpr;
+    const base = Math.max(1, Math.round(ps));
     const pointPx = base; // fine grain: one device pixel per point (studio dots are this size)
+    const styled = p.style > 0;
+    const cell = Math.max(3, Math.round(p.cell * ps));
     const dirLen = 0.45 + 0.55 * p.length;
     const dx = Math.cos(p.angle) * dirLen;
     const dy = Math.sin(p.angle) * dirLen;
@@ -445,14 +539,25 @@ export class LiteEngine {
     const fx = p.fx;
     const hue = (fx.hue * Math.PI) / 180;
     // SCAN starts where the user clicked and restarts its sweep there
-    const scanPhase = ((t - this.clickT) * SCAN_RATE) % 1;
+    const scanRate = this.loopT > 0 ? Math.max(1, Math.round(SCAN_RATE * this.loopT)) / this.loopT : SCAN_RATE;
+    const scanPhase = ((((t - this.clickT) * scanRate) % 1) + 1) % 1; // 0..1 even when t is before the click
     const scanOn = p.scan && p.scanMode !== 5; // BURST is the click shock, not a band
     const velX = Math.max(-2, Math.min(2, this.ptrVel.x));
     const velY = Math.max(-2, Math.min(2, this.ptrVel.y));
 
     gl.clear(gl.COLOR_BUFFER_BIT);
 
+    // STYLE: points are cells wide, so coverage is points per cell; keep about 2.5 of them per cell
+    const rawCover = this.cover(styled ? cell : base);
+    const keep = styled ? Math.min(1, Math.max(0.01, 2.5 / rawCover)) : 1;
+    const covered = styled ? rawCover * keep : rawCover;
+
     const setU = (U: Record<string, WebGLUniformLocation | null>, role: number, morph: number, cover: number) => {
+      gl.uniform1f(U.uLoop, this.loopT);
+      gl.uniform1f(U.uStyle, p.style);
+      gl.uniform1f(U.uCell, cell);
+      gl.uniform1f(U.uKeep, keep);
+      gl.uniform1i(U.uAtlas, 0);
       gl.uniform2f(U.uView, this.canvas.width, this.canvas.height);
       gl.uniform1f(U.uScale, this.scale);
       gl.uniform2f(U.uOffset, this.offX, this.offY + floatY);
@@ -498,8 +603,10 @@ export class LiteEngine {
       gl.uniform1f(U.uBW, p.bw ? 1 : 0);
     };
 
-    const cover = this.cover(pointPx);
+    const cover = covered;
     gl.useProgram(this.pointProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.atlas);
     if (this.morphing) {
       setU(this.pointU, 3, this.morphT, cover);
       gl.bindVertexArray(this.morphVao);
@@ -511,7 +618,7 @@ export class LiteEngine {
     }
 
     // Trails are not drawn during the morph; they come back when it ends
-    if (!this.morphing && p.trails && this.trailsAllowed && p.drift > 0.02) {
+    if (!this.morphing && p.trails && this.trailsAllowed && p.drift > 0.02 && !styled) {
       gl.useProgram(this.trailProg);
       setU(this.trailU, 0, 0, cover);
       gl.bindVertexArray(this.slots[this.cur].vaoTrails);
@@ -519,7 +626,7 @@ export class LiteEngine {
     }
     gl.bindVertexArray(null);
 
-    this.adapt(dtSec * 1000);
+    if (!exact) this.adapt(dtSec * 1000);
   }
 
   /**
@@ -564,6 +671,7 @@ export class LiteEngine {
       gl.deleteVertexArray(slot.vaoTrails);
     }
     gl.deleteVertexArray(this.morphVao);
+    gl.deleteTexture(this.atlas);
     gl.deleteProgram(this.pointProg);
     gl.deleteProgram(this.trailProg);
     gl.getExtension('WEBGL_lose_context')?.loseContext();

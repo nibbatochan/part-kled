@@ -126,7 +126,27 @@
         </section>
 
         <section class="box">
-          <h2><i>02</i> MOTION</h2>
+          <h2><i>02</i> STYLE</h2>
+          <div class="style-grid" id="style-grid">
+            <button class="mode-btn" type="button" data-style="0" title="Soft dots, the default look">DOTS</button>
+            <button class="mode-btn" type="button" data-style="1" title="Dot size follows brightness, on a turned grid">HALFTONE</button>
+            <button class="mode-btn" type="button" data-style="2" title="Square pixels">MOSAIC</button>
+            <button class="mode-btn" type="button" data-style="3" title="Ordered dither (Bayer 8x8)">DITHER</button>
+            <button class="mode-btn" type="button" data-style="4" title="Text characters, thin to dense">ASCII</button>
+            <button class="mode-btn" type="button" data-style="5" title="Small dots, density follows brightness">STIPPLE</button>
+            <button class="mode-btn" type="button" data-style="6" title="Horizontal bars, thickness follows brightness">LINES</button>
+          </div>
+          <div class="pair single">
+            <div class="slider-group" data-param="cell">
+              <label for="sl-cell" title="Size of one cell, in pixels">CELL</label>
+              <input type="range" id="sl-cell" data-path="cell" min="4" max="16" step="1" />
+              <output></output>
+            </div>
+          </div>
+        </section>
+
+        <section class="box">
+          <h2><i>03</i> MOTION</h2>
           <div class="pair">
             <div class="slider-group" data-param="drift">
               <label for="sl-drift">FLOW</label>
@@ -147,7 +167,7 @@
         </section>
 
         <section class="box">
-          <h2><i>03</i> MODES</h2>
+          <h2><i>04</i> MODES</h2>
           <div class="row">
             <span class="row-label">HOVER</span>
             <div class="seg">
@@ -169,7 +189,7 @@
         </section>
 
         <section class="box">
-          <h2><i>04</i> PARTICLES</h2>
+          <h2><i>05</i> PARTICLES</h2>
           <div class="pair">
             <div class="slider-group" data-param="randomness">
               <label for="sl-random" title="How much each particle's path differs: direction and distance">RANDOM</label>
@@ -205,7 +225,7 @@
         </section>
 
         <section id="fx-panel" class="box">
-          <h2><i>05</i> EFFECTS - IMAGE <button id="fx-reset" class="mini" type="button" title="Reset effects"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
+          <h2><i>06</i> EFFECTS - IMAGE <button id="fx-reset" class="mini" type="button" title="Reset effects"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg> RESET</button></h2>
           <div class="pair">
             <div class="slider-group fx-slider" data-path="fx.opacity">
               <label for="fx-fx-opacity">OPACITY</label>
@@ -244,6 +264,52 @@
             </div>
           </div>
         </section>
+
+        <section class="box" id="export-panel">
+          <h2><i>07</i> EXPORT</h2>
+          <div class="row">
+            <span class="row-label">TYPE</span>
+            <div class="seg" id="ex-kind">
+              <button class="mode-btn active" type="button" data-kind="image" title="One picture, as you see it now">IMAGE</button>
+              <button class="mode-btn" type="button" data-kind="video" title="A video clip from now">VIDEO</button>
+              <button class="mode-btn" type="button" data-kind="loop" title="A clip whose last frame meets its first">LOOP</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">SIZE</span>
+            <div class="seg" id="ex-size">
+              <button class="mode-btn" type="button" data-size="480">480P</button>
+              <button class="mode-btn" type="button" data-size="720">720P</button>
+              <button class="mode-btn active" type="button" data-size="1080">1080P</button>
+              <button class="mode-btn" type="button" data-size="1440">2K</button>
+              <button class="mode-btn" type="button" data-size="2160">4K</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">FORMAT</span>
+            <div class="seg" id="ex-format"></div>
+          </div>
+          <div class="row" id="ex-fps-row">
+            <span class="row-label">FPS</span>
+            <div class="seg" id="ex-fps">
+              <button class="mode-btn active" type="button" data-fps="30">30</button>
+              <button class="mode-btn" type="button" data-fps="60">60</button>
+            </div>
+          </div>
+          <div class="pair single" id="ex-len-row">
+            <div class="slider-group">
+              <label for="ex-len" title="Clip length in seconds">LENGTH</label>
+              <input type="range" id="ex-len" min="2" max="20" step="1" value="8" />
+              <output></output>
+            </div>
+          </div>
+          <div class="row">
+            <button class="toggle-btn export-btn" id="ex-go" type="button">EXPORT</button>
+          </div>
+          <div class="export-bar" id="ex-bar" hidden><i id="ex-fill"></i></div>
+          <div class="export-status" id="ex-status" role="status"></div>
+        </section>
+
       </aside>
     </div>
     <script type="module" src="/src/main.ts"></script>

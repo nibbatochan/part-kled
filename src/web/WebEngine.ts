@@ -2,9 +2,18 @@
 // Same surface as core/Engine, so the studio UI and App run unchanged. Motion and drawing come from the
 // light renderer in src/lite. Not in this build: DRAW (flow strokes), PULL (gather spring), MELT travel,
 // and the separate burst slider (BURST is now a scan style). Those controls are removed from index.html.
-import { LiteEngine, type LiteParams } from '../lite/LiteEngine';
+import { LiteEngine, type LiteLayout, type LiteParams } from '../lite/LiteEngine';
 import type { LiteSample } from '../lite/sample';
 import type { Params } from '../core/params';
+
+export interface ExportSnapshot {
+  sample: LiteSample;
+  params: LiteParams;
+  layout: LiteLayout;
+  view: { lookX: number; lookY: number; dolly: number };
+  time: number;
+  liveCssH: number;
+}
 
 /** Scan style index of BURST in the web build (after SWEEP, RING, RADAR, LINES, DEPTH). */
 export const BURST_MODE = 5;
@@ -25,6 +34,8 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     trailSize: p.trailSize,
     trailAngle: p.trailAngle,
     pSat: p.pSat,
+    style: p.style,
+    cell: p.cell,
     track: p.track,
     trackOld: p.trackStyle === 'old',
     // BURST scan style: the click shock, its strength set by the scanner level (3 = studio strength)
@@ -97,6 +108,23 @@ export class WebEngine {
   }
 
   setHasActiveImage(_has: boolean): void {}
+
+  /** Everything the exporter needs to redraw the scene on its own canvas at another size. */
+  exportSnapshot(): ExportSnapshot | null {
+    const sample = this.lite.getSample();
+    if (!sample) return null;
+    const params: LiteParams = { ...this.lite.params, fx: { ...this.lite.params.fx } };
+    params.track = false; // no cursor, no click shock in an export
+    params.burst = 0;
+    return {
+      sample,
+      params,
+      layout: { ...this.lite.layout },
+      view: this.lite.getView(),
+      time: this.lite.getTime(),
+      liveCssH: Math.max(1, this.canvas.clientHeight),
+    };
+  }
 
   /**
    * The studio hands over the picture on screen and the one it is switching to. The light build shows

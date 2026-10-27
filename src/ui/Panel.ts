@@ -51,6 +51,7 @@ export class Panel {
     this.bindFullscreen();
     this.bindPanIcon();
     this.bindThreeD();
+    this.bindStyle();
 
     this.syncUiToParams();
   }
@@ -182,6 +183,7 @@ export class Panel {
       out.classList.add('slider-readout');
       out.tabIndex = 0;
       const open = () => {
+        if (slider.disabled) return;
         out.hidden = true;
         box.hidden = false;
         box.focus();
@@ -214,6 +216,26 @@ export class Panel {
         if (e.key === 'Enter') box.blur();
       });
     });
+  }
+
+  /** STYLE: one button per particle look (data-style = the look's number). CELL only matters for the styled looks. */
+  private bindStyle(): void {
+    const btns = document.querySelectorAll<HTMLButtonElement>('[data-style]');
+    btns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.params.style = Number(btn.dataset.style);
+        this.syncStyleUi();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+  }
+
+  private syncStyleUi(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.style) === this.params.style);
+    });
+    const cell = document.getElementById('sl-cell') as HTMLInputElement | null;
+    if (cell) cell.disabled = this.params.style === 0;
   }
 
   /** A row of buttons that set one string field: data-<attr>="value". */
@@ -368,6 +390,7 @@ export class Panel {
     });
 
     this.syncEffects();
+    this.syncStyleUi();
 
     const levelEl = document.getElementById('scan-level');
     if (levelEl) levelEl.textContent = String(this.params.scanLevel);

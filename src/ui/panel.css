@@ -837,11 +837,11 @@ body.dragging .dropzone-box {
 }
 
 /* ───────── Compact console (UI revamp): two sliders per line, tighter boxes ───────── */
-.console { gap: 6px; padding: 8px; }
+.console { gap: 8px; padding: 8px; }
 .con-head { padding: 2px 2px 4px; gap: 4px; }
 .meta { display: block; font-size: 9px; letter-spacing: 0.08em; color: var(--ink-dim); }
-.box { padding-bottom: 4px; }
-.box h2 { height: 22px; margin-bottom: 4px; font-size: 9.5px; }
+.box { padding-bottom: 12px; }
+.box h2 { height: 22px; margin-bottom: 10px; font-size: 9.5px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; padding: 0 6px; }
 .pair.single { grid-template-columns: 1fr; }
 .pair .slider-group { grid-template-columns: 58px 1fr 34px; gap: 6px; padding: 3px 4px; }
@@ -928,3 +928,13 @@ body.dragging .dropzone-box {
 .slider-val:hover, .slider-val:focus { border-color: var(--line-strong); }
 .slider-readout { cursor: text; }
 .slider-val::-webkit-inner-spin-button, .slider-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* STYLE and EXPORT boxes */
+.style-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0 10px 4px; }
+.style-grid .mode-btn { padding: 0 2px; font-size: 9px; letter-spacing: 0.06em; }
+.export-btn { width: 100%; flex: none; }
+.export-bar { height: 3px; margin: 4px 10px 0; background: var(--line); }
+.export-bar[hidden] { display: none; }
+.export-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.export-status { min-height: 12px; margin: 4px 10px 0; font-size: 9px; letter-spacing: 0.06em; color: var(--ink-dim); word-break: break-word; }
+#ex-size .mode-btn, #ex-kind .mode-btn, #ex-fps .mode-btn, #ex-format .mode-btn { padding: 0 4px; }

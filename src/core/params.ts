@@ -39,6 +39,8 @@ export interface Params {
   trailSize: number; // dot size of drifting particles (multiplier)
   trailAngle: number; // degrees, trail direction turned away from the drift path
   pSat: number; // 0..2 particle saturation
+  style: number; // particle look: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES (web build)
+  cell: number; // 4..16 cell size of the styled looks, css px
   trackStyle: 'old' | 'soft'; // TRACK style: OLD repels and follows the motion, SOFT is a gentle push
   scan: boolean;    // sweep line
   scanLevel: number; // 1..5 scan impact (3 = the original strength)
@@ -79,6 +81,8 @@ export const defaults: Params = {
   trailSize: 1,
   trailAngle: 0,
   pSat: 1.2,
+  style: 0,
+  cell: 8,
   trackStyle: 'old',
   scanLevel: 3,
   trails: true,

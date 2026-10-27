@@ -54,8 +54,21 @@ uniform float uOpacity;     // picture only, trails are not dimmed
 uniform float uMorph;       // 0..1 progress of the morph into the next picture
 uniform float uRole;        // 0 normal, 3 morphing
 uniform float uDolly;       // 3D: move through the picture (camera distance)
+uniform float uLoop;        // export loop length in s, 0 = not looping
+uniform float uStyle;       // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
+uniform float uCell;        // cell size of the styled looks, device px
+uniform float uKeep;        // share of particles kept by the styled looks (fewer, bigger points)
 
 out vec3 vCol;
+out float vLum;             // brightness that shapes the dot, glyph or bar
+flat out int vStyle;
+
+// LOOP: an angular frequency snapped to whole cycles per loop, so frame 0 and frame T match
+float tw(float w, float minCycles) {
+  if (uLoop <= 0.0) return w;
+  float tau = 6.2831853;
+  return tau * max(minCycles, floor(w * uLoop / tau + 0.5)) / uLoop;
+}
 
 uint hashu(uint x) {
   x ^= x >> 16; x *= 0x7feb352du;
@@ -95,7 +108,8 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
 
   if (streamer) {
     float cycle = (5.0 + 5.0 * r2) / max(uSpeed, 0.05);
-    float age = fract(uTime / cycle + r1);
+    // LOOP: whole streamer cycles per loop (1 or more), so the last frame meets the first
+    float age = uLoop > 0.0 ? fract(fract(uTime / uLoop * max(1.0, floor(uLoop / cycle + 0.5))) + r1) : fract(uTime / cycle + r1);
     float rest = 0.30;
     float s = clamp((age - rest) / (1.0 - rest) + sOff, 0.0, 1.0);
     float ease = pow(s, 1.4);
@@ -109,7 +123,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     vec2 perp = vec2(-dir.y, dir.x);
     pos += dir * reach * ease;
     // Streamlines: the bend depends on where the particle starts, so neighbours curve together
-    float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * 0.25;
+    float flow = dot(home.xy, vec2(5.3, 3.7)) + uTime * tw(0.25, 0.0);
     pos += perp * (sin(s * 4.0 + flow) * 0.05 + sin(s * 9.0 + flow * 1.7) * 0.015) * uDrift * s * (0.6 + r3);
 
     alpha = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.35, 1.0, s));
@@ -121,7 +135,7 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   }
 
   // Tiny shimmer so the held picture is alive
-  pos += 0.0015 * (0.3 + uDrift) * vec2(sin(uTime * 0.9 + r1 * 40.0), cos(uTime * 0.7 + r2 * 40.0));
+  pos += 0.0015 * (0.3 + uDrift) * vec2(sin(uTime * tw(0.9, 1.0) + r1 * 40.0), cos(uTime * tw(0.7, 1.0) + r2 * 40.0));
 
   // TRACK. OLD: repel from the cursor and follow its motion (the earlier behaviour).
   // SOFT: a gentle push (the later behaviour).
@@ -216,7 +230,7 @@ void main() {
   float pulse = 0.0;
   if (uScanOn > 0.5 && uScanMode > 5.5) {
     float dz = home.z + 0.5;
-    pulse = pow(0.5 + 0.5 * sin(uTime * 2.4 - dz * 6.0), 4.0) * (uScanLevel / 3.0);
+    pulse = pow(0.5 + 0.5 * sin(uTime * tw(2.4, 1.0) - dz * 6.0), 4.0) * (uScanLevel / 3.0);
     c = clamp(c + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.25 + 0.5 * lum), 0.0, 1.0);
   } else if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
@@ -231,6 +245,35 @@ void main() {
   vec3 o = 1.0 - pow(1.0 - cb, vec3(aMeta.a * 5.0 / max(uCover, 0.25)));
   float opacity = mix(uOpacity, 1.0, streaming); // OPACITY is for the image only
   vCol = o * alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.8);
+
+  // STYLE: fewer, bigger points snapped to a grid; the fragment shapes each one (dot, glyph, bar, threshold)
+  vLum = clamp(lum, 0.0, 1.0);
+  vStyle = int(uStyle + 0.5);
+  if (vStyle != 0) {
+    float keep = uKeep;
+    if (vStyle == 5) keep = min(1.0, keep * 1.6 * pow(vLum, 0.6)); // STIPPLE: density carries the tone
+    if (rnd(id, 11u) > keep || (vStyle != 2 && vLum < 0.03)) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      vCol = vec3(0.0);
+      return;
+    }
+    vec2 px = gl_Position.xy * uView * 0.5; // device px, origin at the canvas centre
+    if (vStyle == 1) {                       // HALFTONE: grid turned 45 degrees
+      const mat2 R = mat2(0.70710678, -0.70710678, 0.70710678, 0.70710678);
+      px = transpose(R) * ((floor((R * px) / uCell) + 0.5) * uCell);
+    } else if (vStyle == 6) {                // LINES: rows only
+      px.y = (floor(px.y / uCell) + 0.5) * uCell;
+    } else if (vStyle != 5) {                // MOSAIC, DITHER, ASCII
+      px = (floor(px / uCell) + 0.5) * uCell;
+    }
+    gl_Position.xy = px / (uView * 0.5);
+    gl_PointSize = vStyle == 5 ? max(2.0, uCell * 0.4) : uCell;
+    if (vStyle != 2) {
+      // The shape carries the brightness, so the ink is the colour at full value
+      vec3 hue = cb / max(max(cb.r, cb.g), max(cb.b, 1e-3));
+      vCol = hue * alpha * (1.0 - 0.3 * streaming) * opacity * 0.9;
+    }
+  }
 }
 `;
 
@@ -239,6 +282,8 @@ void main() {
   // One line per particle. Vertex 0 is the head, vertex 1 the tail: a fixed length back along the
   // drift direction, so trails show at any FLOW, not only near the maximum.
   bool tail = gl_VertexID == 1;
+  vLum = 0.0;
+  vStyle = 0;
   uint id = uint(gl_InstanceID);
   // TRAIL AMOUNT: 0..2, where 1 keeps half of the particles
   if (rnd(id, 6u) > uTrailAmount * 0.5) {
@@ -278,8 +323,44 @@ void main() {
 const FRAG = `#version 300 es
 precision mediump float;
 in vec3 vCol;
+in float vLum;
+flat in int vStyle;
+uniform sampler2D uAtlas;   // ASCII: ten glyphs in a row, thin to dense
 out vec4 o;
-void main() { o = vec4(vCol, 1.0); }
+
+// Ordered dither threshold, 8x8 Bayer built from bits (no texture): rows y, columns x, M2 = [[0,2],[3,1]]/4
+float bayer8(vec2 fc) {
+  ivec2 p = ivec2(fc) & 7;
+  int a = p.x ^ p.y;
+  int v = 0;
+  for (int k = 0; k < 3; k++) {
+    v += (((a >> k) & 1) << (2 * (2 - k) + 1)) + (((p.y >> k) & 1) << (2 * (2 - k)));
+  }
+  return (float(v) + 0.5) / 64.0;
+}
+
+void main() {
+  if (vStyle == 0 || vStyle == 2) { o = vec4(vCol, 1.0); return; }
+  vec2 pc = gl_PointCoord;           // 0..1, origin top left
+  vec2 d = pc - 0.5;
+  float a = 0.0;
+  if (vStyle == 1) {                 // HALFTONE: dot area follows brightness
+    float r = length(d) * 2.0;
+    float R = sqrt(vLum);
+    float w = max(fwidth(r), 1e-3);
+    a = 1.0 - smoothstep(R - w, R + w, r);
+  } else if (vStyle == 3) {          // DITHER: on where brightness beats the Bayer threshold
+    a = step(bayer8(gl_FragCoord.xy), vLum);
+  } else if (vStyle == 4) {          // ASCII: the glyph for this brightness
+    float idx = floor(clamp(pow(vLum, 0.6), 0.0, 0.999) * 10.0); // lift the dark end so dim parts still read
+    a = clamp(texture(uAtlas, vec2((idx + pc.x) / 10.0, pc.y)).r * 1.8, 0.0, 1.0);
+  } else if (vStyle == 5) {          // STIPPLE: small round dot
+    a = 1.0 - smoothstep(0.35, 0.5, length(d));
+  } else if (vStyle == 6) {          // LINES: bar thickness follows brightness
+    a = step(abs(d.y) * 2.0, vLum);
+  }
+  o = vec4(vCol * a, 1.0);
+}
 `;
 
 // The studio's scan bands come from LIFECYCLE_GLSL (which also declares uScanLevel).
