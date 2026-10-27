@@ -75,6 +75,12 @@ try {
   fs.writeFileSync(clipPath, Buffer.from(webmB64, 'base64'));
   console.log('test clip bytes:', fs.statSync(clipPath).size);
 
+  // Lab is the default workspace: the clip panel is not shown, the source strip is
+  const vis = (sel) => page.$eval(sel, (el) => getComputedStyle(el).display !== 'none');
+  console.log('lab mode: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'));
+  await page.click('#mode-switch [data-mode="video"]');
+  console.log('video mode: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'), '| readout:', await page.textContent('#clip-readout'));
+
   // 2. Load it through the file input (same path as a drop)
   await page.setInputFiles('#file-input', clipPath);
   await page.waitForFunction(() => {
@@ -149,11 +155,12 @@ try {
   await page.screenshot({ path: path.join(SHOT_DIR, 'clip-phase1-scrub6.png') });
   console.log('play button label after pause:', await page.textContent('#clip-play-btn'));
 
-  // 6. Images still work after the clip closes
-  await page.click('.thumb-slot[data-index="1"]');
-  await page.waitForTimeout(600);
-  const hidden = await page.$eval('#clip-panel', (el) => el.classList.contains('hidden'));
-  console.log('clip panel hidden after switching to a picture:', hidden);
+  // 6. Back to the lab: the clip closes, the picture returns, the source strip is back
+  await page.click('#mode-switch [data-mode="lab"]');
+  await page.waitForTimeout(800);
+  console.log('back in lab: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'));
+  console.log('frame readout:', await page.textContent('#frame-readout'));
+  await page.screenshot({ path: path.join(SHOT_DIR, 'clip-phase1-lab-restored.png') });
 
   console.log('clip logs:', logs.slice(0, 20));
   console.log('errors:', errors.length ? errors.slice(0, 10) : 'none');

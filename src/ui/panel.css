@@ -1010,7 +1010,11 @@ body.dragging .dropzone-box {
 
 /* CLIP: video source controls, shown only while a video is loaded */
 .clip-len { margin-left: auto; font-size: 8.5px; letter-spacing: 0.12em; color: var(--ink-dim); }
-.clip-prep { grid-template-columns: 1fr; margin-top: 4px; }
+.clip-prep { grid-template-columns: 1fr 1fr; margin-top: 4px; }
 .clip-readout { display: block; padding: 4px 10px 0; font-size: 8.5px; letter-spacing: 0.1em; color: var(--ink-dim); }
-#clip-panel.hidden { display: none; }
+/* LAB and VIDEO are separate workspaces in one console: the body carries the mode */
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px 0; }
+.mode-switch .mode-btn { height: 26px; }
+body[data-mode="lab"] #clip-panel { display: none; }
+body[data-mode="video"] #source-box { display: none; }
 .clip-scrub { width: calc(100% - 20px); margin: 6px 10px 0; }

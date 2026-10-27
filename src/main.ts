@@ -189,6 +189,12 @@ class App {
     on('clip-out-btn', () => this.clipEdit((c) => c.setOutHere()));
     on('clip-play-btn', () => this.togglePlay());
     on('clip-prepare-btn', () => this.prepareClip());
+    on('clip-open-btn', () => this.dropzone.openPicker());
+
+    // LAB (pictures) and VIDEO (clips) are separate workspaces in the same console
+    document.querySelectorAll<HTMLElement>('#mode-switch [data-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => this.setMode(btn.dataset.mode === 'video' ? 'video' : 'lab'));
+    });
 
     // Scrubbing pauses the clip; the picture follows the playhead to the keyframe under it
     document.getElementById('clip-scrub')?.addEventListener('input', (e) => {
@@ -197,6 +203,28 @@ class App {
       c.pause();
       c.video.currentTime = Number((e.target as HTMLInputElement).value);
     });
+  }
+
+  /**
+   * Switch workspace. Leaving VIDEO closes the clip and puts the active picture back on the stage.
+   * `restore` is false when the caller is already switching to a picture.
+   */
+  private setMode(mode: 'lab' | 'video', restore = true): void {
+    const current = document.body.dataset.mode === 'video' ? 'video' : 'lab';
+    document.body.dataset.mode = mode;
+    document.querySelectorAll<HTMLElement>('#mode-switch [data-mode]').forEach((btn) => {
+      const on = btn.dataset.mode === mode;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
+    });
+    if (mode === 'lab' && current === 'video') {
+      this.stopClip();
+      if (restore && this.images.length > 0) void this.switchImage(this.activeIndex);
+    }
+    if (mode === 'video') {
+      this.clipMessage = this.clip ? '' : 'OPEN A VIDEO TO START';
+      this.updateClipReadout();
+    }
   }
 
   private clipEdit(edit: (c: ClipPlayer) => void): void {
@@ -223,11 +251,16 @@ class App {
   private async openClip(file: File): Promise<void> {
     this.stopClip();
     this.dropzone.showOverlay(false);
-    document.getElementById('clip-panel')?.classList.remove('hidden');
+    this.setMode('video');
     this.clipMessage = 'OPENING VIDEO...';
     this.updateClipReadout();
     try {
       const c = await ClipPlayer.open(file);
+      // The user may have gone back to the lab while the file was opening
+      if (document.body.dataset.mode !== 'video') {
+        c.dispose();
+        return;
+      }
       this.clip = c;
       this.clipMessage = '';
       c.video.addEventListener('play', () => this.syncClipButtons());
@@ -252,7 +285,6 @@ class App {
     this.clip = null;
     this.clipMessage = '';
     this.preparing = false;
-    document.getElementById('clip-panel')?.classList.add('hidden');
   }
 
   private async prepareClip(): Promise<void> {
@@ -313,7 +345,11 @@ class App {
     const c = this.clip;
     const readout = document.getElementById('clip-readout');
     const len = document.getElementById('clip-len');
-    if (!c) return;
+    if (!c) {
+      if (readout) readout.textContent = this.clipMessage || 'OPEN A VIDEO TO START';
+      if (len) len.textContent = '0.0 S';
+      return;
+    }
     const span = c.range.end - c.range.start;
     if (len) len.textContent = `${span.toFixed(1)} S`;
     let text = this.clipMessage;
@@ -451,6 +487,8 @@ class App {
   public async switchImage(index: number): Promise<void> {
     if (index < 0 || index >= this.images.length) return;
     this.stopClip();
+    // A picture is being shown, so the lab is the workspace (the caller restores the stage itself)
+    if (document.body.dataset.mode === 'video') this.setMode('lab', false);
     const prevIdx = this.activeIndex;
     if (prevIdx !== index && this.images[prevIdx]) {
       this.settingsByImage.set(this.images[prevIdx].id, clone(this.params));

@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/src/ui/tokens.css" />
     <link rel="stylesheet" href="/src/ui/panel.css" />
   </head>
-  <body>
+  <body data-mode="lab">
     <div id="app">
       <!-- Left: the stage. The canvas, its frame marks, the drop prompt, the loader, PAN and DRIFT live here. -->
       <main id="stage-wrap" class="stage-wrap">
@@ -112,7 +112,12 @@
           </button>
         </header>
 
-        <section class="box">
+        <div class="mode-switch" id="mode-switch" role="tablist" aria-label="Workspace">
+          <button class="mode-btn active" type="button" data-mode="lab" role="tab" aria-selected="true" title="Pictures: the lab">LAB</button>
+          <button class="mode-btn" type="button" data-mode="video" role="tab" aria-selected="false" title="Video clips: trim, prepare, play">VIDEO</button>
+        </div>
+
+        <section class="box" id="source-box">
           <h2><i>01</i> SOURCE</h2>
           <div class="strip" id="thumbnail-strip">
             <div class="thumb-slot active" data-index="0">
@@ -130,7 +135,7 @@
           </div>
         </section>
 
-        <section class="box hidden" id="clip-panel">
+        <section class="box" id="clip-panel">
           <h2><i>V</i> CLIP <span class="clip-len" id="clip-len">0.0 S</span></h2>
           <div class="btn-row">
             <button id="clip-in-btn" class="toggle-btn" type="button" title="Set the clip start to the playhead">SET IN</button>
@@ -139,6 +144,7 @@
           </div>
           <input type="range" id="clip-scrub" class="clip-scrub" min="0" max="1" step="0.01" value="0" aria-label="Playhead" />
           <div class="btn-row clip-prep">
+            <button id="clip-open-btn" class="toggle-btn" type="button" title="Choose a video file (mp4, webm, mov)">OPEN VIDEO</button>
             <button id="clip-prepare-btn" class="toggle-btn" type="button" title="Estimate depth for each keyframe of the clip">PREPARE</button>
           </div>
           <output class="clip-readout" id="clip-readout">LOAD A VIDEO TO START</output>
