@@ -152,7 +152,7 @@ const UNIFORMS = [
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
-  'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
+  'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   // cell looks
   'uImg', 'uImg2', 'uGrid', 'uGridAng', 'uLayer', 'uTexSize', 'uLv', 'uColorMode', 'uInk', 'uPaper', 'uInvert',
   'uStyle', 'uSP', 'uSP2',
@@ -470,7 +470,7 @@ export class LiteEngine {
   dragMove(dx: number, dy: number): void {
     if (!this.dragging) return;
     this.orbit.yaw += dx * 0.01;
-    this.orbit.pitch += dy * 0.01;
+    this.orbit.pitch -= dy * 0.01; // dragging down brings the top toward you, like turning a ball by its front
   }
 
   dragEnd(): void {
@@ -654,16 +654,28 @@ export class LiteEngine {
       gl.uniform1f(U.uBW, p.bw ? 1 : 0);
     };
 
+    // The PULSE scan reads the picture's depth to find where light glances off it
+    const bindPicture = (U: Record<string, WebGLUniformLocation | null>) => {
+      const cur = this.slots[this.cur];
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, cur.tex);
+      gl.uniform1i(U.uImg, 1);
+      gl.uniform1i(U.uImg2, 1);
+      gl.uniform2f(U.uTexSize, cur.texW, cur.texH);
+      gl.uniform1f(U.uHasImg, cur.tex ? 1 : 0);
+    };
     if (styled) {
       this.drawCells(setU, s);
     } else if (this.morphing) {
       gl.useProgram(this.pointProg);
+      bindPicture(this.pointU);
       gl.uniform1f(this.pointU.uGridA, 0);
       setU(this.pointU, 3, this.morphT, cover);
       gl.bindVertexArray(this.morphVao);
       gl.drawArrays(gl.POINTS, 0, Math.min(this.morphCount, this.drawn));
     } else {
       gl.useProgram(this.pointProg);
+      bindPicture(this.pointU);
       gl.uniform1f(this.pointU.uGridA, 0);
       setU(this.pointU, 0, 0, cover);
       gl.bindVertexArray(this.slots[this.cur].vaoPoints);
@@ -734,6 +746,7 @@ export class LiteEngine {
     gl.uniform4f(U.uGrid, nx, ny, cwx, cwy);
     gl.uniform1f(U.uGridAng, pk.angle);
     gl.uniform2f(U.uTexSize, cur.texW, cur.texH);
+    gl.uniform1f(U.uHasImg, 1);
     gl.uniform2f(U.uLv, p.autoLevels ? cur.lv[0] : 0, p.autoLevels ? cur.lv[1] : 1);
     gl.uniform1f(U.uColorMode, p.colorMode);
     gl.uniform3f(U.uInk, p.ink[0], p.ink[1], p.ink[2]);

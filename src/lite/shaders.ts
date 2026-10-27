@@ -60,6 +60,10 @@ uniform float uLineW;      // trail width in px: 1 = plain GL lines, wider = qua
 uniform float uEmitW[9];   // EMITTERS: how much each region of the picture sheds (3 x 3, top left first)
 uniform vec4 uEmitX;       // EMITTERS: spots, scatter, length variety, turn
 uniform float uEmitOn;
+uniform sampler2D uImg;     // the picture on screen: rgb colour, a = depth (cell looks and the PULSE scan)
+uniform sampler2D uImg2;    // the picture arriving (cell looks)
+uniform vec2 uTexSize;      // picture texture size, px
+uniform float uHasImg;      // 1 when uImg holds a picture
 uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
 
 out vec3 vCol;
@@ -199,6 +203,31 @@ vec3 tint(vec3 c) {
   if (uLightOn < 0.5) return c;
   return mix(c, uLightCol, clamp(luma(c) * 0.4, 0.0, 0.55));
 }
+
+// PULSE: light glancing off the picture. A light circles the picture; where the surface (the depth map) turns
+// to face it and the picture is bright, it flashes, and a soft sheet of light sweeps along the light's direction
+// over the bright parts. Dark parts stay dark. Returns 0..1.
+float glint(vec2 h, float lum) {
+  float lit = smoothstep(0.15, 0.8, lum);
+  float a = uTime * tw(0.7, 1.0);
+  vec2 ld = vec2(cos(a), sin(a));
+  float spec = 0.0;
+  if (uHasImg > 0.5) {
+    vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+    vec2 e = 2.0 / uTexSize;
+    float zx = textureLod(uImg, uv + vec2(e.x, 0.0), 1.0).a - textureLod(uImg, uv - vec2(e.x, 0.0), 1.0).a;
+    float zy = textureLod(uImg, uv + vec2(0.0, e.y), 1.0).a - textureLod(uImg, uv - vec2(0.0, e.y), 1.0).a;
+    // depth change per picture height, as a slope of the relief (y is flipped: the texture runs downward)
+    float k = 0.45 * max(uDepth, 0.3) * uTexSize.y * 0.5 * 0.25;
+    vec3 n = normalize(vec3(-zx * k, zy * k, 1.0));
+    vec3 l = normalize(vec3(ld * 0.9, 0.75));
+    vec3 hv = normalize(l + vec3(0.0, 0.0, 1.0));
+    spec = pow(max(dot(n, hv), 0.0), 40.0);
+  }
+  // The sheet: a band of light moving along the light's direction, only where the picture is bright
+  float sheet = pow(0.5 + 0.5 * sin(dot(h, ld) * 5.0 - uTime * tw(1.6, 1.0)), 6.0);
+  return clamp(spec * 1.6 + sheet * 0.5, 0.0, 1.0) * lit;
+}
 `;
 
 // Levels, curve, hue, saturation and black & white: the studio's Effects tab, applied to the picture only
@@ -250,9 +279,8 @@ void main() {
   // PULSE scan: a wave of light travels through the depth, front to back, and lights the dots it passes
   float pulse = 0.0;
   if (uScanOn > 0.5 && uScanMode > 5.5) {
-    float dz = home.z + 0.5;
-    pulse = pow(0.5 + 0.5 * sin(uTime * tw(2.4, 1.0) - dz * 6.0), 4.0) * (uScanLevel / 3.0);
-    c = clamp(c + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.12 + 0.25 * lum), 0.0, 1.0);
+    pulse = glint(home.xy, lum) * (uScanLevel / 3.0);
+    c = clamp(c + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.22 + 0.4 * lum), 0.0, 1.0);
   } else if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
     float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, home.z, uZScale, lum);
@@ -334,12 +362,9 @@ void main() { o = vec4(vCol, 1.0); }
 // a particle (place()), so flow, pointer, burst, scan and pulse all act on it, but its colour and tone come
 // from the picture under the whole cell, so every cell is one clean value.
 const CELLS = `
-uniform sampler2D uImg;     // the picture on screen (the one morphing away): rgb colour, a = depth
-uniform sampler2D uImg2;    // the picture arriving
 uniform vec4 uGrid;         // nx, ny, cell width, cell height (world units)
 uniform float uGridAng;     // radians, the grid turned about the picture centre
 uniform float uLayer;       // 0 the picture, 1 the cells that have drifted off it
-uniform vec2 uTexSize;      // picture texture size, px
 uniform vec2 uLv;           // AUTO LEVELS: brightness range stretched to 0..1
 uniform float uColorMode;   // 0 SOURCE, 1 MONO, 2 DUO
 uniform vec3 uInk;
@@ -409,9 +434,8 @@ void main() {
   float lum = luma(col);
   float pulse = 0.0;
   if (uScanOn > 0.5 && uScanMode > 5.5) {
-    float dz = z + 0.5;
-    pulse = pow(0.5 + 0.5 * sin(uTime * tw(2.4, 1.0) - dz * 6.0), 4.0) * (uScanLevel / 3.0);
-    col = clamp(col + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.12 + 0.25 * lum), 0.0, 1.0);
+    pulse = glint(c, lum) * (uScanLevel / 3.0);
+    col = clamp(col + (uLightOn > 0.5 ? uLightCol : vec3(1.0)) * pulse * (0.22 + 0.4 * lum), 0.0, 1.0);
   } else if (uScanOn > 0.5) {
     vec2 ld = normalize(uDir + vec2(1e-4, 0.0));
     float g = scanBand(w, ld, uScan, uScanMode, uScanCenter, z, uZScale, lum);
