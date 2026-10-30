@@ -52,6 +52,10 @@ export interface Params {
   autoLevels: boolean; // cell looks: stretch the picture's brightness to fill the look
   ink: string; // hex colours of MONO and DUO
   paper: string;
+  audioAmount: number; // MUSIC: 0..1 how strongly sound moves the picture
+  musicLook: number; // MUSIC look: 0 off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE
+  eqStyle: number; // EQUALIZER: 0 off, 1 DOTS, 2 CROSS, 3 SPARKS (particles beside the picture)
+  eqSize: number; // EQUALIZER dot size, CSS px
   trackStyle: 'old' | 'soft'; // TRACK style: OLD repels and follows the motion, SOFT is a gentle push
   scan: boolean;    // sweep line
   scanLevel: number; // 1..5 scan impact (3 = the original strength)
@@ -102,6 +106,10 @@ export const defaults: Params = {
   autoLevels: true,
   ink: '#ffffff',
   paper: '#000000',
+  audioAmount: 0.7,
+  musicLook: 0,
+  eqStyle: 0,
+  eqSize: 1.8,
   trackStyle: 'old',
   scanLevel: 3,
   trails: true,

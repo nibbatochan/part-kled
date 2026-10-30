@@ -65,6 +65,13 @@ uniform sampler2D uImg2;    // the picture arriving (cell looks)
 uniform vec2 uTexSize;      // picture texture size, px
 uniform float uHasImg;      // 1 when uImg holds a picture
 uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
+// MUSIC looks: the sound moves the particles themselves (0 = off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE)
+uniform float uMusic;
+uniform float uBands[32];  // 32 log-spaced bands of the sound, 0..1, smoothed on the CPU
+uniform float uBeat;       // 1 on a beat, decaying
+uniform float uLevel;      // overall loudness, 0..1
+uniform float uBass;       // bass, 0..1
+uniform float uAmt;        // 0..1 how far EQUALIZER, BLOOM and RIPPLE move (the AMOUNT slider and reduced motion applied)
 
 out vec3 vCol;
 
@@ -96,6 +103,35 @@ float rnd(uint id, uint salt) {
 }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 vec3 partSat(vec3 c) { return clamp(mix(vec3(luma(c)), c, uPSat), 0.0, 1.0); }
+
+// MUSIC looks. Each dot's own random numbers decide which band or waveform column it follows, so the
+// picture itself shows the sound. Positions depend only on uniforms and the dot's id: nothing is stored.
+vec2 musicMove(uint id, vec2 h, vec2 p, float r2, float rA, float rB, float rC) {
+  float xn = clamp(h.x / max(uHalfW, 1e-3) * 0.5 + 0.5, 0.0, 1.0);
+  int col = int(clamp(floor(xn * 32.0), 0.0, 31.0));
+  float d = length(h);
+  vec2 rad = d > 1e-4 ? h / d : vec2(0.0);
+  vec2 q = p;
+  if (uMusic < 1.5) {
+    // EQUALIZER: each column lifts its own share of dots, a louder band lifts more of them. Height follows AMOUNT.
+    float b = uBands[col];
+    q.y += step(rA, b) * b * 0.08 * uAmt * (0.4 + 0.6 * r2);
+  } else if (uMusic < 2.5) {
+    // LISTEN: each dot follows one random band and swells with it
+    float b = uBands[int(clamp(floor(rB * 32.0), 0.0, 31.0))];
+    q *= 1.0 + b * 0.16;
+  } else if (uMusic < 3.5) {
+    // BLOOM: on every beat the dots nudge outward, only near their place, and fall back
+    float s = uBeat * uAmt * (0.4 + 0.6 * rC) * 0.06 * exp(-d * 1.2);
+    q += rad * s;
+  } else if (uMusic < 4.5) {
+    // RIPPLE: one ring travels out from the middle, moving only the dots it passes
+    float ringR = fract(uTime * 0.25) * 1.1;
+    float env = smoothstep(0.0, 0.1, ringR) * (1.0 - smoothstep(0.9, 1.1, ringR));
+    q += rad * exp(-pow((d - ringR) / 0.07, 2.0)) * env * uLevel * uAmt * 0.05;
+  }
+  return q;
+}
 
 // World position and opacity of one particle; sOff pulls it back along its own path (trail tails).
 vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out float alpha, out float streaming, out vec2 dirOut) {
@@ -180,6 +216,12 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
   float bl = length(bq);
   float ring = (bl - uBurst.z * 0.9) / 0.06;
   pos += bq / max(bl, 1e-4) * uBurst.w * exp(-ring * ring) * 0.05;
+
+  // MUSIC looks (after the other motion, so they act on the final position)
+  if (uMusic > 0.5) {
+    float rB = rnd(id, 31u);
+    pos = musicMove(id, home.xy, pos, r3, r0, rB, r4);
+  }
 
   return pos;
 }
@@ -588,3 +630,79 @@ export const CELL_FRAG_SRC = CELL_FRAG;
 export const POINT_VERT = VERSION + LIFECYCLE_GLSL + DECLS + FX + POINTS;
 export const TRAIL_VERT = VERSION + LIFECYCLE_GLSL + DECLS + FX + TRAILS;
 export const FRAG_SRC = FRAG;
+
+// EQUALIZER: particles beside the picture, one point per dot, in the picture's colours. Stateless like the picture's
+// dots: each dot's place is a function of its id, the column levels, the waveform and the time. Styles (uEqStyle):
+// 1 DOTS: LED columns mirrored about the middle, unlit dots as faint ghosts. 2 CROSS: the waveform as two lines crossing.
+// 3 SPARKS: dots rising from the middle line and fading.
+// Layout: side (2) x half (2) x column (12) x row (20).
+export const EQ_VERT = `#version 300 es
+precision highp float;
+uniform vec2 uView;
+uniform float uScale;
+uniform vec2 uOffset;
+uniform float uHalfW;
+uniform float uTime;
+uniform float uEqSize;      // dot size, device px
+uniform float uEqStyle;     // 1 DOTS, 2 CROSS, 3 SPARKS
+uniform float uEqLevel[12]; // level of each column, 0..1, column 0 nearest the picture
+uniform float uEqWave[12];  // the waveform in 12 columns, -1..1
+uniform vec3 uEqCol[5];     // the picture's colours
+out vec3 vCol;
+const int COLS = 12;
+const int ROWS = 20;
+float hash1(float n) { return fract(sin(n) * 43758.5453); }
+void main() {
+  int id = gl_VertexID;
+  int row = id % ROWS;
+  int rest = id / ROWS;
+  int col = rest % COLS;
+  rest = rest / COLS;
+  int half_ = rest % 2;
+  int side = rest / 2;
+  float fr = float(row) + 0.5;
+  float lvl = uEqLevel[col];
+  float r = hash1(float(id) * 1.7);
+  float xs = side == 0 ? -1.0 : 1.0;
+  float ys = half_ == 0 ? 1.0 : -1.0;
+  float x = xs * (uHalfW + 0.05 + float(col) * 0.04);
+  float y = 0.0;
+  float size = uEqSize;
+  bool show = true;
+  vec3 colour = uEqCol[col % 5];
+  if (uEqStyle < 1.5) {
+    // DOTS
+    bool lit = fr < lvl * float(ROWS);
+    y = ys * (0.012 + fr / float(ROWS) * 0.36); // tall range: a loud column still has room above it
+    if (lit) y += ys * sin(uTime * (2.0 + 3.0 * r) + r * 30.0) * 0.012 * (0.4 + lvl);
+    colour = lit ? colour : colour * 0.12;
+    size *= lit ? 1.0 : 0.7;
+  } else if (uEqStyle < 2.5) {
+    // CROSS: the waveform as two lines of dots crossing along the margin, one flipped and one column along
+    float along = float(col * ROWS + row) / float(COLS * ROWS); // 0 next to the picture, 1 at the outer edge
+    x = xs * (uHalfW + 0.05 + along * 0.5);
+    y = half_ == 0 ? uEqWave[col] * 0.3 : -uEqWave[(col + 6) % COLS] * 0.3;
+    y += (r - 0.5) * 0.006;
+    size *= 0.9;
+  } else {
+    // SPARKS: each dot rises from the middle line, fades as it goes, and starts again. Louder columns
+    // send up more dots, and the dots climb higher.
+    float life = fract(uTime * (0.15 + 0.25 * r) + r * 17.0);
+    show = fr < lvl * float(ROWS);
+    x += (hash1(float(id) * 3.1) - 0.5) * 0.12 * xs; // a spray, not a grid: each dot strays sideways
+    y = ys * (0.012 + life * (0.08 + 0.4 * lvl));
+    colour = colour * (1.0 - 0.8 * life);
+    size *= 0.9;
+  }
+  if (!show) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    vCol = vec3(0.0);
+    gl_PointSize = 1.0;
+    return;
+  }
+  vec2 px = vec2(x, y) * uScale + uOffset;
+  gl_Position = vec4(px / (uView * 0.5), 0.0, 1.0);
+  vCol = colour;
+  gl_PointSize = size;
+}
+`;

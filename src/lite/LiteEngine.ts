@@ -1,7 +1,7 @@
 // src/lite/LiteEngine.ts
 // Raw WebGL2, no three.js, no framebuffers. Points and optional trail lines. A new picture morphs in
 // from the picture on screen (same particle index, same rule as the studio's morph).
-import { CELL_FRAG_SRC, CELL_VERT, FRAG_SRC, POINT_VERT, TRAIL_VERT } from './shaders';
+import { CELL_FRAG_SRC, CELL_VERT, EQ_VERT, FRAG_SRC, POINT_VERT, TRAIL_VERT } from './shaders';
 import { buildGlyphAtlas } from './glyphs';
 import { defaultStyleValues, packStyle, type StyleValues } from '../core/styles';
 import type { LiteSample } from './sample';
@@ -56,9 +56,21 @@ export interface LiteParams {
   autoLevels: boolean;  // cell looks: stretch the picture's brightness range to fill the look
   ink: [number, number, number];
   paper: [number, number, number];
+  musicLook: number; // MUSIC looks: 0 off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE
+}
+
+/** What the sound looks like this frame (see FeatureExtractor). All zeros when no sound is on. */
+export interface MusicState {
+  bands: Float32Array; // 32 values, 0..1
+  level: number;
+  bass: number;
+  beat: boolean;
+  active: boolean;
+  amount: number; // 0..1 how far the looks move, after AMOUNT and reduced motion
 }
 
 export const liteDefaults: LiteParams = {
+  musicLook: 0,
   drift: 0.6,
   angle: 0.5,
   length: 0.5,
@@ -113,6 +125,24 @@ export interface LiteLayout {
   panY?: number;
 }
 
+/**
+ * Music: small offsets added on top of the user's settings every frame. Never saved, never part of an export.
+ * rate multiplies the speed of the shared clock (the clock is integrated, so a change never makes particles jump).
+ */
+export interface AudioMod {
+  rate: number;      // 1 = normal clock speed
+  bright: number;    // added to the brightness as a share (0.1 = 10% brighter)
+  trailGain: number; // share added to the trail brightness
+  trailLen: number;
+  depth: number;
+  dolly: number;
+  drift: number;
+  sway: number;      // share added to the idle sway
+  scatter: number;
+}
+
+export const AUDIO_OFF: AudioMod = { rate: 1, bright: 0, trailGain: 0, trailLen: 0, depth: 0, dolly: 0, drift: 0, sway: 0, scatter: 0 };
+
 const TRAIL_STRIDE = 1; // one trail line per particle
 const MIN_DRAWN = 40000;
 const SCAN_RATE = 0.155; // the studio's scan speed: one pass about every 6.5 s
@@ -153,6 +183,7 @@ const UNIFORMS = [
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
+  'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt',
   // cell looks
   'uImg', 'uImg2', 'uGrid', 'uGridAng', 'uLayer', 'uTexSize', 'uLv', 'uColorMode', 'uInk', 'uPaper', 'uInvert',
   'uStyle', 'uSP', 'uSP2',
@@ -189,6 +220,19 @@ export class LiteEngine {
   private morphing = false;
   private morphT = 0;
   private morphVao: WebGLVertexArrayObject;
+  // EQUALIZER: particle columns beside the picture (drawn by its own program, no state)
+  private eqProg: WebGLProgram;
+  private eqU: Record<string, WebGLUniformLocation | null> = {};
+  private eqVao: WebGLVertexArrayObject;
+  private eqOn = false;
+  private eqStyle = 0;
+  private eqWave = new Float32Array(12);  // the waveform columns, smoothed
+  private eqWaveT = new Float32Array(12); // the waveform columns, target
+  private eqSize = 1.8;                       // CSS px per dot
+  private floatPx = 0;                        // the picture's float this frame (px), so the equalizer moves with it
+  private eqTarget = new Float32Array(12);    // levels from the sound, 0..1
+  private eqLevel = new Float32Array(12);     // the same, smoothed
+  private eqCol = new Float32Array(15);       // 5 colours, rgb 0..1
   private morphCount = 0;
 
   private sample: LiteSample | null = null;
@@ -202,6 +246,14 @@ export class LiteEngine {
   private offY = 0;
 
   private time = 0;
+  private phase = 0; // the clock the shader sees: time stepped at the music's pace (equals time while no music plays)
+  private audio: AudioMod = AUDIO_OFF;
+  // MUSIC looks: the sound as the shader sees it (smoothed, so nothing snaps)
+  private mBands = new Float32Array(32);
+  private mLevel = 0;
+  private mBass = 0;
+  private mBeat = 0;     // 1 on a beat, decays
+  private mAmt = 0;      // how far the looks move (0..1)
   private ptr = { x: 0, y: 0, on: 0, targetOn: 0 };
   private prevPtr = { x: 0, y: 0 };
   private ptrVel = { x: 0, y: 0 };
@@ -259,6 +311,11 @@ export class LiteEngine {
     }
     this.slots = [this.createSlot(), this.createSlot()];
     this.morphVao = gl.createVertexArray()!;
+    this.eqProg = program(gl, EQ_VERT, FRAG_SRC);
+    for (const n of ['uView', 'uScale', 'uOffset', 'uHalfW', 'uTime', 'uEqSize', 'uEqStyle', 'uEqLevel', 'uEqWave', 'uEqCol']) {
+      this.eqU[n] = gl.getUniformLocation(this.eqProg, n);
+    }
+    this.eqVao = gl.createVertexArray()!; // no attributes: the shader works from gl_VertexID
     this.atlas = this.createAtlas();
 
     gl.disable(gl.DEPTH_TEST);
@@ -462,6 +519,64 @@ export class LiteEngine {
     this.clickT = this.time;
   }
 
+  /** The music's offsets for the coming frames (see AudioMod). Pass AUDIO_OFF to switch it off. */
+  setAudioMod(m: AudioMod): void {
+    this.audio = m;
+  }
+
+  /** EQUALIZER: style 0 off, 1 to 5 the styles; dot size in CSS px; 12 column levels; 12 waveform columns (-1..1); the picture's colours. */
+  setEqualizer(style: number, levels: Float32Array, wave: Float32Array, cols: [number, number, number][], size: number): void {
+    this.eqStyle = style;
+    this.eqOn = style > 0;
+    this.eqSize = size;
+    this.eqTarget.set(levels.subarray(0, 12));
+    this.eqWaveT.set(wave.subarray(0, 12));
+    for (let i = 0; i < 5; i++) {
+      const c = cols[i % cols.length] ?? [233, 236, 238];
+      // Keep the hue, lift the brightest channel to 0.95: a dark picture would otherwise make dark dots
+      const k = 0.95 / Math.max(1, c[0], c[1], c[2]);
+      this.eqCol.set([c[0] * k, c[1] * k, c[2] * k], i * 3);
+    }
+  }
+
+  /** 2 x 2 x 12 x 20 dots, eased toward the levels so the shapes move smoothly. */
+  private drawEqualizer(dt: number, s: LiteSample): void {
+    const gl = this.gl;
+    const a = 1 - Math.exp(-dt / 0.04);
+    const fall = 1 - Math.exp(-dt / 0.2);
+    for (let k = 0; k < 12; k++) {
+      const t = this.eqTarget[k];
+      this.eqLevel[k] += (t - this.eqLevel[k]) * (t > this.eqLevel[k] ? a : fall);
+      this.eqWave[k] += (this.eqWaveT[k] - this.eqWave[k]) * (1 - Math.exp(-dt / 0.03));
+    }
+    const U = this.eqU;
+    gl.useProgram(this.eqProg);
+    gl.uniform2f(U.uView, this.canvas.width, this.canvas.height);
+    gl.uniform1f(U.uScale, this.scale);
+    gl.uniform2f(U.uOffset, this.offX, this.offY + this.floatPx);
+    gl.uniform1f(U.uHalfW, s.aspect / 2);
+    gl.uniform1f(U.uTime, this.time);
+    gl.uniform1f(U.uEqSize, this.eqSize * this.dpr);
+    gl.uniform1f(U.uEqStyle, this.eqStyle);
+    gl.uniform1fv(U.uEqLevel, this.eqLevel);
+    gl.uniform1fv(U.uEqWave, this.eqWave);
+    gl.uniform3fv(U.uEqCol, this.eqCol);
+    gl.bindVertexArray(this.eqVao);
+    gl.drawArrays(gl.POINTS, 0, 2 * 2 * 12 * 20);
+  }
+
+  /** The sound for the MUSIC looks, once per frame from the panel. */
+  setMusic(m: MusicState): void {
+    const k = 0.25;
+    for (let i = 0; i < 32; i++) {
+      this.mBands[i] += (m.bands[i] - this.mBands[i]) * k;
+    }
+    this.mLevel = m.level;
+    this.mBass = m.bass;
+    this.mAmt = m.amount;
+    if (m.beat) this.mBeat = 1;
+  }
+
   /** 3D: drag to turn the picture. No limits, so it turns in every direction. */
   dragStart(): void {
     this.dragging = true;
@@ -547,8 +662,13 @@ export class LiteEngine {
     // exactT (export): the clock is set, not stepped, and every smoothed state stays where it is
     const exact = exactT !== undefined;
     const dt = exact ? 0 : Math.max(0, Math.min(dtSec, 0.05));
-    if (exact) this.time = exactT;
-    else this.time += dt;
+    if (exact) {
+      this.time = exactT;
+      this.phase = exactT;
+    } else {
+      this.time += dt;
+      this.phase += dt * this.audio.rate;
+    }
     this.burstAge = Math.min(BURST_LIFE, this.burstAge + dt);
     const k = 1 - Math.exp(-dt * 5);
     this.ptr.on += (this.ptr.targetOn - this.ptr.on) * k;
@@ -573,13 +693,15 @@ export class LiteEngine {
     this.look.x += (tgtX - this.look.x) * k;
     this.look.y += (tgtY - this.look.y) * k;
     // Idle sway is separate and always on
-    const sw = p.sway;
+    const a = this.audio;
+    const sw = p.sway * (1 + a.sway);
     // LOOP: while exporting a loop, every frequency is snapped to whole cycles per loop
     const lf = (w: number, min: number) => loopFreq(w, this.loopT, min);
     this.sway.x = (Math.sin(t * lf(0.23, 0)) * 0.6 + Math.sin(t * lf(0.11, 0) + 1.3) * 0.4) * sw;
     this.sway.y = (Math.sin(t * lf(0.17, 0) + 0.6) * 0.6 + Math.sin(t * lf(0.09, 0)) * 0.4) * sw * 0.6;
     // FLOAT: the whole picture hovers up and down, slowly
     const floatY = p.floatOn ? (Math.sin(t * lf(0.7, 1)) * 0.012 + Math.sin(t * lf(0.37, 1) + 1) * 0.006) * this.scale : 0;
+    this.floatPx = floatY;
 
     const ps = this.fixedScale ?? this.dpr;
     const base = Math.max(1, Math.round(ps));
@@ -598,6 +720,8 @@ export class LiteEngine {
     const scanOn = p.scan && p.scanMode !== 5; // BURST is the click shock, not a band
     const velX = Math.max(-2, Math.min(2, this.ptrVel.x));
     const velY = Math.max(-2, Math.min(2, this.ptrVel.y));
+    // MUSIC looks: the beat fades
+    if (!exact) this.mBeat *= Math.exp(-dt / 0.25);
 
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -607,20 +731,20 @@ export class LiteEngine {
       gl.uniform1f(U.uLoop, this.loopT);
       const em = p.emit;
       gl.uniform1fv(U.uEmitW, [em.r0, em.r1, em.r2, em.r3, em.r4, em.r5, em.r6, em.r7, em.r8]);
-      gl.uniform4f(U.uEmitX, em.spots, em.scatter, em.lenRand, em.turn);
+      gl.uniform4f(U.uEmitX, em.spots, em.scatter + a.scatter, em.lenRand, em.turn);
       gl.uniform1f(U.uEmitOn, p.emitOn ? 1 : 0);
       gl.uniform2f(U.uView, this.canvas.width, this.canvas.height);
       gl.uniform1f(U.uScale, this.scale);
       gl.uniform2f(U.uOffset, this.offX, this.offY + floatY);
-      gl.uniform1f(U.uTime, t);
-      gl.uniform1f(U.uDrift, p.drift);
-      gl.uniform1f(U.uDepth, p.depth);
+      gl.uniform1f(U.uTime, this.phase);
+      gl.uniform1f(U.uDrift, p.drift + a.drift);
+      gl.uniform1f(U.uDepth, p.depth + a.depth);
       gl.uniform1f(U.uSpeed, p.speed);
       gl.uniform2f(U.uDir, dx, dy);
       gl.uniform1f(U.uLean, p.lean);
       gl.uniform1f(U.uHalfW, s.aspect / 2);
       gl.uniform1f(U.uRandom, p.randomness);
-      gl.uniform1f(U.uDolly, this.dolly);
+      gl.uniform1f(U.uDolly, this.dolly + a.dolly);
       gl.uniform1f(U.uTrailSize, p.trailSize);
       gl.uniform1f(U.uTrailAngle, (p.trailAngle * Math.PI) / 180);
       gl.uniform1f(U.uPSat, p.pSat);
@@ -633,9 +757,9 @@ export class LiteEngine {
       gl.uniform4f(U.uBurst, this.burstX, this.burstY, this.burstAge, burstW);
       gl.uniform1f(U.uCover, cover);
       gl.uniform1f(U.uPointPx, pointPx);
-      gl.uniform1f(U.uBright, p.brightness);
-      gl.uniform1f(U.uTrailLen, 0.5 * p.trailLength);
-      gl.uniform1f(U.uTrailGain, p.trailStrength);
+      gl.uniform1f(U.uBright, p.brightness * (1 + a.bright));
+      gl.uniform1f(U.uTrailLen, 0.5 * (p.trailLength + a.trailLen));
+      gl.uniform1f(U.uTrailGain, p.trailStrength * (1 + a.trailGain));
       gl.uniform1f(U.uTrailAmount, p.trailAmount);
       gl.uniform1f(U.uTrailDetail, p.trailDetail);
       gl.uniform3f(U.uLightCol, light[0], light[1], light[2]);
@@ -644,7 +768,7 @@ export class LiteEngine {
       gl.uniform1f(U.uScan, scanPhase);
       gl.uniform1f(U.uScanMode, p.scanMode);
       gl.uniform2f(U.uScanCenter, this.clickX, this.clickY);
-      gl.uniform1f(U.uZScale, p.depth * 0.275);
+      gl.uniform1f(U.uZScale, (p.depth + a.depth) * 0.275);
       gl.uniform1f(U.uOpacity, p.opacity);
       gl.uniform1f(U.uMorph, morph);
       gl.uniform1f(U.uRole, role);
@@ -652,6 +776,12 @@ export class LiteEngine {
       gl.uniform4f(U.uFx1, fx.black, fx.white, fx.gamma, fx.contrast);
       gl.uniform2f(U.uFx2, hue, fx.saturation);
       gl.uniform1f(U.uBW, p.bw ? 1 : 0);
+      gl.uniform1f(U.uMusic, exact ? 0 : p.musicLook); // a loop export never draws the sound
+      gl.uniform1fv(U.uBands, this.mBands);
+      gl.uniform1f(U.uBeat, this.mBeat);
+      gl.uniform1f(U.uLevel, this.mLevel);
+      gl.uniform1f(U.uBass, this.mBass);
+      gl.uniform1f(U.uAmt, this.mAmt);
     };
 
     // The PULSE scan reads the picture's depth to find where light glances off it
@@ -696,6 +826,7 @@ export class LiteEngine {
       if (lineW > 1.25) gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, Math.floor(this.drawn / TRAIL_STRIDE));
       else gl.drawArraysInstanced(gl.LINES, 0, 2, Math.floor(this.drawn / TRAIL_STRIDE));
     }
+    if (this.eqOn && !exact) this.drawEqualizer(dt, s);
     gl.bindVertexArray(null);
 
     if (!exact) this.adapt(dtSec * 1000);

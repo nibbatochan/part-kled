@@ -15,6 +15,7 @@ const SCAN_CYCLE = [
 // The params each collapsible section owns. Used for the changed dot and the section RESET.
 const GROUP_KEYS: Record<string, string[]> = {
   reactions: ['track', 'trackStyle', 'scan', 'scanMode', 'scanLevel'],
+  music: ['audioAmount', 'musicLook'],
   particles: ['randomness', 'pSat', 'trailSize', 'trailAngle', 'trail.length', 'trail.amount', 'trails'],
   tone: ['fx.opacity', 'fx.black', 'fx.white', 'fx.gamma', 'fx.contrast', 'fx.hue', 'fx.saturation'],
   emitters: ['emitOn', 'emit.r0', 'emit.r1', 'emit.r2', 'emit.r3', 'emit.r4', 'emit.r5', 'emit.r6', 'emit.r7', 'emit.r8',
@@ -641,6 +642,22 @@ export class Panel {
 
   private bindModes(): void {
     this.bindSegment('trackstyle', 'trackStyle');
+    // EQUALIZER beside the picture: 0 off, then the three styles
+    document.querySelectorAll<HTMLButtonElement>('[data-eq]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.params.eqStyle = Number(btn.dataset.eq);
+        this.syncUiToParams();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+    // MUSIC LOOK: the sound moves the particles (0 = off)
+    document.querySelectorAll<HTMLButtonElement>('[data-mlook]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.params.musicLook = Number(btn.dataset.mlook);
+        this.syncUiToParams();
+        this.onParamsChangeCb(this.params);
+      });
+    });
     // PICTURE: COLOUR / GREY (the picture's colour, or grey)
     const colourBtns = document.querySelectorAll<HTMLButtonElement>('[data-cmode]');
     colourBtns.forEach((btn) => {
@@ -745,6 +762,12 @@ export class Panel {
       b.classList.toggle('active', Number(b.dataset.scanId) === this.params.scanMode);
     });
 
+    document.querySelectorAll<HTMLButtonElement>('[data-mlook]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.mlook) === this.params.musicLook);
+    });
+    document.querySelectorAll<HTMLButtonElement>('[data-eq]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.eq) === this.params.eqStyle);
+    });
     document.querySelectorAll<HTMLButtonElement>('[data-cmode]').forEach((b) => {
       b.classList.toggle('active', b.dataset.cmode === this.params.colorMode);
     });

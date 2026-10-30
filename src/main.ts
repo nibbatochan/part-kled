@@ -6,6 +6,7 @@ import { DEPTH_MAX_SIDE, DepthEstimator } from './depth/DepthEstimator';
 import { Dropzone } from './ui/Dropzone';
 import { Frame } from './ui/Frame';
 import { ExportPanel } from './ui/ExportPanel';
+import { MusicPanel } from './ui/MusicPanel';
 import { Panel } from './ui/Panel';
 import { MAX_IMAGES, Thumbs } from './ui/Thumbs';
 import { processImageFile, type ProcessedImage } from './utils/image';
@@ -96,6 +97,7 @@ class App {
 
     // 5b. Export box: images and video at fixed sizes, drawn on a second off-screen engine
     new ExportPanel(() => this.engine.exportSnapshot());
+    new MusicPanel(this.engine); // 5c. MUSIC: sound moves the particles
 
     // 6. Keyboard shortcuts
     setupKeyboardShortcuts({

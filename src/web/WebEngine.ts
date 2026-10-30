@@ -2,7 +2,7 @@
 // Same surface as core/Engine, so the studio UI and App run unchanged. Motion and drawing come from the
 // light renderer in src/lite. Not in this build: DRAW (flow strokes), PULL (gather spring), MELT travel,
 // and the separate burst slider (BURST is now a scan style). Those controls are removed from index.html.
-import { LiteEngine, type LiteLayout, type LiteParams } from '../lite/LiteEngine';
+import { LiteEngine, type AudioMod, type LiteLayout, type LiteParams, type MusicState } from '../lite/LiteEngine';
 import type { LiteSample } from '../lite/sample';
 import type { Params } from '../core/params';
 import { hexToRgb } from '../core/styles';
@@ -66,6 +66,7 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     scanLevel: p.scanLevel,
     // calibrated so the mean brightness matches the studio's (measured: studio 10.1, web 10.5 on the same frame)
     brightness: 1.1,
+    musicLook: p.musicLook,
   };
 }
 
@@ -113,11 +114,38 @@ export class WebEngine {
 
   private threeD = false;
   private drag: { x: number; y: number } | null = null;
+  private audioSettings: { amount: number; look: number; eq: number; eqSize: number } = { amount: 0.7, look: 0, eq: 0, eqSize: 1.8 };
 
   setParams(p: Params): void {
     this.threeD = p.threeD;
+    this.audioSettings = { amount: p.audioAmount, look: p.musicLook, eq: p.eqStyle, eqSize: p.eqSize };
     this.lite.setParams(toLiteParams(p));
   }
+
+  /** MUSIC controls of the sidebar (how strongly, the look and the equalizer). The music panel reads them every frame. */
+  getAudioSettings(): { amount: number; look: number; eq: number; eqSize: number } {
+    return this.audioSettings;
+  }
+
+  /** The picture on screen (for its colours, the equalizer palette). */
+  getPicture(): LiteSample | null {
+    return this.lite.getSample();
+  }
+
+  /** EQUALIZER particles: on or off, dot size, 12 column levels, the picture's colours. */
+  setEqualizer(style: number, levels: Float32Array, wave: Float32Array, cols: [number, number, number][], size: number): void {
+    this.lite.setEqualizer(style, levels, wave, cols, size);
+  }
+
+  /** The sound as the particles see it this frame (the MUSIC looks). */
+  setMusic(m: MusicState): void {
+    this.lite.setMusic(m);
+  }
+
+  setAudioMod(m: AudioMod): void {
+    this.lite.setAudioMod(m);
+  }
+
 
   setHasActiveImage(_has: boolean): void {}
 
@@ -128,6 +156,7 @@ export class WebEngine {
     const params: LiteParams = { ...this.lite.params, fx: { ...this.lite.params.fx } };
     params.track = false; // no cursor, no click shock in an export
     params.burst = 0;
+    params.musicLook = 0; // no sound in an export
     return {
       sample,
       params,
@@ -154,6 +183,11 @@ export class WebEngine {
       this.pending = null;
     }
     onComplete?.();
+  }
+
+  /** Show this sample at once, no morph (the first frame of a video). */
+  showSample(s: LiteSample): void {
+    this.lite.setSample(s);
   }
 
   /** Morph from the picture on screen into the next keyframe of a video clip. */

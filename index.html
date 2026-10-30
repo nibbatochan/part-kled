@@ -256,6 +256,59 @@
           </div>
         </section>
 
+        <section data-collapse="music" class="box" id="music-panel">
+          <h2>MUSIC</h2>
+          <div class="row">
+            <span class="row-label">SOUND</span>
+            <div class="seg seg-wrap">
+              <button class="mode-btn" id="mu-file" type="button" title="Play an audio file from this computer">FILE</button>
+              <button class="mode-btn" id="mu-tab" type="button" title="Share a tab or screen that plays sound (YouTube, Spotify, any player). Tick the share audio box.">TAB SOUND</button>
+              <button class="mode-btn" id="mu-stop" type="button" title="Stop listening">STOP</button>
+            </div>
+          </div>
+          <input type="file" id="mu-file-input" accept="audio/*" hidden />
+          <output class="mu-status" id="mu-status">NO SOUND YET</output>
+          <div class="row">
+            <span class="row-label">LOOK</span>
+            <div class="seg seg-wrap">
+              <button class="mode-btn" type="button" data-mlook="0" title="The picture only, no sound in the particles">OFF</button>
+              <button class="mode-btn" type="button" data-mlook="1" title="Equalizer: each column of the picture lifts with its band of the sound">EQUAL</button>
+              <button class="mode-btn" type="button" data-mlook="2" title="Listen: each dot follows one band and swells with it">LISTEN</button>
+              <button class="mode-btn" type="button" data-mlook="3" title="Bloom: on each beat the dots fly out and drift back">BLOOM</button>
+              <button class="mode-btn" type="button" data-mlook="4" title="Ripple: rings of motion leave the middle with the loudness">RIPPLE</button>
+            </div>
+          </div>
+          <div class="pair single">
+            <div class="slider-group" data-param="audioAmount">
+              <label for="sl-audio" title="How strongly the sound moves the particles">AMOUNT</label>
+              <input type="range" id="sl-audio" data-path="audioAmount" data-format="pct" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label" title="Particles beside the picture in the picture's colours, moved by the sound. Runs together with the picture's own particles.">EQUALIZER</span>
+            <div class="seg seg-wrap">
+              <button class="mode-btn" type="button" data-eq="0">OFF</button>
+              <button class="mode-btn" type="button" data-eq="1" title="LED dot columns">DOTS</button>
+              <button class="mode-btn" type="button" data-eq="2" title="The waveform as two lines crossing">CROSS</button>
+              <button class="mode-btn" type="button" data-eq="3" title="Dots rising from the middle line and fading">SPARKS</button>
+            </div>
+          </div>
+          <div class="pair single">
+            <div class="slider-group" data-param="eqSize">
+              <label for="sl-eqsize" title="Size of each particle in the equalizer, for every style">SIZE</label>
+              <input type="range" id="sl-eqsize" data-path="eqSize" min="1" max="6" step="0.1" />
+              <output></output>
+            </div>
+          </div>
+          <div class="mu-meter" id="mu-meter" aria-hidden="true">
+            <span><i data-b="bass"></i><b>BASS</b></span>
+            <span><i data-b="mid"></i><b>MID</b></span>
+            <span><i data-b="high"></i><b>HIGH</b></span>
+            <span><i data-b="beat"></i><b>BEAT</b></span>
+          </div>
+        </section>
+
         <section data-collapse="particles" class="box">
           <h2>PARTICLES AND TRAILS <button class="toggle-btn mini-toggle" type="button" data-toggle="trails" title="Streaks behind the drifting particles">TRAILS</button></h2>
           <div class="pair">

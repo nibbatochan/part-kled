@@ -119,3 +119,69 @@ Research and sources: `docs/RESEARCH_STYLES_AND_EXPORT.md` (first pass) and `doc
 
 - **PULSE** is dimmer: colour lift 0.12 + 0.25 x brightness (was 0.25 + 0.5), size +0.8 px (was +1.5), opacity x(1 + 0.3 x pulse) (was 0.8).
 - **EMITTERS (box 06, ON/OFF).** Where particles leave the picture from, on top of the brightness weighting. A 3 x 3 map of sliders (`emit.r0..r8`, 0 to 2, top left first, 1 = normal) blended smoothly across the picture (`regionWeight()` in `place()`), so a boxy picture with a lot of content on one side can shed from the top right, the bottom, or anywhere. SPOTS: a few small patches (about 12 percent of an 18-per-height grid) shed up to 9x more, the brighter the patch the more. SCATTER: the start of each path moves by up to 0.05 picture heights as it leaves, so origins are not exact pixels. LEN VARY: 1 = trail lengths differ as before, 0 = all alike. TURN: each trail leans a random angle of up to 0.18 rad (about 10 degrees) off the common direction. OFF returns to the earlier behaviour (brightness and LEAN only).
+
+## MUSIC (sound moves the particles)
+
+- **Sources** (MUSIC section, `src/ui/MusicPanel.ts`, `src/audio/AudioFeed.ts`): FILE (plays through the speakers), TAB SOUND (a shared tab or screen with its audio: YouTube, Spotify, any player; the browser asks each time and the share-audio box must be ticked). A wallpaper host will later supply system sound instead.
+- **Analysis** (`src/audio/features.ts`, no Web Audio inside, unit tested): FFT 2048 into bass (20 to 150 Hz), mid (150 Hz to 2 kHz), high (2 to 12 kHz) and loudness, then a noise gate with hysteresis, a slow auto gain per band, and beat detection by spectral flux (150 Hz to 4 kHz) against an adaptive threshold, at most 3 beats a second.
+- **Mapping** (`src/audio/AudioMap.ts`): each band drives small offsets with its own attack and release. Loudness speeds the shared clock (x1 to x1.6) and lifts brightness (capped at +15%), bass breathes the depth and camera and strengthens the scan, mids add drift and sway, highs brighten and fizz the trails, a beat fires one shock ring (`LiteEngine.kick()`) and snaps the trails longer. Silence glides everything back to the idle look over about 2 s.
+- **How the engine takes it** (`LiteEngine.setAudioMod`): offsets are added on top of the user's settings each frame and never saved or exported. The shader clock is now an integrated `phase` that advances at the music's pace, so a change of pace never makes particles jump (measured: frame change at the switch 1.24x typical, against 3.04x for a live change of the SPEED slider). Exports render on their own engine with no music.
+- **Controls**: AMOUNT (0.7 default), in the LOOK group under SOUND. A system setting of reduced motion cuts the amount to a quarter. Section dot and RESET work like the other sections.
+- **Checks**: 10 unit tests (`tests/audio.test.ts`); a synthetic kick drum through real Web Audio gave a beat every 0.5 s; the UI path was run with a generated WAV. Not checked: a real phone, a real song, TAB SOUND in Chrome on Windows (needs a real click and the share-audio box).
+
+## MUSIC looks (the particles show the sound)
+
+- **Pick a LOOK** in the MUSIC section (`musicLook`, 0 to 6): OFF, EQUAL, LISTEN, BLOOM, RIPPLE. These act on the particles themselves. The sweep and the click ring are switched off while a look is on.
+- **EQUAL**: each column of the picture lifts its share of dots with its own band (32 log bands, 40 Hz to 16 kHz).
+- **LISTEN**: each dot follows one random band and swells with it.
+- **BLOOM**: on each beat the dots fly out from their place and drift back (`uBeat`, decay 0.25 s).
+- **RIPPLE**: rings of motion leave the middle, strength from loudness, speed from the shared clock.
+- **VORTEX**: the picture turns about its middle, faster near the middle and when loud (`uSpin`, the integral of loudness, so it never jumps).
+- **How**: `musicMove()` in `src/lite/shaders.ts` runs at the end of `place()`, so trails and cell looks follow it too. Each dot's own hashed numbers decide its band. Positions depend only on uniforms and the dot's id, so the stateless design holds. The engine smooths the bands on the CPU (`LiteEngine.setMusic`).
+- **Checks**: all seven looks compile with no console errors. A synthetic kick track changes the picture in every look compared with rest, and each look keeps moving. Not checked: how they look on a real song and a phone (judge by eye).
+
+## MUSIC feedback round: traits and the looks
+
+- **VORTEX removed.** The look list is OFF, EQUAL, LISTEN, BLOOM, RIPPLE (WAVE removed later).
+- **EQUAL**: height follows AMOUNT (`uAmt`); smaller maximum lift (0.08, was 0.16).
+- **BLOOM**: a small nudge outward, falling off with distance from the middle, scaled by AMOUNT. Was a large push on every dot.
+- **RIPPLE**: one ring travels out from the middle and moves only the dots it passes. Was a sine over the whole picture. Fades at the edge so it does not pop.
+- **LISTEN**: unchanged (it was the one the owner liked).
+- **TRAITS** (`src/audio/traits.ts`): any number of rows in the MUSIC section. Each row: a name, the part of the sound it listens to (BASS, LOW MID, MID, HIGH MID, TREBLE, BEAT), the setting it moves, and how much. Particle settings can move a lot (randomness, particle size, trail variety, side bias, movement, speed). Picture settings are capped small (little depth, highlights, shadows, brightness). Traits sum per setting and are clamped to the setting's maximum. Saved with the other settings.
+- **Not possible yet:** naming an instrument (saxophone, drums) reliably. Traits listen to frequency ranges and the beat, not to instruments. Telling a saxophone from a guitar needs source separation, a separate project.
+- **Checks**: 7 unit tests (`tests/traits.test.ts`). In the browser: a trait added through the UI reached its setting (0.40 from the mid band) and was saved; EQUAL motion changes with AMOUNT.
+
+## EQUALIZER beside the picture (background music presets)
+
+- **Where**: a 2D canvas over the stage (`src/ui/EqualizerOverlay.ts`), drawn only in the margins left and right of the picture (width from `LiteEngine.pictureFraction()`). The centre is never drawn on. Nothing shows on a screen too narrow for the margins.
+- **Styles** (EQUALIZER row in MUSIC, `params.eqStyle` 0 to 3): DOTS (LED columns, ghosts), CROSS (two waveform lines crossing), SPARKS (dots rising from the middle line and fading, spread sideways). Low bands sit nearest the picture, high bands at the outer edge. Bars peak at 70% height so they keep moving.
+- **Colours**: the picture's own palette (`src/audio/palette.ts`): the most common saturated colours of the sample grid, 16-level bins, refreshed when the picture changes. Black and white backgrounds are skipped. Fallback: greys.
+- **Particles while the equalizer is on**: the music is scaled to 35 percent, so the particles stay mellow and the bars are the main show.
+- **Trails and regions**: trail culling now uses the EMITTERS region weight (`regionK` in the trail vertex shader, `shaders.ts`), so trails shed by region as the dots do: weight 0 means no trails there, 2 means up to twice the share.
+- **Checks**: 4 palette unit tests (42 in total). In the browser: BARS and CROSS draw in the margins only (pixel count and screenshot); the centre stays clear.
+- **Not checked**: how each preset looks on a real song and a phone. The owner judges the look.
+
+### Update: dots only
+
+- The EQUALIZER is now DOTS only (OFF or DOTS). The other four presets are removed.
+- Smaller columns, placed nearer the picture and centred on the picture's middle line (mirrored above and below it).
+- While the equalizer is on, no music reaches the particles: looks, traits, kicks and the AMOUNT reaction are all held at zero. The mellow 35 percent scale is gone.
+- Checked in code and in the engine: with DOTS on, bands, level, amount and targets are all zero. Not re-checked: a frame-by-frame comparison with sound on.
+
+## Update: equalizer as particles, traits removed
+
+- The TRAITS editor and every trait setting are removed (trait module, UI, engine targets, params).
+- The EQUALIZER is its own sidebar section above LOOK: SHOW (OFF or ON) and SIZE (`eqSize`, CSS px, default 2.5).
+- The equalizer is drawn as particles (`EQ_VERT` in `src/lite/shaders.ts`): 2 sides x 12 columns x 2 halves x 20 rows. Each dot's place depends only on its id, the column level and time, as the picture's dots do. Lit dots drift with the music; the rest are a faint ghost of the full column. Colours come from the picture's palette.
+- Column levels come from the 32 bands grouped into 12, each column with its own auto gain (1.5 s memory), so the columns use their full height.
+- While the equalizer is on, no music reaches the picture's own particles (unchanged).
+- Checked in the browser: columns beside the picture, centre clear; levels move 0 to 0.9 with the synthetic track.
+
+## Update: equalizer back in MUSIC, styles, no kick
+
+- The EQUALIZER is inside the MUSIC section again: OFF, DOTS, CROSS, SPARKS, and one SIZE slider for all of them (`eqSize`).
+- All styles are particles, in one shader (`EQ_VERT`, `uEqStyle`): DOTS (LED columns, ghosts), BARS (solid, rising from the middle), MIRROR (thin mirrored bars), LINE (the waveform as dots), CROSS (two waveform lines crossing).
+- The equalizer runs together with the picture's particles. No more quiet mode.
+- Click-style reactions are not driven by music: the burst ring (`kick()`) and the sweep level offset are removed from the music. Looks, AMOUNT and the movement settings still act on the picture.
+- Checked in the browser: LINE and CROSS draw in the margins; LISTEN moves the picture with the equalizer on (5.3 against 2.4 with it off). DOTS, BARS and MIRROR compile in the same program but were not measured this round: the pane's audio analyser stalled during the check.
+- Colours of the equalizer are lifted to a bright brightest channel, keeping the hue, so dark pictures still show.
