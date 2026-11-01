@@ -647,13 +647,15 @@ export class Panel {
     const show = (el: HTMLElement | null, on: boolean) => {
       if (el) el.style.display = on ? '' : 'none';
     };
-    show(document.getElementById('look-presets'), st > 0);
+    // Only the DOTS looks keep their settings; every other look shows its cell size (and size by) and nothing else
+    const fullSettings = st > 0 && LOOK_CATEGORIES[0].looks.includes(st);
+    show(document.getElementById('look-presets'), fullSettings);
     show(document.getElementById('sizeby-row'), st > 0);
     document.querySelectorAll<HTMLButtonElement>('[data-sizeby]').forEach((b) => {
       b.classList.toggle('active', Number(b.dataset.sizeby) === lookTone(this.params).sizeBy);
     });
-    show(document.getElementById('style-more'), st > 0);
-    show(document.getElementById('style-more-btn'), st > 0);
+    show(document.getElementById('style-more'), fullSettings);
+    show(document.getElementById('style-more-btn'), fullSettings);
     const tone = lookTone(this.params);
     document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((b) => {
       b.classList.toggle('active', Number(b.dataset.scolor) === tone.colour);
@@ -672,7 +674,7 @@ export class Panel {
       this.updateSliderOutput(cellSlider);
     }
     document.querySelectorAll<HTMLElement>('[data-style-set]').forEach((w) => {
-      w.style.display = Number(w.dataset.styleSet) === st ? '' : 'none';
+      w.style.display = Number(w.dataset.styleSet) === st && fullSettings ? '' : 'none';
     });
     document.querySelectorAll<HTMLButtonElement>('[data-ssk]').forEach((b) => {
       b.classList.toggle('active', this.params.ss[b.dataset.ssk ?? ''] === Number(b.dataset.ssv));
