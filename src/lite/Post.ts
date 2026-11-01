@@ -1,4 +1,5 @@
 // src/lite/Post.ts
+import { BITMAP_GLSL } from './bitmapGlsl';
 // LIGHT: bloom and halo. The scene is drawn into a texture; its bright parts are copied to a half-size
 // texture, shrunk step by step (each step blurs, the last ones are very wide), and the soft copies are added
 // back over the scene with a screen blend. Bloom is the tight glow (the two largest copies, set by RADIUS);
@@ -44,6 +45,14 @@ export interface PostParams {
   stackColour: [number, number, number];
   glowPat: number;      // STACK glow: 0 off, 1 GLOW, 2 DOTS, 3 GRID, 4 SCAN, 5 HAZE
   glowPatAmt: number;   // 0..1.5 strength
+  bitMode: number;      // BITMAP overlay: 0 OFF, 1 INK, 2 GRADE, 3 CGA, 4 STIPPLE
+  bitAmount: number;    // 0..1 how much of the overlay replaces the picture
+  bitCell: number;      // 1..12 px: the STIPPLE cell
+  bitLevel: number;     // 0..1: INK threshold, STIPPLE density
+  bitRamp: number;      // GRADE ramp: 0 DUSK, 1 ICE, 2 EMBER
+  bitMid: number;       // 0.15..0.85 GRADE midpoint
+  bitDither: number;    // 0..1 CGA dither
+  bitSize: number;      // 0.3..1 INK noise width, STIPPLE dot size
 }
 
 const VERT = `#version 300 es
@@ -90,7 +99,9 @@ void main() {
 const FRAG_COMPOSE = `#version 300 es
 precision highp float;
 in vec2 vUv;
-uniform sampler2D uScene;
+uniform vec4 uBit;     // BITMAP: mode, amount, cell px, level
+uniform vec4 uBit2;    // BITMAP: ramp, midpoint, dither, size
+uniform sampler2D uScene;${BITMAP_GLSL}
 uniform sampler2D uL1;
 uniform sampler2D uL2;
 uniform sampler2D uL3;
@@ -274,6 +285,8 @@ void main() {
     float w = 0.4 + 0.6 * (1.0 - abs(l - 0.5) * 2.0);
     res += (n - 0.5) * uGrain.y * 0.55 * w;
   }
+  // BITMAP: the last layer, over the finished picture. Mode 0 passes it through.
+  res = bitmapStage(res, gl_FragCoord.xy, uRes, uScene, uBit, uBit2);
   o = vec4(clamp(res, 0.0, 1.0), 1.0);
 }`;
 
@@ -441,6 +454,8 @@ export class Post {
     u3('uMesh', p.meshOn ? 1 : 0, p.meshAmount, p.meshPalette);
     gl.uniform4f(gl.getUniformLocation(this.compose, 'uStack'), p.stackOn ? 1 : 0, p.stackCount, p.stackWidth, p.stackWords ? 1 : 0);
     u3('uStackCol', p.stackColour[0], p.stackColour[1], p.stackColour[2]);
+    gl.uniform4f(gl.getUniformLocation(this.compose, 'uBit'), p.bitMode, p.bitAmount, p.bitCell, p.bitLevel);
+    gl.uniform4f(gl.getUniformLocation(this.compose, 'uBit2'), p.bitRamp, p.bitMid, p.bitDither, p.bitSize);
     if (p.stackOn && p.stackWords) {
       this.ensureWords();
       gl.activeTexture(gl.TEXTURE9);

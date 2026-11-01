@@ -61,6 +61,16 @@ export interface Params {
   trails: boolean;  // fading streaks
   bloomOn: boolean; // LIGHT: a tight soft glow around bright parts
   haloOn: boolean;  // LIGHT: a wide tinted glow
+  chromeOn: boolean; // METAL filter: a chrome finish on the dots (no cells)
+  chrome: { bevel: number; shine: number; hue: number; depth: number }; // CHROME: bevel, shine, depth 0..1, hue in degrees
+  prismaticOn: boolean; // PRISMATIC filter: rainbow streaks from the bright parts, on the dots
+  prismatic: { length: number; spread: number; glow: number; threshold: number }; // PRISMATIC: each 0..1
+  auraOn: boolean; // AURA filter: the bright parts turn white and glow ice blue, on the dots
+  aura: { glow: number; reach: number; core: number; tint: number }; // AURA: each 0..1
+  linedOn: boolean; // LINED filter: the dots gather into vertical lines, thicker where the picture is brighter
+  lined: { count: number; weight: number; contrast: number }; // LINED: lines across the picture height (20..160), weight and contrast 0..1
+  bloodOn: boolean; // BLOOD SHADOW filter: black ink masses with a red plate printed off register, on the dots
+  blood: { shift: number; bleed: number; grain: number }; // BLOOD SHADOW: each 0..1
   vhsOn: boolean;   // SIGNAL: tape look
   glitchOn: boolean; // SIGNAL: sliced, colour-split bursts
   glitchBeat: boolean; // SIGNAL: bursts on the beat instead of on time
@@ -74,7 +84,7 @@ export interface Params {
   stackWords: boolean; // GRAPHIC: a word tag at each point
   graphic: { stackCount: number; stackWidth: number; stackColour: string };
   surface: { grainAmount: number; grainSize: number; holoAmount: number; holoSpeed: number; duoAmount: number; duoShadow: string; duoLight: string; cloudAmount: number; cloudScale: number; cloudTint: string; meshAmount: number; meshPalette: number };
-  glow: { threshold: number; bloomAmount: number; bloomRadius: number; haloAmount: number; haloSize: number; haloTint: string; glowPat: number; glowPatAmt: number };
+  glow: { threshold: number; bloomAmount: number; bloomRadius: number; haloAmount: number; haloSize: number; haloTint: string; glowPat: number; glowPatAmt: number; bitMode: number; bitAmount: number; bitCell: number; bitLevel: number; bitRamp: number; bitMid: number; bitDither: number; bitSize: number };
 
   travel: 'swarm' | 'melt';
   background: 'dark' | 'white';      // ON WHITE
@@ -133,6 +143,16 @@ export const defaults: Params = {
   trails: true,
   bloomOn: false,
   haloOn: false,
+  chromeOn: false,
+  chrome: { bevel: 0.5, shine: 0.5, hue: 0, depth: 0.5 },
+  prismaticOn: false,
+  prismatic: { length: 0.5, spread: 0.5, glow: 0.5, threshold: 0.4 },
+  auraOn: false,
+  aura: { glow: 0.5, reach: 0.5, core: 0.6, tint: 0.5 },
+  linedOn: false,
+  lined: { count: 60, weight: 0.6, contrast: 0.5 },
+  bloodOn: false,
+  blood: { shift: 0.5, bleed: 0.5, grain: 0.5 },
   vhsOn: false,
   glitchOn: false,
   glitchBeat: false,
@@ -146,7 +166,7 @@ export const defaults: Params = {
   stackWords: true,
   graphic: { stackCount: 9, stackWidth: 1, stackColour: '#ffffff' },
   surface: { grainAmount: 0.5, grainSize: 0.3, holoAmount: 0.5, holoSpeed: 0.5, duoAmount: 0.8, duoShadow: '#1a0d4d', duoLight: '#ffd980', cloudAmount: 0.5, cloudScale: 0.4, cloudTint: '#ccd9ff', meshAmount: 0.6, meshPalette: 0 },
-  glow: { threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: '#ffd9a0', glowPat: 0, glowPatAmt: 0.8 },
+  glow: { threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: '#ffd9a0', glowPat: 0, glowPatAmt: 0.8, bitMode: 0, bitAmount: 1, bitCell: 4, bitLevel: 0.5, bitRamp: 0, bitMid: 0.5, bitDither: 0.7, bitSize: 0.9 },
 
   travel: 'swarm',
   background: 'dark',
@@ -209,6 +229,11 @@ export function withEffectsStart(): Params {
     glow: { ...defaults.glow, glowPat: 0 },
     bloomOn: false,
     haloOn: false,
+    chromeOn: false,
+    auraOn: false,
+    prismaticOn: false,
+    linedOn: false,
+    bloodOn: false,
     holoOn: false,
     vhsOn: false,
     glitchOn: false,

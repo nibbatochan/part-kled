@@ -3,6 +3,10 @@
 // Particles are written in a low-discrepancy shuffled order, so ANY prefix of the buffer is an even
 // subset of the picture. That is what lets the engine drop quality at runtime by drawing fewer points.
 import { buildCDF, computeImportanceWeights, hash01, lowerBound } from '../core/Sampler';
+import { haloGrade } from './haloImage';
+
+/** HALO treatment of the picture: glow strength, reach as a share of the height, and how much it replaces the colour. */
+export interface HaloTreat { glow: number; reach: number; amount: number }
 
 export interface LiteSample {
   /** Interleaved: f32 x, y, z then u8 r, g, b, gain/5. Stride 16 bytes. */
@@ -16,9 +20,50 @@ export interface LiteSample {
    * lo and hi are the 2nd and 98th percentile of brightness, used by AUTO LEVELS.
    */
   grid?: { w: number; h: number; rgba: Uint8Array; lo: number; hi: number };
+  /** PIXEL ART: the picture's own palette, 24 colours as rgb floats (k-means over the picture) */
+  palette: Float32Array;
 }
 
 const MAX_SIDE = 768;
+const PALETTE_SIZE = 24;
+
+/** k-means in rgb over the picture's visible pixels (alpha above zero; a cut-out background is not a colour). Seeds are
+ *  spread along the brightness order, so it is deterministic. */
+export function paletteOf(rgba: ArrayLike<number>, n: number): Float32Array {
+  const stride = Math.max(1, Math.round(Math.sqrt(n / 40000)));
+  const pts: number[] = [];
+  for (let i = 0; i < n; i += stride) if (rgba[i * 4 + 3] >= 16) pts.push(i);
+  if (!pts.length) for (let i = 0; i < n; i += stride) pts.push(i);
+  const lum = (i: number) => 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+  pts.sort((a, b) => lum(a) - lum(b));
+  const K = PALETTE_SIZE;
+  const c = new Float32Array(K * 3);
+  for (let k = 0; k < K; k++) {
+    const p = pts[Math.floor(((k + 0.5) / K) * pts.length)];
+    c.set([rgba[p * 4], rgba[p * 4 + 1], rgba[p * 4 + 2]], k * 3);
+  }
+  const sum = new Float64Array(K * 3);
+  const cnt = new Uint32Array(K);
+  for (let it = 0; it < 12; it++) {
+    sum.fill(0);
+    cnt.fill(0);
+    for (const p of pts) {
+      const r = rgba[p * 4], g = rgba[p * 4 + 1], b = rgba[p * 4 + 2];
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const dr = r - c[k * 3], dg = g - c[k * 3 + 1], db = b - c[k * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bd) { bd = d; best = k; }
+      }
+      sum[best * 3] += r; sum[best * 3 + 1] += g; sum[best * 3 + 2] += b; cnt[best]++;
+    }
+    for (let k = 0; k < K; k++) {
+      if (!cnt[k]) continue;
+      c[k * 3] = sum[k * 3] / cnt[k]; c[k * 3 + 1] = sum[k * 3 + 1] / cnt[k]; c[k * 3 + 2] = sum[k * 3 + 2] / cnt[k];
+    }
+  }
+  return new Float32Array(Array.from(c, (v) => v / 255));
+}
 
 function gcd(a: number, b: number): number {
   while (b) [a, b] = [b, a % b];
@@ -30,7 +75,8 @@ export function sampleLite(
   depthFull: Float32Array | null,
   dw: number,
   dh: number,
-  count: number
+  count: number,
+  treat?: HaloTreat
 ): LiteSample {
   const sw = img.width;
   const sh = img.height;
@@ -43,7 +89,9 @@ export function sampleLite(
   cv.height = h;
   const ctx = cv.getContext('2d', { willReadFrequently: true })!;
   ctx.drawImage(img, 0, 0, w, h);
-  const rgba = ctx.getImageData(0, 0, w, h).data;
+  // HALO: the picture is treated first, so the grid and the particle colours both come from the treated picture
+  const raw = ctx.getImageData(0, 0, w, h).data;
+  const rgba = treat ? haloGrade(raw, w, h, treat.glow, treat.reach, treat.amount) : raw;
 
   // Depth comes in at picture size (from the estimator); sample it down to the working size
   const depth = new Float32Array(w * h);
@@ -139,5 +187,6 @@ export function sampleLite(
     aspect,
     subjectFraction: Math.max(0.05, activeCount / (w * h)),
     grid: { w, h, rgba: gridRgba, lo, hi },
+    palette: paletteOf(rgba, w * h),
   };
 }

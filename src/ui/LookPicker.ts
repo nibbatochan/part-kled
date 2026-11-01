@@ -4,6 +4,8 @@
 import { makeEngine, type ExportFrame } from '../web/Exporter';
 import { toLiteParams, type ExportSnapshot } from '../web/WebEngine';
 import type { Params } from '../core/params';
+import type { LiteSample } from '../lite/sample';
+import { AURA_FILTER, BLOOD_FILTER, CHROME_FILTER, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER } from '../core/styles';
 
 const TILE_W = 144; // drawn at 2x the 72 x 54 css size so it stays sharp on screen
 const TILE_H = 108;
@@ -13,7 +15,12 @@ export class LookPicker {
   private timer = 0;
 
   /** The picture on screen and the settings of every look: each tile is drawn with its own look's cell and colour. */
-  constructor(private snapshot: () => ExportSnapshot | null, private settings: () => Params) {}
+  constructor(
+    private snapshot: () => ExportSnapshot | null,
+    private settings: () => Params,
+    /** The picture with HALO applied, as particles: the HALO tile is a filter, so it needs its own treated picture. */
+    private haloSample?: () => LiteSample | null,
+  ) {}
 
   /** Redraw all tiles soon (debounced). Call after a change of picture, look or look setting. */
   refresh(delayMs = 350): void {
@@ -45,9 +52,31 @@ export class LookPicker {
         }
         img.src = made.canvas.toDataURL('image/png');
       };
-      looks.forEach((btn) => tile(btn, { ...params, style: Number(btn.dataset.style) }));
+      looks.forEach((btn) => {
+        const look = Number(btn.dataset.style);
+        if (look !== HALO_FILTER && look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER) tile(btn, { ...params, style: look });
+      });
+      // The filter tiles last: each is drawn on the DOTS base with only its own filter on
+      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false };
+      const chromeBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CHROME_FILTER}"]`);
+      if (chromeBtn) tile(chromeBtn, { ...params, style: 0, ...off, chromeOn: true });
+      const prismBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${PRISMATIC_FILTER}"]`);
+      if (prismBtn) tile(prismBtn, { ...params, style: 0, ...off, prismaticOn: true });
+      const linedBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${LINED_FILTER}"]`);
+      if (linedBtn) tile(linedBtn, { ...params, style: 0, ...off, linedOn: true });
+      const bloodBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${BLOOD_FILTER}"]`);
+      if (bloodBtn) tile(bloodBtn, { ...params, style: 0, ...off, bloodOn: true });
+      const auraBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${AURA_FILTER}"]`);
+      if (auraBtn) tile(auraBtn, { ...params, style: 0, ...off, auraOn: true });
       moves.forEach((btn) => tile(btn, { ...params, motionFx: Number(btn.dataset.mfx) }));
       glows.forEach((btn) => tile(btn, { ...params, glow: { ...params.glow, glowPat: Number(btn.dataset.glowpat), glowPatAmt: 1 } }));
+      // The HALO tile last: it swaps in the treated picture, and the dots stay the plain DOTS look
+      const treated = this.haloSample?.();
+      const haloBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${HALO_FILTER}"]`);
+      if (treated && haloBtn) {
+        engine.setSample(treated);
+        tile(haloBtn, { ...params, style: 0 });
+      }
     } catch {
       // The device cannot make the tile canvas: the buttons keep their text only
     } finally {

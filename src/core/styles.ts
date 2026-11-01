@@ -3,18 +3,38 @@
 // Kept free of DOM and GL code so the studio panel, the engine and tests share one description.
 
 /** Look numbers: 0 DOTS (the point look), then the cell looks. Each look keeps its own cell, colour and tone. */
-export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'GLOW', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BRUTAL', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE'] as const; // 14 to 16 are retired: their slots stay so the numbers do not move
+export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
 
 /** Every look sits in one category; the LOOK picker shows them grouped. */
 export const LOOK_CATEGORIES: { name: string; looks: number[] }[] = [
   { name: 'DOTS', looks: [0, 1, 6] },
-  { name: 'PIXEL', looks: [2, 8] },
+  { name: 'PIXEL', looks: [2, 22] },
   { name: 'TEXT', looks: [4] },
-  { name: 'LINES', looks: [5, 7] },
+  { name: 'METAL', looks: [25, 26] },
   { name: 'RETRO', looks: [9] },
   { name: 'GRAPHIC', looks: [10, 11, 12] },
   { name: 'DITHER', looks: [3, 13, 17] },
+  { name: 'BITMAP', looks: [18, 19, 20, 21] },
+  { name: 'HALO', looks: [23, 24, 27] },
 ];
+
+/** The HALOS tile is a filter: it turns on the halo layer (glow bitMode 5) over the dots instead of changing the look. */
+export const HALO_FILTER = 23;
+
+/** The CHROME tile is a filter too: it puts a metal finish on the dots (chromeOn) and keeps the dots base, with no cell. */
+export const CHROME_FILTER = 25;
+
+/** The AURA tile replaces BLUE HALO in slot 24: a filter on the dots, a figure lit from within. */
+export const AURA_FILTER = 24;
+
+/** The PRISMATIC tile is a filter on the dots: bright parts split into rainbow streaks that run outward. */
+export const PRISMATIC_FILTER = 26;
+
+/** The LINED tile is a filter on the dots (it replaced the GLOW look): vertical lines, wider where the picture is brighter. */
+export const LINED_FILTER = 6;
+
+/** The BLOOD SHADOW tile is a filter on the dots (it replaced the BRUTAL look): a two-ink screenprint, black masses with a red plate printed slightly off register. */
+export const BLOOD_FILTER = 12;
 
 /** The hint shown on each look's button. */
 export const LOOK_TITLES: Record<number, string> = {
@@ -23,16 +43,25 @@ export const LOOK_TITLES: Record<number, string> = {
   2: 'Flat square tiles',
   3: 'Ordered dither: pure ink dots, a printed-pixel pattern',
   4: 'Text characters, thin to dense',
-  5: 'Lines, thickness follows brightness',
-  6: 'Soft glowing dots with a bright core',
+  6: 'Lined filter: the dots gather into vertical lines, wider where the picture is brighter, like a moire print',
   7: 'The cell grid drawn as thin lines, like a wireframe',
   8: 'Bevelled glass tiles with a highlight',
   9: 'Red, green and blue bars in each cell, with scan lines',
   10: 'Little 3D blocks: brighter parts stand taller',
   11: 'Glossy stickers with a white border and a drop shadow',
-  12: 'Neo-brutalism: flat colours, thick black outlines, hard offset shadows',
+  12: 'Blood shadow filter: shadows turn to black ink with a red plate printed slightly off register, like a two-ink screenprint',
   13: 'Scan dither: rows of light on a dark screen, green phosphor',
   17: 'Palette dither: four colours, black, navy, orange and cream',
+  18: 'One ink on black, a fine per-pixel noise dither (1-bit print)',
+  19: 'Pixel cells on a gradient ramp, dithered so it breaks into dots. Black stays empty',
+  20: 'CGA 16-colour palette: nearest colour, dithered between the two closest',
+  21: 'Stipple: dots placed at random, dense where the picture is bright',
+  22: 'Pixel art: each cell snapped to a fixed 24-colour palette, the colours of a pixel-art picture',
+  23: 'Halo filter: the whole picture in amber and blue light, glowing outward, dark stays dark',
+  24: 'Aura filter: the bright parts turn white and glow ice blue over the dark ground, like a figure lit from within',
+  27: 'X-ray: bright parts glow pale blue-white like bone on a scan, dark parts fall to navy and black',
+  25: 'Chrome filter: the dots take a polished blue steel finish. Edges and details catch light, flat areas keep the picture',
+  26: 'Prismatic filter: bright parts split into rainbow streaks that run outward, like light through a prism',
 };
 
 export type StyleSetting =
@@ -57,10 +86,6 @@ export const STYLE_SETTINGS: StyleSetting[] = [
   // ASCII
   { kind: 'seg', key: 'aRamp', label: 'CHARACTERS', styles: [4], options: ['CLASSIC', 'DENSE', 'BINARY'], def: 0, title: 'Characters used, thin to dense' },
   { kind: 'range', key: 'aPaper', label: 'LETTER FILL', styles: [4], min: 0, max: 0.3, step: 0.01, def: 0.1, title: 'Dim fill behind each character' },
-  // GLOW
-  { kind: 'range', key: 'oSize', label: 'GLOW SIZE', styles: [6], min: 0.3, max: 1.2, step: 0.01, def: 0.8, title: 'How far each glow reaches' },
-  { kind: 'range', key: 'oSoft', label: 'SOFTNESS', styles: [6], min: 0.1, max: 1, step: 0.01, def: 0.6, title: 'Crisp edge (low) or soft falloff (high)' },
-  { kind: 'range', key: 'oCore', label: 'HOT CORE', styles: [6], min: 0, max: 1.5, step: 0.01, def: 0.6, title: 'White-hot centre of each glow' },
   // WIRE
   { kind: 'range', key: 'wWidth', label: 'LINE WIDTH', styles: [7], min: 0.02, max: 0.2, step: 0.005, def: 0.06, title: 'Width of the grid lines' },
   { kind: 'seg', key: 'wMode', label: 'GRID', styles: [7], options: ['SQUARE', 'DIAGONAL', 'CROSSED'], def: 0, title: 'Square grid, with a diagonal, or crossed diagonals' },
@@ -82,14 +107,14 @@ export const STYLE_SETTINGS: StyleSetting[] = [
   { kind: 'range', key: 'sBorder', label: 'BORDER', styles: [11], min: 0.03, max: 0.2, step: 0.01, def: 0.08, title: 'Width of the white sticker border' },
   { kind: 'range', key: 'sShadow', label: 'SHADOW', styles: [11], min: 0, max: 1, step: 0.01, def: 0.5, title: 'Drop shadow under each sticker' },
   { kind: 'range', key: 'sRound', label: 'ROUNDNESS', styles: [11], min: 0.05, max: 0.3, step: 0.01, def: 0.16, title: 'Rounded corners' },
-  // BRUTAL
-  { kind: 'range', key: 'bBorder', label: 'OUTLINE', styles: [12], min: 0.02, max: 0.12, step: 0.005, def: 0.05, title: 'Thickness of the black outline' },
-  { kind: 'range', key: 'bShadow', label: 'SHADOW', styles: [12], min: 0, max: 0.2, step: 0.005, def: 0.1, title: 'Distance of the hard offset shadow' },
-  { kind: 'range', key: 'bLevels', label: 'COLOURS', styles: [12], min: 2, max: 8, step: 1, def: 4, title: 'Flat colour steps per channel' },
-  // LINES
-  { kind: 'seg', key: 'lMode', label: 'MODE', styles: [5], options: ['SCAN', 'HATCH', 'CROSS'], def: 0, title: 'Scan lines, hatching or cross-hatching' },
-  { kind: 'range', key: 'lAngle', label: 'LINE ANGLE', styles: [5], min: 0, max: 180, step: 1, def: 0, title: 'Direction of the lines, degrees' },
-  { kind: 'range', key: 'lWeight', label: 'LINE WEIGHT', styles: [5], min: 0.5, max: 2, step: 0.01, def: 1, title: 'Line thickness' },
+  // INK 1-BIT
+  { kind: 'range', key: 'iLevel', label: 'THRESHOLD', styles: [18], min: 0, max: 1, step: 0.01, def: 0.5, title: 'Brightness where ink starts. Low is darker, high is lighter' },
+  { kind: 'range', key: 'iSpread', label: 'NOISE', styles: [18], min: 0, max: 1, step: 0.01, def: 0.5, title: 'Width of the noise dither. 0 is a hard cut' },
+  // CGA
+  { kind: 'range', key: 'cDither', label: 'DITHER', styles: [20], min: 0, max: 1, step: 0.01, def: 0.7, title: 'Mix between the two nearest CGA colours. 0 is nearest only' },
+  // STIPPLE
+  { kind: 'range', key: 'pDensity', label: 'DENSITY', styles: [21], min: 0, max: 1, step: 0.01, def: 0.75, title: 'Share of cells that get a dot' },
+  { kind: 'range', key: 'pSize', label: 'DOT SIZE', styles: [21], min: 0.3, max: 1, step: 0.01, def: 0.9, title: 'Largest dot, as a share of the cell' },
 ];
 
 export type StyleValues = Record<string, number>;
@@ -103,7 +128,7 @@ export function defaultStyleValues(): StyleValues {
 /** One look's own cell size, colour and tone. colour: 0 SOURCE, 1 MONO ink, 2 DUO ink on paper. */
 export interface LookTone {
   cell: number;      // css px
-  sizeBy: number;    // cell looks: 0 FIXED, 1 LIGHT (brighter, bigger cells), 2 COLOUR (more colourful, bigger cells)
+  gap: number;       // cell looks: 0 touching, up to 0.6 leaves a gap between the particles, as a share of the cell
   colour: number;
   ink: string;       // hex
   paper: string;     // hex
@@ -113,21 +138,24 @@ export interface LookTone {
 
 /** Quality defaults for each look, tuned by look: a fine look starts fine, a bold one starts bold. */
 export const LOOK_TONE_DEFAULTS: Record<number, LookTone> = {
-  0: { cell: 2, colour: 0, ink: '#ffffff', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },
-  1: { cell: 2, colour: 0, ink: '#ffffff', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },  // HALFTONE: source colour dots
-  2: { cell: 2, colour: 0, ink: '#ffffff', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // MOSAIC: source colour tiles
-  3: { cell: 2, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },  // DITHER: fine mono pattern
-  4: { cell: 3, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // ASCII: mono characters
-  5: { cell: 2, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },  // LINES: mono lines
-  6: { cell: 2, colour: 0, ink: '#ffd9a0', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },  // GLOW: source colour glows
-  7: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // WIRE: source colour grid
-  8: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // GLASS: source colour tiles
-  9: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },  // CRT: source colour bars
-  10: { cell: 4, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // BARS: source colour blocks
-  11: { cell: 4, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // STICKER
-  12: { cell: 5, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 }, // BRUTAL
-  13: { cell: 2, colour: 2, ink: '#b6f23a', paper: '#050805', invert: false, autoLevels: true, sizeBy: 0 },  // SCAN: green phosphor
-  17: { cell: 2, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, sizeBy: 0 },  // PALETTE: its own four colours
+  0: { cell: 2, colour: 0, ink: '#ffffff', paper: '#000000', invert: false, autoLevels: true, gap: 0 },
+  1: { cell: 2, colour: 0, ink: '#ffffff', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // HALFTONE: source colour dots
+  2: { cell: 2, colour: 0, ink: '#ffffff', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // MOSAIC: source colour tiles
+  3: { cell: 2, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // DITHER: fine mono pattern
+  4: { cell: 3, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // ASCII: mono characters
+  7: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // WIRE: source colour grid
+  8: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // GLASS: source colour tiles
+  9: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // CRT: source colour bars
+  10: { cell: 4, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // BARS: source colour blocks
+  11: { cell: 4, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // STICKER
+  13: { cell: 2, colour: 2, ink: '#b6f23a', paper: '#050805', invert: false, autoLevels: true, gap: 0 },  // SCAN: green phosphor
+  17: { cell: 2, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // PALETTE: its own four colours
+  18: { cell: 2, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // INK: one ink on black
+  19: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // DISSOLVE: the ramp replaces the colour
+  20: { cell: 2, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // CGA: source colour, snapped to CGA
+  21: { cell: 3, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // STIPPLE: mono dots
+  27: { cell: 6, colour: 0, ink: '#d6ecff', paper: '#02060c', invert: false, autoLevels: true, gap: 0 }, // X-RAY: bone-white dots on a scan-dark ground
+  22: { cell: 8, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // PIXEL ART: the 8 px grid, palette from the picture
 };
 
 /** The cell size (css px) at which each HALFTONE pattern reads well, in the order of its SHAPE choices. */
@@ -141,15 +169,19 @@ export const CELL_RANGE: Record<number, [number, number]> = {
   3: [2, 16],
   4: [3, 24],
   5: [2, 24],
-  6: [2, 24],
   7: [3, 32],
   8: [3, 32],
   9: [3, 24],
   10: [4, 40],
   11: [4, 40],
-  12: [5, 48],
   13: [2, 16],
   17: [2, 16],
+  18: [2, 16],
+  19: [2, 24],
+  20: [2, 16],
+  21: [3, 24],
+  22: [4, 24],
+  27: [3, 16],
 };
 
 /**
@@ -161,16 +193,16 @@ export const LOOK_ESSENTIALS: Record<number, { seg?: string; pad?: [string, stri
   2: { pad: ['mGap', 'mCorner'] },
   3: { seg: 'dMethod', pad: ['dLevels', 'dBias'] },
   4: { seg: 'aRamp', range: ['aPaper'] },
-  5: { seg: 'lMode', pad: ['lAngle', 'lWeight'] },
-  6: { pad: ['oSize', 'oSoft'], range: ['oCore'] },
   7: { seg: 'wMode', pad: ['wWidth', 'wFill'] },
   8: { pad: ['yBevel', 'yGloss'] },
   9: { pad: ['cWidth', 'cScan'] },
   10: { pad: ['rHeight', 'rLean'] },
   11: { pad: ['sBorder', 'sShadow'] },
-  12: { pad: ['bBorder', 'bShadow'] },
   13: { pad: ['dLevels', 'dBias'] },
   17: { range: ['dBias'] },
+  18: { pad: ['iLevel', 'iSpread'] },
+  20: { range: ['cDither'] },
+  21: { pad: ['pDensity', 'pSize'] },
 };
 
 /** Whole-look presets: each sets the cell size and a few values of its look, and keeps its colour. */
@@ -200,16 +232,6 @@ export const LOOK_PRESETS: Record<number, LookPreset[]> = {
     { label: 'DENSE', cell: 8, values: { aRamp: 1 } },
     { label: 'BINARY', cell: 12, values: { aRamp: 2 } },
   ],
-  5: [
-    { label: 'SCAN', cell: 6, values: { lMode: 0, lAngle: 0 } },
-    { label: 'HATCH', cell: 6, values: { lMode: 1, lAngle: 45 } },
-    { label: 'CROSS', cell: 8, values: { lMode: 2, lAngle: 30 } },
-  ],
-  6: [
-    { label: 'SOFT', cell: 8, values: { oSize: 0.9, oSoft: 0.9, oCore: 0.3 } },
-    { label: 'NEON', cell: 8, values: { oSize: 0.8, oSoft: 0.5, oCore: 1 } },
-    { label: 'PINPOINT', cell: 6, values: { oSize: 0.45, oSoft: 0.3, oCore: 0.8 } },
-  ],
   7: [
     { label: 'GRID', cell: 10, values: { wMode: 0, wWidth: 0.05, wFill: 0.15 } },
     { label: 'DIAGONAL', cell: 12, values: { wMode: 1, wWidth: 0.05, wFill: 0.2 } },
@@ -234,11 +256,6 @@ export const LOOK_PRESETS: Record<number, LookPreset[]> = {
     { label: 'THIN', cell: 12, values: { sBorder: 0.04, sShadow: 0.3, sRound: 0.1 } },
     { label: 'GLOSSY', cell: 14, values: { sBorder: 0.08, sShadow: 0.5, sRound: 0.16 } },
     { label: 'CHUNKY', cell: 20, values: { sBorder: 0.15, sShadow: 0.8, sRound: 0.26 } },
-  ],
-  12: [
-    { label: 'FINE', cell: 12, values: { bBorder: 0.03, bShadow: 0.06, bLevels: 5 } },
-    { label: 'BOLD', cell: 16, values: { bBorder: 0.05, bShadow: 0.1, bLevels: 4 } },
-    { label: 'POSTER', cell: 24, values: { bBorder: 0.08, bShadow: 0.16, bLevels: 3 } },
   ],
 };
 
@@ -270,12 +287,14 @@ export function packStyle(style: number, v: StyleValues): PackedStyle {
       return { ...base, sp: [0, v.dLevels, v.dBias, 0] };
     case 17:
       return { ...base, sp: [0, 4, v.dBias, 0] };
+    case 18:
+      return { ...base, sp: [v.iSpread, v.iLevel, 0, 0] };
+    case 20:
+      return { ...base, sp: [v.cDither, 0, 0, 0] };
+    case 21:
+      return { ...base, sp: [v.pDensity, v.pSize, 0, 0] };
     case 4:
       return { ...base, sp: [v.aRamp, v.aPaper, 0, 0], ramp: RAMP_SIZES[Math.round(v.aRamp)] ?? 10, cellAspect: 2 };
-    case 5:
-      return { ...base, sp: [v.lMode, v.lWeight, 0, 0], angle: rad(v.lAngle) };
-    case 6:
-      return { ...base, sp: [v.oSize, v.oSoft, v.oCore, 0] };
     case 7:
       return { ...base, sp: [v.wWidth, v.wMode, v.wFill, 0] };
     case 8:
@@ -286,8 +305,6 @@ export function packStyle(style: number, v: StyleValues): PackedStyle {
       return { ...base, sp: [v.rHeight, v.rLean, v.rGap, 0] };
     case 11:
       return { ...base, sp: [v.sBorder, v.sShadow, v.sRound, 0] };
-    case 12:
-      return { ...base, sp: [v.bBorder, v.bShadow, v.bLevels, 0] };
     default:
       return base;
   }

@@ -1,7 +1,7 @@
 // src/ui/Panel.ts
 import { MOTION_PRESETS, defaults, lookTone, withEffectsStart, withLightStart, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
-import { CELL_RANGE, HALFTONE_CELL, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
+import { AURA_FILTER, BLOOD_FILTER, CELL_RANGE, CHROME_FILTER, HALFTONE_CELL, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
 import { XyPad } from './XyPad';
 import { scrollRow } from './ScrollRow';
 
@@ -74,6 +74,7 @@ export class Panel {
     this.bindTopTabs();
     document.getElementById('effects-reset')?.addEventListener('click', () => this.resetEffects());
     this.bindGlowPat();
+    this.bindBitmode();
     this.bindEffects();
     this.bindValueInputs();
     this.bindToggles();
@@ -268,9 +269,28 @@ export class Panel {
     document.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-style]');
       if (!btn) return;
+      if (Number(btn.dataset.style) === HALO_FILTER) {
+        // HALOS is a filter, not a look: the dots stay as they are and the halo layer goes over them
+        this.params.glow = { ...this.params.glow, bitMode: 5 };
+        this.syncBitmode();
+        this.onParamsChangeCb(this.params);
+        return;
+      }
+      const look = Number(btn.dataset.style);
+      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER) {
+        // CHROME, PRISMATIC, LINED and BLOOD SHADOW are standalone filters on the dots base. Picking one turns the others off,
+        // and picking the one that is on turns it off.
+        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : this.params.bloodOn;
+        this.params.style = 0;
+        this.setFilter(wasOn ? null : look);
+        this.syncStyleUi();
+        this.onParamsChangeCb(this.params);
+        return;
+      }
+      this.setFilter(null);
       this.params.style = Number(btn.dataset.style);
       // Every look starts with its colour on ORIGINAL when it is chosen; the dither types bring their own colours
-      const own = this.params.style === 13 || this.params.style === 17 ? LOOK_TONE_DEFAULTS[this.params.style] : null;
+      const own = [13, 17, 18, 21].includes(this.params.style) ? LOOK_TONE_DEFAULTS[this.params.style] : null;
       this.setLook(own ? { colour: own.colour, ink: own.ink, paper: own.paper } : { colour: 0 });
       this.syncStyleUi();
       this.onParamsChangeCb(this.params);
@@ -290,14 +310,6 @@ export class Panel {
     };
     color('in-ink', 'ink');
     color('in-paper', 'paper');
-    // Size by light or colour: a choice of the chosen look, like its colour
-    document.querySelectorAll<HTMLButtonElement>('[data-sizeby]').forEach((b) => {
-      b.addEventListener('click', () => {
-        this.setLook({ sizeBy: Number(b.dataset.sizeby) });
-        this.syncStyleUi();
-        this.onParamsChangeCb(this.params);
-      });
-    });
     // Per-look choices (data-ssk = settings key, data-ssv = value)
     document.querySelectorAll<HTMLButtonElement>('[data-ssk]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -413,6 +425,23 @@ export class Panel {
     });
   }
 
+  /** BITMAP layer: the mode buttons. The layer sits over the finished picture, after every other effect. */
+  private bindBitmode(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-bitmode]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.params.glow = { ...this.params.glow, bitMode: Number(b.dataset.bitmode) };
+        this.syncBitmode();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+  }
+
+  private syncBitmode(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-bitmode]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.bitmode) === this.params.glow.bitMode);
+    });
+  }
+
   private syncSurface(): void {
     const v = (id: string, val: string) => {
       const el = document.getElementById(id) as HTMLInputElement | null;
@@ -431,10 +460,37 @@ export class Panel {
     });
   }
 
+  /** The standalone filters are one choice: this turns exactly the given one on, or none when null. */
+  private setFilter(look: number | null): void {
+    this.params.chromeOn = look === CHROME_FILTER;
+    this.params.prismaticOn = look === PRISMATIC_FILTER;
+    this.params.linedOn = look === LINED_FILTER;
+    this.params.auraOn = look === AURA_FILTER;
+    this.params.bloodOn = look === BLOOD_FILTER;
+  }
+
   private syncStyleUi(): void {
     const st = this.params.style;
+    const chromeBox = document.getElementById('chrome-settings');
+    if (chromeBox) chromeBox.hidden = !this.params.chromeOn;
+    const prismBox = document.getElementById('prismatic-settings');
+    if (prismBox) prismBox.hidden = !this.params.prismaticOn;
+    const linedBox = document.getElementById('lined-settings');
+    if (linedBox) linedBox.hidden = !this.params.linedOn;
+    const auraBox = document.getElementById('aura-settings');
+    if (auraBox) auraBox.hidden = !this.params.auraOn;
+    const bloodBox = document.getElementById('blood-settings');
+    if (bloodBox) bloodBox.hidden = !this.params.bloodOn;
+    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn;
     document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => {
-      b.classList.toggle('active', Number(b.dataset.style) === st);
+      const look = Number(b.dataset.style);
+      const on = look === CHROME_FILTER ? this.params.chromeOn
+        : look === PRISMATIC_FILTER ? this.params.prismaticOn
+        : look === LINED_FILTER ? this.params.linedOn
+        : look === AURA_FILTER ? this.params.auraOn
+        : look === BLOOD_FILTER ? this.params.bloodOn
+        : look === st && !filtersOn;
+      b.classList.toggle('active', on);
     });
     const cell = document.getElementById('sl-cell') as HTMLInputElement | null;
     if (cell) {
@@ -446,13 +502,9 @@ export class Panel {
     const show = (el: HTMLElement | null, on: boolean) => {
       if (el) el.style.display = on ? '' : 'none';
     };
-    // Only the DOTS looks keep their settings; every other look shows its cell size (and size by) and nothing else
+    // Only the DOTS looks keep their settings; every other look shows its cell size and gap and nothing else
     const fullSettings = st > 0 && LOOK_CATEGORIES[0].looks.includes(st);
     show(document.getElementById('look-presets'), fullSettings);
-    show(document.getElementById('sizeby-row'), st > 0);
-    document.querySelectorAll<HTMLButtonElement>('[data-sizeby]').forEach((b) => {
-      b.classList.toggle('active', Number(b.dataset.sizeby) === lookTone(this.params).sizeBy);
-    });
     show(document.getElementById('style-more'), fullSettings);
     show(document.getElementById('style-more-btn'), fullSettings);
     const tone = lookTone(this.params);
@@ -850,6 +902,7 @@ export class Panel {
     document.querySelector<HTMLButtonElement>('[data-toggle="autoLevels"]')?.classList.toggle('active', tone.autoLevels);
 
     this.syncEffects();
+    this.syncBitmode();
     this.syncStyleUi();
     this.syncEmitUi();
     this.updateSummaries();

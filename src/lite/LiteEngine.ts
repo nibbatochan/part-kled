@@ -49,8 +49,31 @@ export interface LiteParams {
   scanMode: number;     // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH, (5 BURST is the click shock)
   scanLevel: number;    // 1..5, 3 = studio strength
   style: number;        // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 LINES
+  chromeOn: boolean;    // METAL filter: chrome finish on the dots (style is 0 while it is on)
+  chromeBevel: number;  // CHROME: 0..1 how steep the edges bevel
+  chromeShine: number;  // CHROME: 0..1 strength of the highlights
+  chromeHue: number;    // CHROME: hue turn in degrees
+  chromeDepth: number;  // CHROME: 0..1 how much the picture's depth shapes the surface
+  prismaticOn: boolean; // PRISMATIC filter on the dots
+  prismaticLength: number;    // PRISMATIC: 0..1 reach of the streaks
+  prismaticSpread: number;    // PRISMATIC: 0..1 how far the rainbow stretches
+  prismaticGlow: number;      // PRISMATIC: 0..1 strength of the light
+  prismaticThreshold: number; // PRISMATIC: 0..1 brightness where the light starts
+  auraOn: boolean;      // AURA filter on the dots
+  auraGlow: number;     // AURA: 0..1 strength of the glow
+  auraReach: number;    // AURA: 0..1 how far the glow reaches
+  auraCore: number;     // AURA: 0..1 how far the bright parts turn white
+  auraTint: number;     // AURA: 0..1 white to ice blue
+  linedOn: boolean;     // LINED filter on the dots
+  linedCount: number;   // LINED: lines across the picture height
+  linedWeight: number;  // LINED: 0..1 how wide the lines grow where the picture is bright
+  linedContrast: number; // LINED: 0..1 how much the picture's brightness stretches the line width
+  bloodOn: boolean;     // BLOOD SHADOW filter on the dots
+  bloodShift: number;   // BLOOD SHADOW: 0..1 how far the red plate sits off register
+  bloodBleed: number;   // BLOOD SHADOW: 0..1 how far the red reaches into the mid tones
+  bloodGrain: number;   // BLOOD SHADOW: 0..1 ink grain and ragged edges
   cell: number;         // cell size of the cell looks, css px
-  sizeBy: number;       // cell looks: 0 fixed, 1 size by light, 2 size by colour
+  gap: number;          // cell looks: 0 touching, up to 0.6 leaves a gap between the particles
   styleSet: StyleValues; // per-look settings (see core/styles.ts)
   emitOn: boolean;      // EMITTERS panel on
   emit: Record<string, number>; // r0..r8 region weights, spots, scatter, lenRand, turn
@@ -106,14 +129,37 @@ export const liteDefaults: LiteParams = {
   opacity: 1,
   bw: false,
   fx: { black: 0, white: 1, gamma: 1, contrast: 0, hue: 0, saturation: 1 },
-  glow: { bloomOn: false, haloOn: false, threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: [1, 0.85, 0.63], vhsOn: false, vhsAmount: 0.5, vhsNoise: 0.5, glitchOn: false, glitchAmount: 0.5, glitchRate: 0.4, glitchBeat: false, grainOn: false, grainAmount: 0.5, grainSize: 0.3, holoOn: false, holoAmount: 0.5, holoSpeed: 0.5, duoOn: false, duoAmount: 0.8, duoShadow: [0.1, 0.05, 0.3], duoLight: [1, 0.85, 0.5], cloudOn: false, cloudAmount: 0.5, cloudScale: 0.4, cloudTint: [0.8, 0.85, 1], meshOn: false, meshAmount: 0.6, meshPalette: 0, stackOn: false, stackWords: true, stackCount: 9, stackWidth: 1, stackColour: [1, 1, 1], glowPat: 0, glowPatAmt: 0.8 },
+  glow: { bloomOn: false, haloOn: false, threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: [1, 0.85, 0.63], vhsOn: false, vhsAmount: 0.5, vhsNoise: 0.5, glitchOn: false, glitchAmount: 0.5, glitchRate: 0.4, glitchBeat: false, grainOn: false, grainAmount: 0.5, grainSize: 0.3, holoOn: false, holoAmount: 0.5, holoSpeed: 0.5, duoOn: false, duoAmount: 0.8, duoShadow: [0.1, 0.05, 0.3], duoLight: [1, 0.85, 0.5], cloudOn: false, cloudAmount: 0.5, cloudScale: 0.4, cloudTint: [0.8, 0.85, 1], meshOn: false, meshAmount: 0.6, meshPalette: 0, stackOn: false, stackWords: true, stackCount: 9, stackWidth: 1, stackColour: [1, 1, 1], glowPat: 0, glowPatAmt: 0.8, bitMode: 0, bitAmount: 1, bitCell: 4, bitLevel: 0.5, bitRamp: 0, bitMid: 0.5, bitDither: 0.7, bitSize: 0.9 },
   light: [0.95, 0.9, 0.79],
   scan: false,
   scanMode: 0,
   scanLevel: 3,
   style: 0,
+  chromeOn: false,
+  chromeBevel: 0.5,
+  chromeShine: 0.5,
+  chromeHue: 0,
+  chromeDepth: 0.5,
+  prismaticOn: false,
+  prismaticLength: 0.5,
+  prismaticSpread: 0.5,
+  prismaticGlow: 0.5,
+  prismaticThreshold: 0.4,
+  auraOn: false,
+  auraGlow: 0.5,
+  auraReach: 0.5,
+  auraCore: 0.6,
+  auraTint: 0.5,
+  linedOn: false,
+  linedCount: 60,
+  linedWeight: 0.6,
+  linedContrast: 0.5,
+  bloodOn: false,
+  bloodShift: 0.5,
+  bloodBleed: 0.5,
+  bloodGrain: 0.5,
   cell: 8,
-  sizeBy: 0,
+  gap: 0,
   styleSet: defaultStyleValues(),
   emitOn: true,
   emit: { r0: 1, r1: 1, r2: 1, r3: 1, r4: 1, r5: 1, r6: 1, r7: 1, r8: 1, spots: 0, scatter: 0.35, lenRand: 1, turn: 0.3 },
@@ -192,12 +238,12 @@ const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
-  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
+  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt', 'uMotion', 'uMotionAmt', 'uMotionSpeed',
   // cell looks
   'uImg', 'uImg2', 'uGrid', 'uGridAng', 'uLayer', 'uTexSize', 'uLv', 'uColorMode', 'uInk', 'uPaper', 'uInvert',
-  'uStyle', 'uSP', 'uSP2', 'uSizeBy',
+  'uStyle', 'uSP', 'uSP2', 'uGap', 'uPalArt',
 ];
 
 interface Slot {
@@ -210,6 +256,8 @@ interface Slot {
   texW: number;
   texH: number;
   lv: [number, number];
+  /** PIXEL ART palette of the picture in this slot */
+  palette: Float32Array | null;
 }
 
 export class LiteEngine {
@@ -349,6 +397,7 @@ export class LiteEngine {
       texW: 1,
       texH: 1,
       lv: [0, 1],
+      palette: null,
     };
     gl.bindBuffer(gl.ARRAY_BUFFER, slot.vbo);
     gl.bindVertexArray(slot.vaoPoints);
@@ -430,6 +479,7 @@ export class LiteEngine {
     gl.bindBuffer(gl.ARRAY_BUFFER, slot.vbo);
     gl.bufferData(gl.ARRAY_BUFFER, s.buffer, gl.STATIC_DRAW);
     slot.count = s.count;
+    slot.palette = s.palette;
     if (s.grid) {
       // Cell looks read the picture under each cell from a mipmapped texture (the mips are the area averages)
       if (!slot.tex) slot.tex = gl.createTexture();
@@ -737,7 +787,7 @@ export class LiteEngine {
 
     // LIGHT: with bloom or halo on, the scene is drawn into a texture first and the glow is added after
     const g = p.glow;
-    const lightPost = g.glowPat > 0 || g.bloomOn || g.haloOn || g.vhsOn || g.glitchOn || g.grainOn || g.holoOn || g.duoOn || g.cloudOn || g.meshOn || g.stackOn;
+    const lightPost = g.glowPat > 0 || g.bloomOn || g.haloOn || g.vhsOn || g.glitchOn || g.grainOn || g.holoOn || g.duoOn || g.cloudOn || g.meshOn || g.stackOn || g.bitMode > 0;
     if (lightPost) {
       this.post ??= new Post(gl);
       this.post.begin(this.canvas.width, this.canvas.height);
@@ -795,6 +845,29 @@ export class LiteEngine {
       gl.uniform4f(U.uFx1, fx.black, fx.white, fx.gamma, fx.contrast);
       gl.uniform2f(U.uFx2, hue, fx.saturation);
       gl.uniform1f(U.uBW, p.bw ? 1 : 0);
+      gl.uniform1f(U.uChrome, p.chromeOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uChromeBevel, p.chromeBevel);
+      gl.uniform1f(U.uChromeShine, p.chromeShine);
+      gl.uniform1f(U.uChromeHue, (p.chromeHue * Math.PI) / 180);
+      gl.uniform1f(U.uChromeDepth, p.chromeDepth);
+      gl.uniform1f(U.uPrism, p.prismaticOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uPrismLen, p.prismaticLength);
+      gl.uniform1f(U.uPrismSpread, p.prismaticSpread);
+      gl.uniform1f(U.uPrismGlow, p.prismaticGlow);
+      gl.uniform1f(U.uPrismThr, p.prismaticThreshold);
+      gl.uniform1f(U.uAura, p.auraOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uAuraGlow, p.auraGlow);
+      gl.uniform1f(U.uAuraReach, p.auraReach);
+      gl.uniform1f(U.uAuraCore, p.auraCore);
+      gl.uniform1f(U.uAuraTint, p.auraTint);
+      gl.uniform1f(U.uLined, p.linedOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uLinedCount, p.linedCount);
+      gl.uniform1f(U.uLinedWeight, p.linedWeight);
+      gl.uniform1f(U.uLinedContrast, p.linedContrast);
+      gl.uniform1f(U.uBlood, p.bloodOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uBloodShift, p.bloodShift);
+      gl.uniform1f(U.uBloodBleed, p.bloodBleed);
+      gl.uniform1f(U.uBloodGrain, p.bloodGrain);
       gl.uniform1f(U.uMusic, exact ? 0 : p.musicLook); // a loop export never draws the sound
       gl.uniform1f(U.uMotion, p.motionFx);
       gl.uniform1f(U.uMotionAmt, p.motionAmount);
@@ -909,7 +982,8 @@ export class LiteEngine {
     gl.uniform1f(U.uStyle, p.style);
     gl.uniform4f(U.uSP, pk.sp[0], pk.sp[1], pk.sp[2], pk.sp[3]);
     gl.uniform4f(U.uSP2, pk.ramp, 0, 0, 0);
-    gl.uniform1f(U.uSizeBy, p.sizeBy);
+    gl.uniform1f(U.uGap, p.gap);
+    if (cur.palette) gl.uniform3fv(U.uPalArt, cur.palette);
     gl.bindVertexArray(null);
     for (const layer of [0, 1]) {
       gl.uniform1f(U.uLayer, layer);

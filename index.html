@@ -174,19 +174,136 @@
           <div class="ecat-panel" data-ecat="0">
           <div class="look-dots sub" id="look-dots" role="group" aria-label="Look type"></div>
           <div class="style-grid" id="style-grid"></div>
-          <div class="pair single">
+          <div class="pair">
             <div class="slider-group" data-param="cell">
               <label for="sl-cell" title="Size of one cell, in pixels">CELL SIZE</label>
               <input type="range" id="sl-cell" data-path="look.cell" min="4" max="24" step="1" />
               <output></output>
             </div>
+            <div class="slider-group">
+              <label for="sl-gap" title="Empty space between the particles, as a share of the cell">GAP</label>
+              <input type="range" id="sl-gap" data-path="look.gap" min="0" max="0.6" step="0.01" data-format="pct" />
+              <output></output>
+            </div>
           </div>
-          <div class="row" id="sizeby-row">
-            <span class="row-label">size by</span>
-            <div class="seg">
-              <button class="mode-btn" type="button" data-sizeby="0" title="Every cell the same size">fixed</button>
-              <button class="mode-btn" type="button" data-sizeby="1" title="Brighter parts get bigger cells">light</button>
-              <button class="mode-btn" type="button" data-sizeby="2" title="More colourful parts get bigger cells">colour</button>
+          <div id="chrome-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-chrome-bevel" title="How steep the edges of the picture bevel">BEVEL</label>
+                <input type="range" id="sl-chrome-bevel" data-path="chrome.bevel" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-chrome-shine" title="Strength of the hot white highlights">SHINE</label>
+                <input type="range" id="sl-chrome-shine" data-path="chrome.shine" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-chrome-hue" title="Turns the steel colour around the colour wheel, in degrees">HUE</label>
+                <input type="range" id="sl-chrome-hue" data-path="chrome.hue" min="-180" max="180" step="1" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-chrome-depth" title="How much the picture's depth shapes the surface, on top of its detail">DEPTH</label>
+                <input type="range" id="sl-chrome-depth" data-path="chrome.depth" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="aura-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-aura-glow" title="Strength of the ice-blue glow around the figure">GLOW</label>
+                <input type="range" id="sl-aura-glow" data-path="aura.glow" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-aura-reach" title="How far the glow reaches past the edges">REACH</label>
+                <input type="range" id="sl-aura-reach" data-path="aura.reach" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-aura-core" title="How far the bright parts turn pure white">CORE</label>
+                <input type="range" id="sl-aura-core" data-path="aura.core" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-aura-tint" title="White at zero, ice blue at one">TINT</label>
+                <input type="range" id="sl-aura-tint" data-path="aura.tint" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="prismatic-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-prism-length" title="How far the rainbow streaks reach">LENGTH</label>
+                <input type="range" id="sl-prism-length" data-path="prismatic.length" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-prism-spread" title="How far the colours part along each ray, the rainbow fringe">SPREAD</label>
+                <input type="range" id="sl-prism-spread" data-path="prismatic.spread" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-prism-glow" title="Strength of the light in the streaks">GLOW</label>
+                <input type="range" id="sl-prism-glow" data-path="prismatic.glow" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-prism-threshold" title="Size of the white-hot core at the centre">CORE</label>
+                <input type="range" id="sl-prism-threshold" data-path="prismatic.threshold" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="lined-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-lined-count" title="How many lines run across the height of the picture">LINES</label>
+                <input type="range" id="sl-lined-count" data-path="lined.count" min="20" max="160" step="1" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-lined-weight" title="How wide the lines grow where the picture is bright">WEIGHT</label>
+                <input type="range" id="sl-lined-weight" data-path="lined.weight" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-lined-contrast" title="How strongly the picture's brightness stretches the line width">CONTRAST</label>
+                <input type="range" id="sl-lined-contrast" data-path="lined.contrast" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="blood-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-blood-shift" title="How far the red plate is printed off register, down and to the left">MISREGISTER</label>
+                <input type="range" id="sl-blood-shift" data-path="blood.shift" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-blood-bleed" title="How far the red floods into the mid tones">BLEED</label>
+                <input type="range" id="sl-blood-bleed" data-path="blood.bleed" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-blood-grain" title="Dry-brush grain, ragged edges and paper speckle in the ink">GRAIN</label>
+                <input type="range" id="sl-blood-grain" data-path="blood.grain" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
             </div>
           </div>
           </div>
@@ -210,6 +327,41 @@
               <div class="slider-group">
                 <label for="sl-glow-pat-amt" title="How strong the glow is">STRENGTH</label>
                 <input type="range" id="sl-glow-pat-amt" data-path="glow.glowPatAmt" min="0" max="1.5" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">bitmap</span>
+              <div class="seg">
+                <button class="mode-btn" type="button" data-bitmode="0" title="No bitmap layer">OFF</button>
+                <button class="mode-btn" type="button" data-bitmode="1" title="One ink on black, noise dither, over the whole picture">INK</button>
+                <button class="mode-btn" type="button" data-bitmode="2" title="Pixel cells with a dithered gradient that breaks into dots, and a glow from the hot parts">DISSOLVE</button>
+                <button class="mode-btn" type="button" data-bitmode="3" title="CGA 16-colour palette, dithered between the two nearest colours">CGA</button>
+                <button class="mode-btn" type="button" data-bitmode="4" title="Stipple dots over the picture">STIPPLE</button>
+                <button class="mode-btn" type="button" data-bitmode="5" title="Halo: the whole picture in amber and blue light, glowing outward">HALO</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-bit-amt" title="How much of the bitmap layer replaces the picture">AMOUNT</label>
+                <input type="range" id="sl-bit-amt" data-path="glow.bitAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-bit-level" title="INK: threshold. STIPPLE: density. DISSOLVE and HALO: glow">LEVEL</label>
+                <input type="range" id="sl-bit-level" data-path="glow.bitLevel" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-bit-cell" title="STIPPLE: size of the cell that holds one dot, in px">CELL</label>
+                <input type="range" id="sl-bit-cell" data-path="glow.bitCell" min="1" max="12" step="0.5" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-bit-size" title="INK: noise width. STIPPLE: dot size. HALO: reach">SIZE</label>
+                <input type="range" id="sl-bit-size" data-path="glow.bitSize" min="0.3" max="1" step="0.01" />
                 <output></output>
               </div>
             </div>

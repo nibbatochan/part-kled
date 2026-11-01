@@ -64,6 +64,29 @@ uniform sampler2D uImg;     // the picture on screen: rgb colour, a = depth (cel
 uniform sampler2D uImg2;    // the picture arriving (cell looks)
 uniform vec2 uTexSize;      // picture texture size, px
 uniform float uHasImg;      // 1 when uImg holds a picture
+uniform float uChrome;      // METAL filter on the dots: 1 on, 0 off
+uniform float uChromeBevel; // CHROME: 0..1 how steep the edges bevel
+uniform float uChromeShine; // CHROME: 0..1 strength of the highlights
+uniform float uChromeHue;   // CHROME: hue turn, radians
+uniform float uChromeDepth; // CHROME: 0..1 how much the depth shapes the surface
+uniform float uPrism;       // PRISMATIC filter on the dots: 1 on, 0 off
+uniform float uPrismLen;    // PRISMATIC: 0..1 reach of the streaks
+uniform float uPrismSpread; // PRISMATIC: 0..1 how far the rainbow stretches
+uniform float uPrismGlow;   // PRISMATIC: 0..1 strength of the light
+uniform float uPrismThr;    // PRISMATIC: 0..1 brightness where the light starts
+uniform float uAura;        // AURA filter on the dots: 1 on, 0 off
+uniform float uAuraGlow;    // AURA: 0..1 strength of the glow
+uniform float uAuraReach;   // AURA: 0..1 how far the glow reaches
+uniform float uAuraCore;    // AURA: 0..1 how far the bright parts turn white
+uniform float uAuraTint;    // AURA: 0..1 white (0) to ice blue (1)
+uniform float uLined;         // LINED filter on the dots: 1 on, 0 off
+uniform float uLinedCount;    // LINED: lines across the picture height
+uniform float uLinedWeight;   // LINED: 0..1 how wide the lines grow where the picture is bright
+uniform float uLinedContrast; // LINED: 0..1 how much the brightness stretches the line width
+uniform float uBlood;         // BLOOD SHADOW filter on the dots: 1 on, 0 off
+uniform float uBloodShift;    // BLOOD SHADOW: 0..1 how far the red plate sits off register
+uniform float uBloodBleed;    // BLOOD SHADOW: 0..1 how far the red reaches into the mid tones
+uniform float uBloodGrain;    // BLOOD SHADOW: 0..1 ink grain and ragged plate edges
 uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
 // MUSIC looks: the sound moves the particles themselves (0 = off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE)
 uniform float uMusic;
@@ -311,6 +334,112 @@ float glint(vec2 h, float lum) {
   float sheet = pow(0.5 + 0.5 * sin(dot(h, ld) * 5.0 - uTime * tw(1.6, 1.0)), 6.0);
   return clamp(spec * 1.6 + sheet * 0.5, 0.0, 1.0) * lit;
 }
+
+// METAL: a chrome finish on the dots. Only the picture makes the surface: its fine detail tilts it (a slope of
+// the brightness) and its depth gives the broad curve. Flat areas stay flat, so they keep the picture's colour and
+// brightness, and the light catches only edges and details. Black stays black. No cells and no settings.
+vec3 chromeFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  // The slope is taken from a softened copy of the picture (mip level 2, wide taps), so a dot's
+  // normal follows a feature's shape instead of its single-texel noise: sheets, not speckle.
+  vec2 e = 4.0 / uTexSize;   // the fine slope: a feature a few dots wide
+  vec2 f = 8.0 / uTexSize;   // the broad curve from depth
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float k = uChromeBevel * 6.0;                                     // BEVEL: how far the slopes tilt the surface
+  float kz = uChromeDepth * 2.0;                                    // DEPTH: weight of the broad curve
+  vec3 n = normalize(vec3(-(dx + zx * kz) * k, (dy + zy * kz) * k, 1.0));
+  vec3 L = normalize(vec3(-0.45, 0.6, 0.66));                       // light from the top left
+  float sky = smoothstep(-0.2, 0.9, dot(n, L));
+  vec3 hue = c / max(max(c.r, max(c.g, c.b)), 1e-3);
+  vec3 steel = mix(vec3(0.02, 0.05, 0.12), vec3(0.36, 0.72, 1.0) * mix(vec3(1.0), hue, 0.5), sky);
+  float lum = luma(c);
+  // Chrome's bright horizon band: a narrow reflection where the surface turns to the sky line
+  float band = exp(-pow((n.y * 0.5 + 0.5 - 0.62) / 0.09, 2.0));
+  float hot = pow(max(dot(n, normalize(L + vec3(0.0, 0.0, 1.0))), 0.0), 24.0);
+  float glint = (hot + 0.6 * band) * smoothstep(0.05, 0.35, lum);
+  vec3 metal = steel * lum * 1.2 + vec3(0.9, 0.95, 1.0) * glint * uChromeShine * 2.0;   // SHINE scales the highlights
+  return clamp(metal * smoothstep(0.03, 0.2, lum), 0.0, 1.0);   // near-black picture stays black
+}
+
+// PRISMATIC: a starburst of light, from a bright white core at the centre of the picture. Seven sharp rays run out
+// from it, each one fading with distance. The red, green and blue rays sit at slightly different angles, so every
+// ray fringes into a rainbow. The core size is set by THRESHOLD. It is a light layer over the dots, so the particles
+// keep their positions and colour.
+vec3 prismaticFinish(vec2 h, vec3 c) {
+  float r = length(h);                                    // distance from the centre; the picture is 1 unit tall
+  float a = atan(h.y, h.x);
+  float fr = uPrismSpread * 0.12;                         // rainbow fringe: how far the colours part, in radians
+  float reach = mix(1.5, 6.0, uPrismLen);                 // LENGTH: how far the rays carry before they fade
+  float fall = exp(-r * reach);
+  vec3 ray = vec3(
+    pow(0.5 + 0.5 * cos(7.0 * (a - fr)), 24.0),
+    pow(0.5 + 0.5 * cos(7.0 * a), 24.0),
+    pow(0.5 + 0.5 * cos(7.0 * (a + fr)), 24.0));
+  float core = exp(-r * r / (0.001 + uPrismThr * 0.01));  // white-hot centre
+  vec3 light = (ray * fall + vec3(core)) * uPrismGlow * 1.2;
+  return clamp(c + light, 0.0, 1.0);
+}
+
+// AURA: a figure that glows. The bright parts turn white at the core and throw a soft ice-blue glow over the dark
+// ground. The glow reads a blurred copy of the picture, so its reach follows the picture's own shape. Dark stays dark
+// away from the picture. A light layer over the dots: positions and count are unchanged.
+vec3 auraFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float lum = luma(c);
+  float lod = mix(1.0, 6.0, uAuraReach);                       // REACH: a blurrier copy reaches further
+  float soft = luma(textureLod(uImg, uv, lod).rgb);
+  vec3 ice = mix(vec3(1.0), vec3(0.45, 0.72, 1.0), uAuraTint); // TINT: white to ice blue
+  vec3 white = mix(c, vec3(1.0), smoothstep(0.35, 1.0, lum) * uAuraCore);
+  vec3 glow = ice * soft * uAuraGlow * 1.5 * (1.0 - lum * 0.5);
+  return clamp(white + glow, 0.0, 1.0);
+}
+
+// LINED: the dots gather into vertical lines on a fixed pitch. A line grows wider where the picture is brighter and
+// thins to nothing where it is dark, so the picture reads as line weight, like a moire print. A dot keeps its own
+// colour; only the dots between the lines go dark. Positions and count are unchanged: it only masks the colour.
+vec3 linedFinish(vec2 h, vec3 c) {
+  float tone = luma(c);
+  if (uHasImg > 0.5) {
+    vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+    tone = luma(textureLod(uImg, uv, 1.5).rgb);   // a softened copy, so the width changes smoothly along a line
+  }
+  float present = smoothstep(0.03, 0.15, tone);          // black stays empty: no lines where the picture has no light
+  tone = clamp((tone - 0.5) * (1.0 + 3.0 * uLinedContrast) + 0.5, 0.0, 1.0);
+  float d = abs(fract(h.x * uLinedCount) - 0.5) * 2.0;   // 0 on a line's centre, 1 halfway to the next line
+  float half_ = 0.1 + tone * uLinedWeight * 1.3;         // every lit area keeps a hairline; brighter parts grow it wider
+  float m = (1.0 - smoothstep(half_ - 0.18, half_ + 0.18, d)) * present;
+  return clamp(c * m * 1.4, 0.0, 1.0);
+}
+
+// BLOOD SHADOW: a two-ink screenprint on cream paper. The picture's dark masses print in black ink; a second, red plate
+// of the same picture is printed slightly off register (down and to the left), so red fringes the black and floods
+// the mid tones, with a ragged dry-brush edge and paper speckle. The lights stay paper. Only colour changes: dots keep
+// their place and count, and dots where the picture has no light stay empty.
+float bloodHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 bloodFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float g = bloodHash(floor(h * 420.0));
+  float rag = (g - 0.5) * 0.22 * uBloodGrain;                       // ragged plate edges
+  float T = luma(textureLod(uImg, uv, 1.0).rgb);
+  vec2 off = vec2(-0.7, 0.55) * 0.03 * uBloodShift;                 // the red plate: down and to the left, in picture uv
+  float Tr = luma(textureLod(uImg, uv + off, 1.0).rgb);
+  float ink = 1.0 - smoothstep(0.12 + rag, 0.28 + rag, T);          // black plate: only the deepest masses
+  float reach = mix(0.45, 0.75, uBloodBleed);
+  float redPlate = 1.0 - smoothstep(reach - 0.22 + rag, reach + rag, Tr);   // red plate: darks and mids, shifted
+  float red = redPlate * (1.0 - ink);                               // red shows where the black plate is not on top
+  vec3 paper = vec3(1.0, 0.97, 0.88);
+  vec3 col = paper * mix(vec3(1.0), vec3(0.82, 0.20, 0.22), red) * mix(vec3(1.0), vec3(0.12, 0.10, 0.11), ink);
+  col *= mix(0.6, 1.0, smoothstep(0.35, 0.95, T));                  // the lights keep a little of the picture's gradation
+  col *= 1.0 - uBloodGrain * 0.35 * step(0.88, g) * (ink + red);    // paper speckle through the ink
+  return col * present;
+}
 `;
 
 // Levels, curve, hue, saturation and black & white: the studio's Effects tab, applied to the picture only
@@ -357,6 +486,12 @@ void main() {
   // IMAGE dots get the Effects tab. DRIFTING dots get particle saturation instead.
   // streaming is 0 on the picture and 1 on the drifting particles, so the two blend smoothly.
   vec3 c = tint(mix(effects(mc), partSat(mc), streaming));
+  // METAL: the chrome finish on the picture's dots (drifting dots keep their colour)
+  if (uChrome > 0.5) c = mix(c, hueRotate(chromeFinish(home.xy, c), uChromeHue), 1.0 - streaming);
+  if (uPrism > 0.5) c = mix(c, prismaticFinish(home.xy, c), 1.0 - streaming);
+  if (uAura > 0.5) c = mix(c, auraFinish(home.xy, c), 1.0 - streaming);
+  if (uLined > 0.5) c = mix(c, linedFinish(home.xy, c), 1.0 - streaming);
+  if (uBlood > 0.5) c = mix(c, bloodFinish(home.xy, c), 1.0 - streaming);
   float lum = luma(c);
 
   // PULSE scan: a wave of light travels through the depth, front to back, and lights the dots it passes
@@ -443,12 +578,12 @@ out vec4 o;
 void main() { o = vec4(vCol, 1.0); }
 `;
 
-// CELL LOOKS: one instance per grid cell (HALFTONE, MOSAIC, DITHER, ASCII, LINES). A cell is treated as
+// CELL LOOKS: one instance per grid cell (HALFTONE, MOSAIC, DITHER, ASCII). A cell is treated as
 // a particle (place()), so flow, pointer, burst, scan and pulse all act on it, but its colour and tone come
 // from the picture under the whole cell, so every cell is one clean value.
 const CELLS = `
 uniform vec4 uGrid;         // nx, ny, cell width, cell height (world units)
-uniform float uSizeBy;      // cell looks: 0 fixed size, 1 cell size by light, 2 cell size by colour
+uniform float uGap;         // cell looks: share of each cell left empty between the particles
 uniform float uGridAng;     // radians, the grid turned about the picture centre
 uniform float uLayer;       // 0 the picture, 1 the cells that have drifted off it
 uniform vec2 uLv;           // AUTO LEVELS: brightness range stretched to 0..1
@@ -456,7 +591,7 @@ uniform float uColorMode;   // 0 SOURCE, 1 MONO, 2 DUO
 uniform vec3 uInk;
 uniform vec3 uPaper;
 uniform float uInvert;
-uniform float uStyle;       // 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 LINES
+uniform float uStyle;       // 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII
 uniform vec4 uSP;           // settings of the look
 
 out vec2 vUv;               // 0..1 across the cell
@@ -480,7 +615,6 @@ out vec3 vBg;
 out float vTone;
 out float vFade;
 out vec4 vEdge;             // MOSAIC outline: left, right, bottom, top border a cell of another brightness
-out vec2 vTn;               // LINES: brightness of the cells to the left and right
 flat out ivec2 vCell;
 
 float toneOf(vec3 c) {
@@ -506,7 +640,6 @@ void main() {
   vTone = 0.0;
   vFade = 0.0;
   vEdge = vec4(0.0);
-  vTn = vec2(0.0);
 
   // Outside the picture
   if (abs(c.x) > uHalfW + 0.5 * cw.x || abs(c.y) > 0.5 + 0.5 * cw.y) {
@@ -547,14 +680,8 @@ void main() {
   float opacity = mix(uOpacity, 1.0, streaming);
   vFade = alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.3);
   vTone = tone;
-  // Size by light or colour: the cell itself shrinks or grows, and what is drawn in it follows the cell
-  if (uSizeBy > 0.5) {
-    float key = uSizeBy < 1.5 ? tone : (max(max(cb.r, cb.g), cb.b) - min(min(cb.r, cb.g), cb.b));
-    // The cell carries the size: dark parts shrink to almost nothing, bright parts fill the full cell.
-    // The shape inside then fills its cell, so the size is not counted twice.
-    cw *= mix(0.12, 1.0, pow(clamp(key, 0.0, 1.0), 0.9));
-    vTone = 0.9;
-  }
+  // The gap: the quad shrinks inside its cell and the shape fills the quad, so empty space shows between particles
+  cw *= 1.0 - uGap;
 
   // Ink: the cell's colour at full value (the shape carries the brightness), or the chosen ink
   vec3 hue = cb / max(max(cb.r, cb.g), max(cb.b, 1e-3));
@@ -563,6 +690,7 @@ void main() {
   vBg = (uColorMode > 1.5 && uColorMode < 2.5) ? uPaper : vec3(0.0);
 
   int st = int(uStyle + 0.5);
+  if (st == 22) vInk = cb;                         // PIXEL ART: the true colour, snapped in the fragment
   if (st == 2) {
     // MOSAIC: flat colour, optionally limited to a few levels per channel
     float lv = uSP.x;
@@ -578,10 +706,13 @@ void main() {
       vec2 uy = vec2(dy.x / aspect, -dy.y);
       vEdge = step(0.12, abs(vec4(toneAt(uv - ux, lod), toneAt(uv + ux, lod), toneAt(uv - uy, lod), toneAt(uv + uy, lod)) - tone));
     }
-  } else if (st == 5) {
+  } else if (st == 22) {
+    // PIXEL ART outline: a cell with a brighter neighbour sits on the dark side of an edge and is drawn in a dark shade
     vec2 dx = R * vec2(cw.x, 0.0);
+    vec2 dy = R * vec2(0.0, cw.y);
     vec2 ux = vec2(dx.x / aspect, -dx.y);
-    vTn = vec2(toneAt(uv - ux, lod), toneAt(uv + ux, lod));
+    vec2 uy = vec2(dy.x / aspect, -dy.y);
+    vEdge = step(0.3, vec4(toneAt(uv - ux, lod), toneAt(uv + ux, lod), toneAt(uv - uy, lod), toneAt(uv + uy, lod)) - tone);
   }
 
   // Corners of the cell, a little oversize so neighbours overlap; the fragment keeps only its own cell
@@ -602,11 +733,11 @@ in vec3 vBg;
 in float vTone;
 in float vFade;
 in vec4 vEdge;
-in vec2 vTn;
 flat in ivec2 vCell;
 uniform float uStyle;
 uniform float uColorMode;
 uniform vec4 uSP;
+uniform vec3 uPalArt[24];   // PIXEL ART palette
 uniform vec4 uSP2;
 uniform vec4 uGrid;     // nx, ny, cell width, cell height: the RINGS pattern needs the cell's place on the grid
 uniform sampler2D uAtlas;   // ASCII glyphs: 16 columns, one row per ramp, each glyph 16 x 32 px
@@ -614,6 +745,76 @@ out vec4 o;
 
 float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+// Triangular remap of a uniform value to [0,1], centred on 0.5: removes the banding of a plain threshold (Wronski)
+float triRemap(float u) { return u < 0.5 ? sqrt(u * 0.5) : 1.0 - sqrt((1.0 - u) * 0.5); }
+
+// Oklab, Ottosson's matrices: lightness that tracks the eye, so ramps and nearest-colour tests stay even
+vec3 srgbToLin(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+vec3 linToSrgb(vec3 c) { c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+vec3 toOklab(vec3 c) {
+  vec3 v = srgbToLin(c);
+  vec3 lms = pow(vec3(dot(v, vec3(0.4122214708, 0.5363325363, 0.0514459929)),
+                      dot(v, vec3(0.2119034982, 0.6806995451, 0.1073969566)),
+                      dot(v, vec3(0.0883024619, 0.2817188376, 0.6299787005))), vec3(1.0 / 3.0));
+  return vec3(dot(lms, vec3(0.2104542553, 0.7936177850, -0.0040720468)),
+              dot(lms, vec3(1.9779984951, -2.4285922050, 0.4505937099)),
+              dot(lms, vec3(0.0259040371, 0.7827717662, -0.8086757660)));
+}
+vec3 fromOklab(vec3 o) {
+  vec3 lms = vec3(o.x + 0.3963377774 * o.y + 0.2158037573 * o.z,
+                  o.x - 0.1055613458 * o.y - 0.0638541728 * o.z,
+                  o.x - 0.0894841775 * o.y - 1.2914855480 * o.z);
+  lms = lms * lms * lms;
+  return linToSrgb(vec3(dot(lms, vec3(4.0767416621, -3.3077115913, 0.2309699292)),
+                        dot(lms, vec3(-1.2684380046, 2.6097574011, -0.3413193965)),
+                        dot(lms, vec3(-0.0041960863, -0.7034186147, 1.7076147010))));
+}
+
+// DISSOLVE ramp: six sRGB stops from black (no ink, so the cell adds nothing) through navy and teal to pink and hot white
+vec3 dissolveStop(int i) {
+  if (i <= 0) return vec3(0.0);
+  if (i == 1) return vec3(0.070, 0.110, 0.200);
+  if (i == 2) return vec3(0.122, 0.353, 0.431);
+  if (i == 3) return vec3(0.498, 0.722, 0.769);
+  if (i == 4) return vec3(0.910, 0.471, 0.561);
+  return vec3(1.0, 0.941, 0.902);
+}
+
+// CGA 16-colour palette 1 in mode 4: black, cyan, magenta, light grey, and the bright cyan, magenta, white [CGA, Wikipedia]
+vec3 cgaColour(int i) {
+  if (i == 0) return vec3(0.0);
+  if (i == 1) return vec3(0.0, 0.667, 0.667);
+  if (i == 2) return vec3(0.667, 0.0, 0.667);
+  if (i == 3) return vec3(0.667);
+  if (i == 4) return vec3(0.333, 1.0, 1.0);
+  if (i == 5) return vec3(1.0, 0.333, 1.0);
+  return vec3(1.0);
+}
+// The nearest colour of the PIXEL ART palette in Oklab
+vec3 palArt(vec3 src) {
+  vec3 so = toOklab(src);
+  float best = 1e9;
+  vec3 pick = uPalArt[0];
+  for (int i = 0; i < 24; i++) {
+    vec3 e = so - toOklab(uPalArt[i]);
+    float d = dot(e, e);
+    if (d < best) { best = d; pick = uPalArt[i]; }
+  }
+  return pick;
+}
+// The nearest CGA colour in Oklab; the second nearest where the Bayer threshold b falls under the mix amount
+vec3 cgaPick(vec3 src, float b, float amt) {
+  vec3 so = toOklab(src);
+  float d1 = 1e9; float d2 = 1e9; int i1 = 0; int i2 = 0;
+  for (int i = 0; i < 7; i++) {
+    vec3 e = so - toOklab(cgaColour(i));
+    float d = dot(e, e);
+    if (d < d1) { d2 = d1; i2 = i1; d1 = d; i1 = i; }
+    else if (d < d2) { d2 = d; i2 = i; }
+  }
+  float frac = clamp(2.0 * amt * d1 / (d1 + d2 + 1e-6), 0.0, 1.0);   // 0.5 between the two, so amt sets the full mix
+  return cgaColour(frac > b ? i2 : i1);
+}
 
 // Ordered dither threshold built from bits, no texture. Rows y, columns x, M2 = [[0,2],[3,1]]/4.
 float bayer(ivec2 cell, int n) {        // n = 2 gives 4x4, n = 3 gives 8x8
@@ -687,6 +888,37 @@ void main() {
       float v = clamp(floor(tt * (L - 1.0) + b) / (L - 1.0), 0.0, 1.0);
       col = mix(col, vInk, v);
     }
+  } else if (st == 18) {                           // INK: one ink on paper, a per-pixel noise threshold
+    float n = triRemap(ign(gl_FragCoord.xy));
+    col = mix(vBg, vInk, step(uSP.y + (n - 0.5) * uSP.x, tone));
+  } else if (st == 19) {                           // DISSOLVE: the brightness through the ramp, dithered per cell so it breaks into dots
+    float f = clamp(tone, 0.0, 1.0) * 5.0;
+    float fl = floor(f);
+    float thr = bayer(vCell, 2) + (hash21(vec2(vCell)) - 0.5) * 0.12;
+    col = dissolveStop(int(fl) + int(step(thr, f - fl)));
+  } else if (st == 27) {                           // X-RAY: bone-white where the picture is bright, navy and black where it is dark
+    float r = length(p);
+    float body = 1.0 - smoothstep(0.2, 0.48, r);
+    float t = clamp(tone, 0.0, 1.0);
+    vec3 dark = vec3(0.02, 0.05, 0.14);
+    vec3 blue = vec3(0.22, 0.52, 0.86);
+    vec3 bone = vec3(0.86, 0.95, 1.0);
+    vec3 ramp = t < 0.55 ? mix(dark, blue, smoothstep(0.08, 0.55, t)) : mix(blue, bone, smoothstep(0.55, 1.0, t));
+    float lit = smoothstep(0.03, 0.22, t);
+    float halo = exp(-r * r * 7.0) * 0.35 * smoothstep(0.5, 1.0, t);   // a soft glow around the brightest cells
+    col = ramp * lit * (0.55 + 0.45 * body) + vec3(0.45, 0.7, 1.0) * halo * lit;
+  } else if (st == 22) {                           // PIXEL ART: each cell one colour of the fixed palette
+    // one palette colour per cell; an outline cell takes the dark shade of its own colour
+    float edge = max(max(vEdge.x, vEdge.y), max(vEdge.z, vEdge.w));
+    col = edge > 0.5 ? palArt(vInk * 0.4) : palArt(vInk);
+  } else if (st == 20) {                           // CGA: the source colour snapped to the CGA palette, dithered per pixel
+    col = cgaPick(vInk * clamp(tone, 0.0, 1.0), bayer(ivec2(gl_FragCoord.xy), 3), uSP.x);
+  } else if (st == 21) {                           // STIPPLE: one dot per cell, placed at random, denser in the dark
+    vec2 h = vec2(hash21(vec2(vCell)), hash21(vec2(vCell) + 17.3));
+    float r = uSP.y * 0.5 * sqrt(tone);
+    float keep = step(h.x, uSP.x * pow(tone, 1.2));
+    float m = keep * (1.0 - smoothstep(r - aa, r + aa, length(p - (h - 0.5) * (1.0 - 2.0 * r))));
+    col = mix(vBg, vInk, m);
   } else if (st == 4) {                            // ASCII
     float N = uSP2.x;
     float idx = floor(clamp(pow(tone, 0.8), 0.0, 0.999) * N);
@@ -694,13 +926,6 @@ void main() {
     float m = smoothstep(0.2, 0.65, texture(uAtlas, g).r);
     vec3 bg = uColorMode > 1.5 ? vBg : vInk * uSP.y * tone;
     col = mix(bg, vInk, m);
-  } else if (st == 6) {                            // GLOW: round dots with a soft halo and a hot core
-    float r = mix(0.12, 0.5, sqrt(tone)) * uSP.x * 1.6;
-    float d = length(p);
-    float n = mix(6.0, 2.0, uSP.y);
-    float halo = exp(-pow(d / max(r, 0.02), n));
-    float hot = exp(-pow(d / max(r * 0.35, 0.01), 2.0)) * uSP.z * tone;
-    col = clamp(vBg + vInk * halo * (0.55 + 0.9 * tone) + hot * mix(vInk, vec3(1.0), 0.6), 0.0, 1.0);
   } else if (st == 7) {                            // WIRE: the grid as lines; brighter parts draw thicker lines
     float w = uSP.x * (0.35 + 0.65 * tone);
     float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
@@ -763,30 +988,6 @@ void main() {
     float shine = smoothstep(0.25, -0.05, (p.y - 0.12) + (p.x + 0.12) * 0.35) * 0.18 * inner;
     col = mix(col, vec3(1.0), body);
     col = mix(col, clamp(vInk * (0.5 + 0.6 * tone) + shine, 0.0, 1.0), inner);
-  } else if (st == 12) {                           // BRUTAL: flat colours, thick black outline, hard offset shadow
-    vec2 off = vec2(uSP.y, -uSP.y);
-    vec2 hb = vec2(0.36);
-    vec2 qb = abs(p) - hb;
-    float d = max(qb.x, qb.y);
-    vec2 qs = abs(p - off) - hb;
-    float ds = max(qs.x, qs.y);
-    float L = max(uSP.z - 1.0, 1.0);
-    vec3 flat_ = floor(clamp(vInk * (0.3 + 0.8 * tone), 0.0, 1.0) * L + 0.5) / L;
-    col = vec3(0.96, 0.94, 0.88);
-    col = mix(col, vec3(0.0), 1.0 - smoothstep(0.0, aa * 1.5, ds));
-    col = mix(col, vec3(0.0), 1.0 - smoothstep(0.0, aa * 1.5, d));
-    col = mix(col, flat_, 1.0 - smoothstep(0.0, aa * 1.5, d + uSP.x));
-  } else if (st == 5) {                            // LINES
-    float wgt = uSP.y;
-    float th = tone * wgt;
-    if (uSP.x < 0.5) th = (vUv.x < 0.5 ? mix(vTn.x, tone, vUv.x + 0.5) : mix(tone, vTn.y, vUv.x - 0.5)) * wgt;
-    th = clamp(th, 0.0, 1.0);
-    float m = (1.0 - smoothstep(th * 0.5 - aa, th * 0.5 + aa, abs(p.y))) * smoothstep(0.02, 0.08, th);
-    if (uSP.x > 1.5) {                              // CROSS-HATCH: columns come in with the darker parts
-      float tc = clamp((tone - 0.4) / 0.6 * wgt, 0.0, 1.0);
-      m = max(m, (1.0 - smoothstep(tc * 0.5 - aa, tc * 0.5 + aa, abs(p.x))) * smoothstep(0.02, 0.08, tc));
-    }
-    col = mix(col, vInk, m);
   }
   o = vec4(clamp(col * vFade, 0.0, 1.0), 1.0);
 }
