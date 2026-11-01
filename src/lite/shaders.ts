@@ -72,6 +72,9 @@ uniform float uBeat;       // 1 on a beat, decaying
 uniform float uLevel;      // overall loudness, 0..1
 uniform float uBass;       // bass, 0..1
 uniform float uAmt;        // 0..1 how far EQUALIZER, BLOOM and RIPPLE move (the AMOUNT slider and reduced motion applied)
+uniform float uMotion;     // MOTION effect: 0 off, 1 STARDUST, 2 BREAKDOWN, 3 DISAPPEAR, 4 COSMIC
+uniform float uMotionAmt;  // 0..1 how strong
+uniform float uMotionSpeed; // 0.2..2 how fast one cycle runs
 
 out vec3 vCol;
 
@@ -223,6 +226,44 @@ vec2 place(uint id, vec3 home, float light, float sOff, float shareMul, out floa
     pos = musicMove(id, home.xy, pos, r3, r0, rB, r4);
   }
 
+  // MOTION effects: one cycle per loop. STARDUST and BREAKDOWN let a share of the particles or cells go; DISAPPEAR and
+  // COSMIC act on all of them. Every look moves, cell looks included.
+  if (uMotion > 0.5) {
+    float cyc = uLoop > 0.0 ? max(1.0, floor(uLoop * uMotionSpeed * 0.25 + 0.5)) / uLoop : uMotionSpeed * 0.25;
+    float ph = fract(uTime * cyc);
+    float amt = uMotionAmt;
+    vec2 outDir = vec2(cos(r1 * 6.2831853), sin(r1 * 6.2831853));
+    float live = 1.0;
+    if (uMotion < 1.5) {
+      // STARDUST: a share of the particles lifts off, drifts up and out, twinkles, and fades; each on its own cycle
+      float pick = step(r0, amt * 0.7) * live;
+      float age = fract(ph + r2);
+      pos += pick * (outDir * (0.05 + 0.35 * r3) + vec2(0.0, 0.12)) * pow(age, 0.8) * amt;
+      alpha *= mix(1.0, (1.0 - age) * (0.55 + 0.45 * sin(uTime * 14.0 + r4 * 50.0)), pick);
+      streaming = max(streaming, pick * smoothstep(0.0, 0.1, age));
+    } else if (uMotion < 2.5) {
+      // BREAKDOWN: a front sweeps across the picture; behind it the particles fall away and fade
+      float x01 = clamp(home.x / max(uHalfW, 1e-3) * 0.5 + 0.5, 0.0, 1.0);
+      float t = clamp((ph * 1.6 - 0.3 - x01) / 0.35 - r2 * 0.4, 0.0, 1.0) * live;
+      float fall = t * t;
+      pos += vec2(outDir.x * 0.3 + 0.4 * t, outDir.y * 0.2 - 0.5) * fall * amt;
+      alpha *= 1.0 - smoothstep(0.55, 1.0, t);
+      streaming = max(streaming, smoothstep(0.0, 0.1, t));
+    } else if (uMotion < 3.5) {
+      // DISAPPEAR: particles drop out in a random order, then come back
+      float tri = abs(ph * 2.0 - 1.0);
+      float cut = (1.0 - tri) * amt;
+      alpha *= smoothstep(cut - 0.06, cut + 0.06, r2);
+    } else {
+      // COSMIC: space bends around the middle, a slow swirl and a ripple that travels out
+      float d = length(pos);
+      float a = amt * 1.2 * exp(-d * 1.8) * sin(6.2831853 * ph);
+      float ca2 = cos(a), sa2 = sin(a);
+      pos = vec2(pos.x * ca2 - pos.y * sa2, pos.x * sa2 + pos.y * ca2);
+      pos *= 1.0 + amt * 0.08 * sin(d * 10.0 - 12.566 * ph) * exp(-d * 0.8);
+    }
+  }
+
   return pos;
 }
 
@@ -349,7 +390,9 @@ void main() {
   float side = (gl_VertexID & 1) == 0 ? -1.0 : 1.0;
   uint id = uint(gl_InstanceID);
   // TRAIL AMOUNT: 0..2, where 1 keeps half of the particles
-  if (rnd(id, 6u) > uTrailAmount * 0.5) {
+  // EMITTERS: the trails shed by region too. A region with weight 0 has no trails; 2 has up to twice the share.
+  float regionK = uEmitOn > 0.5 ? clamp(regionWeight(aHome.xy), 0.0, 2.0) : 1.0;
+  if (rnd(id, 6u) > uTrailAmount * 0.5 * regionK) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     vCol = vec3(0.0);
     return;
@@ -400,11 +443,12 @@ out vec4 o;
 void main() { o = vec4(vCol, 1.0); }
 `;
 
-// CELL LOOKS: one instance per grid cell (HALFTONE, MOSAIC, DITHER, ASCII, STIPPLE, LINES). A cell is treated as
+// CELL LOOKS: one instance per grid cell (HALFTONE, MOSAIC, DITHER, ASCII, LINES). A cell is treated as
 // a particle (place()), so flow, pointer, burst, scan and pulse all act on it, but its colour and tone come
 // from the picture under the whole cell, so every cell is one clean value.
 const CELLS = `
 uniform vec4 uGrid;         // nx, ny, cell width, cell height (world units)
+uniform float uSizeBy;      // cell looks: 0 fixed size, 1 cell size by light, 2 cell size by colour
 uniform float uGridAng;     // radians, the grid turned about the picture centre
 uniform float uLayer;       // 0 the picture, 1 the cells that have drifted off it
 uniform vec2 uLv;           // AUTO LEVELS: brightness range stretched to 0..1
@@ -412,11 +456,26 @@ uniform float uColorMode;   // 0 SOURCE, 1 MONO, 2 DUO
 uniform vec3 uInk;
 uniform vec3 uPaper;
 uniform float uInvert;
-uniform float uStyle;       // 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
+uniform float uStyle;       // 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 LINES
 uniform vec4 uSP;           // settings of the look
 
 out vec2 vUv;               // 0..1 across the cell
 out vec3 vInk;
+
+// THERMAL and ACID colour the cell from its brightness (colour modes 3 and 4)
+vec3 thermalRamp(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 c = mix(vec3(0.0, 0.0, 0.18), vec3(0.45, 0.0, 0.55), smoothstep(0.0, 0.3, t));
+  c = mix(c, vec3(0.95, 0.15, 0.1), smoothstep(0.25, 0.55, t));
+  c = mix(c, vec3(1.0, 0.85, 0.1), smoothstep(0.5, 0.8, t));
+  return mix(c, vec3(1.0), smoothstep(0.78, 1.0, t));
+}
+vec3 acidRamp(float t) {
+  return 0.5 + 0.5 * cos(6.28318 * (t * 1.1 + vec3(0.0, 0.33, 0.67)));
+}
+vec3 rampColour(float t, float mode) {
+  return mode < 3.5 ? thermalRamp(t) : acidRamp(t);
+}
 out vec3 vBg;
 out float vTone;
 out float vFade;
@@ -488,11 +547,20 @@ void main() {
   float opacity = mix(uOpacity, 1.0, streaming);
   vFade = alpha * (1.0 - 0.3 * streaming) * opacity * (1.0 + pulse * 0.3);
   vTone = tone;
+  // Size by light or colour: the cell itself shrinks or grows, and what is drawn in it follows the cell
+  if (uSizeBy > 0.5) {
+    float key = uSizeBy < 1.5 ? tone : (max(max(cb.r, cb.g), cb.b) - min(min(cb.r, cb.g), cb.b));
+    // The cell carries the size: dark parts shrink to almost nothing, bright parts fill the full cell.
+    // The shape inside then fills its cell, so the size is not counted twice.
+    cw *= mix(0.12, 1.0, pow(clamp(key, 0.0, 1.0), 0.9));
+    vTone = 0.9;
+  }
 
   // Ink: the cell's colour at full value (the shape carries the brightness), or the chosen ink
   vec3 hue = cb / max(max(cb.r, cb.g), max(cb.b, 1e-3));
   vInk = uColorMode < 0.5 ? hue : uInk;
-  vBg = uColorMode > 1.5 ? uPaper : vec3(0.0);
+  if (uColorMode > 2.5) vInk = rampColour(tone, uColorMode);   // THERMAL, ACID: the colour comes from the brightness
+  vBg = (uColorMode > 1.5 && uColorMode < 2.5) ? uPaper : vec3(0.0);
 
   int st = int(uStyle + 0.5);
   if (st == 2) {
@@ -502,7 +570,7 @@ void main() {
     vec3 q = smooth_ ? cb : floor(cb * (lv - 1.0) + 0.5) / (lv - 1.0);
     if (uInvert > 0.5) q = 1.0 - q;
     float qt = smooth_ ? tone : floor(tone * (lv - 1.0) + 0.5) / (lv - 1.0);
-    vInk = uColorMode < 0.5 ? q : (uColorMode < 1.5 ? uInk * qt : mix(uPaper, uInk, qt));
+    vInk = uColorMode < 0.5 ? q : (uColorMode < 1.5 ? uInk * qt : (uColorMode < 2.5 ? mix(uPaper, uInk, qt) : rampColour(qt, uColorMode)));
     if (uSP.w > 0.0) {
       vec2 dx = R * vec2(cw.x, 0.0);
       vec2 dy = R * vec2(0.0, cw.y);
@@ -510,7 +578,7 @@ void main() {
       vec2 uy = vec2(dy.x / aspect, -dy.y);
       vEdge = step(0.12, abs(vec4(toneAt(uv - ux, lod), toneAt(uv + ux, lod), toneAt(uv - uy, lod), toneAt(uv + uy, lod)) - tone));
     }
-  } else if (st == 6) {
+  } else if (st == 5) {
     vec2 dx = R * vec2(cw.x, 0.0);
     vec2 ux = vec2(dx.x / aspect, -dx.y);
     vTn = vec2(toneAt(uv - ux, lod), toneAt(uv + ux, lod));
@@ -540,6 +608,7 @@ uniform float uStyle;
 uniform float uColorMode;
 uniform vec4 uSP;
 uniform vec4 uSP2;
+uniform vec4 uGrid;     // nx, ny, cell width, cell height: the RINGS pattern needs the cell's place on the grid
 uniform sampler2D uAtlas;   // ASCII glyphs: 16 columns, one row per ramp, each glyph 16 x 32 px
 out vec4 o;
 
@@ -571,11 +640,23 @@ void main() {
     float area = pow(tone, 1.0 / (1.0 + uSP.y));
     float sq = sqrt(area);
     float m;
-    if (uSP.x < 0.5)      m = 1.0 - smoothstep(sq * 0.7072 - aa, sq * 0.7072 + aa, length(p));
-    else if (uSP.x < 1.5) m = 1.0 - smoothstep(sq * 0.5 - aa, sq * 0.5 + aa, max(abs(p.x), abs(p.y)));
-    else if (uSP.x < 2.5) m = 1.0 - smoothstep(sq * 0.7072 - aa, sq * 0.7072 + aa, abs(p.x) + abs(p.y));
-    else if (uSP.x < 3.5) m = (1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, min(abs(p.x), abs(p.y)))) * step(max(abs(p.x), abs(p.y)), 0.5);
-    else                  m = 1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, abs(p.y));
+    if (uSP.x < 0.5)      m = 1.0 - smoothstep(sq * 0.7072 - aa, sq * 0.7072 + aa, length(p));   // ROUND: the newsprint dot
+    else if (uSP.x < 1.5) m = 1.0 - smoothstep(sq * 0.5 - aa, sq * 0.5 + aa, max(abs(p.x), abs(p.y)));   // SQUARE
+    else if (uSP.x < 2.5) m = 1.0 - smoothstep(sq * 0.7072 - aa, sq * 0.7072 + aa, abs(p.x) + abs(p.y));   // DIAMOND
+    else if (uSP.x < 3.5) m = (1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, min(abs(p.x), abs(p.y)))) * step(max(abs(p.x), abs(p.y)), 0.5);   // CROSS
+    else if (uSP.x < 4.5) m = 1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, abs(p.y));   // LINE
+    else if (uSP.x < 5.5) {                                                                   // DASH: short diagonal strokes
+      float across = 1.0 - smoothstep(area * 0.35 - aa, area * 0.35 + aa, abs(p.x + p.y) * 0.7072);
+      float along = 1.0 - smoothstep(0.42 - aa, 0.42 + aa, abs(p.x - p.y) * 0.7072);
+      m = across * along;
+    } else if (uSP.x < 6.5) {                                                                 // STAR: three strokes through the cell, a hexagon net
+      float d = min(abs(p.x * 0.0 + p.y), min(abs(p.x * 0.8660 - p.y * 0.5), abs(p.x * 0.8660 + p.y * 0.5)));
+      m = 1.0 - smoothstep(area * 0.25 - aa, area * 0.25 + aa, d);
+    } else {                                                                                  // RINGS: rings about the picture centre, thicker where brighter
+      vec2 w = (vec2(vCell) + 0.5 - 0.5 * uGrid.xy) * uGrid.zw + p * uGrid.zw;
+      float band = abs(fract(length(w) / uGrid.z * 0.3) - 0.5);
+      m = 1.0 - smoothstep(area * 0.5 - aa, area * 0.5 + aa, band);
+    }
     m *= step(0.003, area);
     col = mix(col, vInk, m);
   } else if (st == 2) {                            // MOSAIC
@@ -586,12 +667,26 @@ void main() {
     float edge = max(max(vEdge.x * smoothstep(0.14, 0.0, vUv.x), vEdge.y * smoothstep(0.14, 0.0, 1.0 - vUv.x)),
                      max(vEdge.z * smoothstep(0.14, 0.0, vUv.y), vEdge.w * smoothstep(0.14, 0.0, 1.0 - vUv.y)));
     col = mix(col, vInk * (1.0 - uSP.w * 0.85 * edge), m);
-  } else if (st == 3) {                            // DITHER
-    float b = uSP.x < 0.5 ? bayer(vCell, 2) : (uSP.x < 1.5 ? bayer(vCell, 3) : ign(vec2(vCell)));
+  } else if (st == 3 || st == 13 || st == 17) {    // DITHER, SCAN and PALETTE
+    float b;
+    if (st == 3) {
+      b = uSP.x < 0.5 ? bayer(vCell, 2) : (uSP.x < 1.5 ? bayer(vCell, 3) : ign(vec2(vCell)));
+    } else if (st == 13) {                         // SCAN: rows alternate dense and sparse, so lines of light show
+      b = 0.5 * bayer(vCell, 2) + 0.5 * (((vCell.y & 1) == 0) ? 0.2 : 0.8);
+    } else {                                       // PALETTE
+      b = bayer(vCell, 3);
+    }
     float L = uSP.y;
     float tt = clamp(pow(tone, 0.75) + uSP.z, 0.0, 1.0); // a lift, so dark pictures keep their shape
-    float v = clamp(floor(tt * (L - 1.0) + b) / (L - 1.0), 0.0, 1.0);
-    col = mix(col, vInk, v);
+    if (st == 17) {                                // PALETTE: four colours, dithered between neighbours
+      float f = tt * 3.0;
+      int i0 = int(floor(f));
+      int idx = clamp(i0 + ((f - float(i0)) > b ? 1 : 0), 0, 3);
+      col = idx == 0 ? vec3(0.04, 0.04, 0.05) : (idx == 1 ? vec3(0.11, 0.25, 0.58) : (idx == 2 ? vec3(1.0, 0.54, 0.12) : vec3(0.89, 0.89, 0.54)));
+    } else {
+      float v = clamp(floor(tt * (L - 1.0) + b) / (L - 1.0), 0.0, 1.0);
+      col = mix(col, vInk, v);
+    }
   } else if (st == 4) {                            // ASCII
     float N = uSP2.x;
     float idx = floor(clamp(pow(tone, 0.8), 0.0, 0.999) * N);
@@ -599,15 +694,89 @@ void main() {
     float m = smoothstep(0.2, 0.65, texture(uAtlas, g).r);
     vec3 bg = uColorMode > 1.5 ? vBg : vInk * uSP.y * tone;
     col = mix(bg, vInk, m);
-  } else if (st == 5) {                            // STIPPLE
-    float rmax = uSP.x;
-    float tl = pow(tone, 0.7);                       // a lift, so dark pictures keep their shape
-    float r = mix(rmax * 0.35, rmax, sqrt(tl));
-    float present = step(ign(vec2(vCell) * 1.7 + 3.1) * 0.9 + 0.05, tl * uSP.y);
-    vec2 jit = (vec2(hash21(vec2(vCell)), hash21(vec2(vCell).yx + 7.3)) - 0.5) * uSP.z * max(1.0 - 2.0 * r, 0.0);
-    float m = (1.0 - smoothstep(r - aa, r + aa, length(p - jit))) * present;
-    col = mix(col, vInk, m);
-  } else if (st == 6) {                            // LINES
+  } else if (st == 6) {                            // GLOW: round dots with a soft halo and a hot core
+    float r = mix(0.12, 0.5, sqrt(tone)) * uSP.x * 1.6;
+    float d = length(p);
+    float n = mix(6.0, 2.0, uSP.y);
+    float halo = exp(-pow(d / max(r, 0.02), n));
+    float hot = exp(-pow(d / max(r * 0.35, 0.01), 2.0)) * uSP.z * tone;
+    col = clamp(vBg + vInk * halo * (0.55 + 0.9 * tone) + hot * mix(vInk, vec3(1.0), 0.6), 0.0, 1.0);
+  } else if (st == 7) {                            // WIRE: the grid as lines; brighter parts draw thicker lines
+    float w = uSP.x * (0.35 + 0.65 * tone);
+    float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    float m = 1.0 - smoothstep(w - aa, w + aa, edge);
+    if (uSP.y > 0.5) {
+      m = max(m, 1.0 - smoothstep(w - aa, w + aa, abs(vUv.x - vUv.y) * 0.7071));
+    }
+    if (uSP.y > 1.5) {
+      m = max(m, 1.0 - smoothstep(w - aa, w + aa, abs(vUv.x + vUv.y - 1.0) * 0.7071));
+    }
+    col = mix(vBg + vInk * uSP.z * tone, vInk, m);
+  } else if (st == 8) {                            // GLASS: bevelled tiles lit from the top left
+    float gap = uSP.w * 0.5;
+    vec2 q = abs(p);
+    float e = 0.5 - gap - max(q.x, q.y);
+    float inside = smoothstep(0.0, aa, e);
+    float bev = 1.0 - smoothstep(0.0, max(uSP.x, 0.02), e);
+    vec2 nrm = q.x > q.y ? vec2(sign(p.x), 0.0) : vec2(0.0, sign(p.y));
+    float facing = dot(nrm, normalize(vec2(-0.6, 0.8)));
+    vec3 base = vInk * (0.55 + 0.45 * tone);
+    vec3 lit = base * (1.0 + uSP.y * bev * facing * 1.2);
+    float spec = exp(-length(p - vec2(-0.22, 0.22)) * 9.0) * uSP.z;
+    col = mix(vBg, clamp(lit + spec * (0.4 + 0.6 * tone), 0.0, 1.0), inside);
+  } else if (st == 9) {                            // CRT: a red, a green and a blue bar per cell, and a scan line
+    vec3 c = vInk * (0.25 + 0.95 * tone);
+    float k = floor(vUv.x * 3.0);
+    float fx = fract(vUv.x * 3.0) - 0.5;
+    float bar = 1.0 - smoothstep(uSP.x * 0.5 - aa * 3.0, uSP.x * 0.5 + aa * 3.0, abs(fx));
+    vec3 phos = k < 0.5 ? vec3(1.0, 0.0, 0.0) : (k < 1.5 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0));
+    float scan = 1.0 - uSP.y * pow(abs(p.y) * 2.0, 4.0);
+    col = clamp(c * phos * bar * scan * uSP.z * 1.6, 0.0, 1.0);
+  } else if (st == 10) {                           // BARS: a little 3D block per cell, taller where it is brighter
+    float gp = uSP.z * 0.5;
+    float lean = uSP.y;
+    float h = 0.08 + 0.85 * tone * uSP.x;
+    float bx0 = gp + 0.02;
+    float bx1 = 1.0 - lean - gp;
+    float fy0 = gp;
+    vec2 q = vUv;
+    float inFront = step(bx0, q.x) * step(q.x, bx1) * step(fy0, q.y) * step(q.y, fy0 + h);
+    float ty = (q.y - fy0 - h) / max(lean, 1e-3);
+    float inTop = step(0.0, ty) * step(ty, 1.0) * step(bx0 + ty * lean, q.x) * step(q.x, bx1 + ty * lean);
+    float sx = (q.x - bx1) / max(lean, 1e-3);
+    float inSide = step(0.0, sx) * step(sx, 1.0) * step(fy0 + sx * lean, q.y) * step(q.y, fy0 + h + sx * lean);
+    vec3 baseC = vInk * (0.45 + 0.55 * tone);
+    col = vBg;
+    col = mix(col, baseC * 0.55, inSide);
+    col = mix(col, baseC * 1.1, inTop);
+    col = mix(col, baseC * 0.8, inFront);
+  } else if (st == 11) {                           // STICKER: a glossy tile with a white border and a drop shadow
+    float r = uSP.z;
+    vec2 qd = abs(p) - vec2(0.38 - r) ;
+    float d = length(max(qd, 0.0)) + min(max(qd.x, qd.y), 0.0) - r;
+    vec2 ps = p - vec2(0.03, -0.045);
+    vec2 qs = abs(ps) - vec2(0.38 - r);
+    float ds = length(max(qs, 0.0)) + min(max(qs.x, qs.y), 0.0) - r;
+    col = mix(col, vec3(0.0), smoothstep(0.06, -0.01, ds) * 0.55 * uSP.y);
+    float body = 1.0 - smoothstep(0.0, aa * 1.5, d);
+    float inner = 1.0 - smoothstep(0.0, aa * 1.5, d + uSP.x);
+    float shine = smoothstep(0.25, -0.05, (p.y - 0.12) + (p.x + 0.12) * 0.35) * 0.18 * inner;
+    col = mix(col, vec3(1.0), body);
+    col = mix(col, clamp(vInk * (0.5 + 0.6 * tone) + shine, 0.0, 1.0), inner);
+  } else if (st == 12) {                           // BRUTAL: flat colours, thick black outline, hard offset shadow
+    vec2 off = vec2(uSP.y, -uSP.y);
+    vec2 hb = vec2(0.36);
+    vec2 qb = abs(p) - hb;
+    float d = max(qb.x, qb.y);
+    vec2 qs = abs(p - off) - hb;
+    float ds = max(qs.x, qs.y);
+    float L = max(uSP.z - 1.0, 1.0);
+    vec3 flat_ = floor(clamp(vInk * (0.3 + 0.8 * tone), 0.0, 1.0) * L + 0.5) / L;
+    col = vec3(0.96, 0.94, 0.88);
+    col = mix(col, vec3(0.0), 1.0 - smoothstep(0.0, aa * 1.5, ds));
+    col = mix(col, vec3(0.0), 1.0 - smoothstep(0.0, aa * 1.5, d));
+    col = mix(col, flat_, 1.0 - smoothstep(0.0, aa * 1.5, d + uSP.x));
+  } else if (st == 5) {                            // LINES
     float wgt = uSP.y;
     float th = tone * wgt;
     if (uSP.x < 0.5) th = (vUv.x < 0.5 ? mix(vTn.x, tone, vUv.x + 0.5) : mix(tone, vTn.y, vUv.x - 0.5)) * wgt;

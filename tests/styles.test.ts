@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RAMP_SIZES, STYLE_NAMES, STYLE_SETTINGS, defaultStyleValues, hexToRgb, packStyle } from '../src/core/styles';
+import { LOOK_CATEGORIES, RAMP_SIZES, STYLE_NAMES, STYLE_SETTINGS, defaultStyleValues, hexToRgb, packStyle } from '../src/core/styles';
 
 describe('style settings', () => {
   it('has a default inside the range for every setting', () => {
@@ -17,7 +17,8 @@ describe('style settings', () => {
   it('uses unique keys and gives each cell look at most four settings', () => {
     const keys = STYLE_SETTINGS.map((s) => s.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (let st = 1; st < STYLE_NAMES.length; st++) {
+    // the offered looks only: the retired dither slots (14 to 16) have no settings
+    for (const st of LOOK_CATEGORIES.flatMap((c) => c.looks).filter((st) => st > 0)) {
       const n = STYLE_SETTINGS.filter((s) => s.styles.includes(st)).length;
       expect(n).toBeGreaterThan(0);
       expect(n).toBeLessThanOrEqual(4);

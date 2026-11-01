@@ -4,7 +4,7 @@
 // and the separate burst slider (BURST is now a scan style). Those controls are removed from index.html.
 import { LiteEngine, type AudioMod, type LiteLayout, type LiteParams, type MusicState } from '../lite/LiteEngine';
 import type { LiteSample } from '../lite/sample';
-import type { Params } from '../core/params';
+import { lookTone, type Params } from '../core/params';
 import { hexToRgb } from '../core/styles';
 
 export interface ExportSnapshot {
@@ -39,15 +39,16 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     trailAngle: p.trailAngle,
     pSat: p.pSat,
     style: p.style,
-    cell: p.cell,
+    cell: lookTone(p).cell,
+    sizeBy: lookTone(p).sizeBy,
     styleSet: { ...p.ss },
     emitOn: p.emitOn,
     emit: { ...p.emit },
-    colorMode: p.styleColor,
-    invert: p.styleInvert,
-    autoLevels: p.autoLevels,
-    ink: hexToRgb(p.ink),
-    paper: hexToRgb(p.paper),
+    colorMode: lookTone(p).colour,
+    invert: lookTone(p).invert,
+    autoLevels: lookTone(p).autoLevels,
+    ink: hexToRgb(lookTone(p).ink),
+    paper: hexToRgb(lookTone(p).paper),
     track: p.track,
     trackOld: p.trackStyle === 'old',
     // BURST scan style: the click shock, its strength set by the scanner level (3 = studio strength)
@@ -67,6 +68,50 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
     // calibrated so the mean brightness matches the studio's (measured: studio 10.1, web 10.5 on the same frame)
     brightness: 1.1,
     musicLook: p.musicLook,
+    motionFx: p.motionFx,
+    motionAmount: p.motionAmount,
+    motionSpeed: p.motionSpeed,
+    glow: {
+      bloomOn: p.bloomOn,
+      haloOn: p.haloOn,
+      glowPat: p.glow.glowPat,
+      glowPatAmt: p.glow.glowPatAmt,
+      threshold: p.glow.threshold,
+      bloomAmount: p.glow.bloomAmount,
+      bloomRadius: p.glow.bloomRadius,
+      haloAmount: p.glow.haloAmount,
+      haloSize: p.glow.haloSize,
+      haloTint: hexToRgb(p.glow.haloTint),
+      vhsOn: p.vhsOn,
+      vhsAmount: p.signal.vhsAmount,
+      vhsNoise: p.signal.vhsNoise,
+      glitchOn: p.glitchOn,
+      glitchAmount: p.signal.glitchAmount,
+      glitchRate: p.signal.glitchRate,
+      glitchBeat: p.glitchBeat,
+      grainOn: p.grainOn,
+      grainAmount: p.surface.grainAmount,
+      grainSize: p.surface.grainSize,
+      holoOn: p.holoOn,
+      holoAmount: p.surface.holoAmount,
+      holoSpeed: p.surface.holoSpeed,
+      duoOn: p.duoOn,
+      duoAmount: p.surface.duoAmount,
+      duoShadow: hexToRgb(p.surface.duoShadow),
+      duoLight: hexToRgb(p.surface.duoLight),
+      cloudOn: p.cloudOn,
+      cloudAmount: p.surface.cloudAmount,
+      cloudScale: p.surface.cloudScale,
+      cloudTint: hexToRgb(p.surface.cloudTint),
+      meshOn: p.meshOn,
+      meshAmount: p.surface.meshAmount,
+      meshPalette: p.surface.meshPalette,
+      stackOn: p.stackOn,
+      stackWords: p.stackWords,
+      stackCount: p.graphic.stackCount,
+      stackWidth: p.graphic.stackWidth,
+      stackColour: hexToRgb(p.graphic.stackColour),
+    },
   };
 }
 
@@ -88,6 +133,7 @@ export class WebEngine {
     this.canvas = canvas;
     this.lite = new LiteEngine(canvas, { maxDpr: 1.5 });
     this.lite.setLayout({ fit: 'contain', zoom: 0.72 }); // same picture size as the studio
+    this.setPictureZoom(0.72, 1);
 
     // 3D: drag to turn in any direction, wheel to move through, double-click to reset
     canvas.addEventListener('pointerdown', (e) => {
@@ -134,8 +180,15 @@ export class WebEngine {
 
   /** EQUALIZER particles: on or off, dot size, 12 column levels, the picture's colours. */
   setEqualizer(style: number, levels: Float32Array, wave: Float32Array, cols: [number, number, number][], size: number): void {
-    this.lite.setEqualizer(style, levels, wave, cols, size);
+    this.lite.setEqualizer(style, levels, wave, cols, size * this.dotScale);
   }
+
+  /** Picture size and equalizer dot size. The desktop wallpaper uses a smaller picture (the screen is larger). */
+  setPictureZoom(zoom: number, dotScale: number): void {
+    this.dotScale = dotScale;
+    this.lite.setLayout({ fit: 'contain', zoom });
+  }
+  private dotScale = 1;
 
   /** The sound as the particles see it this frame (the MUSIC looks). */
   setMusic(m: MusicState): void {

@@ -18,6 +18,14 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-01: console restructure (LOOK, LIGHT, MOTION, PARTICLE EFFECTS, COLOUR)
+- LOOK: one dot per look type with its name beside it; only that type's looks are listed; the top right shows the look in use. Showing a type does not pick a look.
+- MOTION now holds the motion effect, GLITCH (VHS and glitch) and GRAPHIC (STACK). The SIGNAL and GRAPHIC boxes are gone.
+- PARTICLE EFFECTS is its own box: preset, MOVEMENT, 3D DEPTH, SIDE BIAS.
+- COLOUR is one custom picker (square, hue, RGB sliders and numbers, hex) for ink, background, halo, shadow, highlight, cloud and lines. It drives the existing hidden colour inputs, so their bindings are unchanged.
+- Why: the effects list was too long to scroll.
+- Evidence: typecheck, 33 tests and build pass. Browser: LOOK type switching and the COLOUR picker checked. Not checked: the motion and glitch groups on screen after the move.
+
 ### 2026-10-31
 - **Music panel trimmed.** Removed: MIC source, CALM, WAVE look, and the BARS, MIRROR and LINE equalizer styles. Added SPARKS (dots rising from the middle line and fading, spread sideways). AMOUNT moved into the LOOK group. Equalizer bars peak at 70% height so high bands keep moving. The equalizer now follows the picture's float offset, which was the misalignment. Decision: keep the music panel to what the owner uses; reactions stay on clicks. Checked: typecheck, 33 tests, build, and the browser with fake band data. Not checked: real music, a phone.
 - **Equalizer back in MUSIC, with five particle styles; no kick.** The equalizer is inside MUSIC again, with DOTS, BARS, MIRROR, LINE and CROSS, one SIZE slider, and it runs together with the picture's particles. Music no longer drives the burst ring or the sweep (reactions to clicks stay the user's). Decision: keep click reactions separate from the music.

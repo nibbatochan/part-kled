@@ -78,16 +78,24 @@ try {
   // Lab is the default workspace: the clip panel is not shown, the source strip is
   const vis = (sel) => page.$eval(sel, (el) => getComputedStyle(el).display !== 'none');
   console.log('lab mode: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'));
-  await page.click('#mode-switch [data-mode="video"]');
-  console.log('video mode: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'), '| readout:', await page.textContent('#clip-readout'));
+  console.log('lab view: VIDEO link visible', await vis('#to-video'), '| LAB link visible', await vis('#to-lab'));
+  // The video page: same app, ?view=video. No pictures, empty stage.
+  await page.goto(`http://localhost:${PORT}/?view=video`);
+  await page.waitForSelector('#file-input', { state: 'attached' });
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1500);
+  console.log('video view: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'), '| export visible', await vis('#export-btn'), '| pictures loaded:', await page.evaluate(() => window.__app.images.length), '| frame readout:', await page.textContent('#frame-readout'), '| readout:', await page.textContent('#clip-readout'));
+  await page.screenshot({ path: path.join(SHOT_DIR, 'clip-video-page-empty.png') });
 
   // 2. Load it through the file input (same path as a drop)
   await page.setInputFiles('#file-input', clipPath);
   await page.waitForFunction(() => {
     const el = document.getElementById('clip-readout');
-    return el && /PREPARE TO PLAY/.test(el.textContent || '');
+    return el && /PRESS BUILD DEPTH/.test(el.textContent || '');
   }, null, { timeout: 30000 });
   console.log('readout after load:', await page.textContent('#clip-readout'));
+  console.log('stage readout after load:', await page.textContent('#frame-readout'), '| loader hidden:', await page.$eval('#loading-indicator', (el) => el.classList.contains('hidden')), '| overlay hidden:', await page.$eval('#dropzone', (el) => el.classList.contains('hidden')));
+  await page.screenshot({ path: path.join(SHOT_DIR, 'clip-video-page-first-frame.png') });
 
   // 3. Prepare keyframes
   const heapBefore = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? null);
@@ -105,7 +113,7 @@ try {
   const t0 = Date.now();
   // The click can hold while the main thread is busy; do not wait for navigation
   await page.click('#clip-prepare-btn', { noWaitAfter: true });
-  await page.waitForFunction(() => /KEYFRAMES/.test(document.getElementById('clip-readout')?.textContent || ''), null, {
+  await page.waitForFunction(() => /DEPTH READY/.test(document.getElementById('clip-readout')?.textContent || ''), null, {
     timeout: 900000,
     polling: 500,
   });
@@ -156,11 +164,10 @@ try {
   console.log('play button label after pause:', await page.textContent('#clip-play-btn'));
 
   // 6. Back to the lab: the clip closes, the picture returns, the source strip is back
-  await page.click('#mode-switch [data-mode="lab"]');
-  await page.waitForTimeout(800);
-  console.log('back in lab: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'));
-  console.log('frame readout:', await page.textContent('#frame-readout'));
-  await page.screenshot({ path: path.join(SHOT_DIR, 'clip-phase1-lab-restored.png') });
+  await page.click('#to-lab');
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
+  console.log('back in lab: clip panel visible', await vis('#clip-panel'), '| source box visible', await vis('#source-box'), '| pictures loaded:', await page.evaluate(() => window.__app.images.length));
 
   console.log('clip logs:', logs.slice(0, 20));
   console.log('errors:', errors.length ? errors.slice(0, 10) : 'none');

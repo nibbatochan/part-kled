@@ -18,7 +18,7 @@ export interface PrepOptions {
 const yieldToPage = () => new Promise<void>((r) => setTimeout(r, 0));
 
 /** Seek the video to source time t and resolve once that frame is ready to draw. */
-function seekTo(video: HTMLVideoElement, t: number): Promise<void> {
+export function seekTo(video: HTMLVideoElement, t: number): Promise<void> {
   if (Math.abs(video.currentTime - t) < 0.001 && video.readyState >= 2) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const ok = () => {
@@ -38,7 +38,7 @@ function seekTo(video: HTMLVideoElement, t: number): Promise<void> {
 }
 
 /** Draw the video's current frame into a canvas whose long side is KEYFRAME_MAX_SIDE at most. */
-function frameCanvas(video: HTMLVideoElement): HTMLCanvasElement {
+export function frameCanvas(video: HTMLVideoElement): HTMLCanvasElement {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   const k = Math.min(1, KEYFRAME_MAX_SIDE / Math.max(vw, vh));

@@ -4,7 +4,8 @@
 import type { DepthEstimator } from '../depth/DepthEstimator';
 import type { LiteSample } from '../lite/sample';
 import { clampClip, keyframeIndexAt, VIDEO_PARTICLE_CAP, type ClipRange } from './clip';
-import { prepareClip } from './ClipSampler';
+import { frameCanvas, prepareClip, seekTo } from './ClipSampler';
+import { sampleLite } from '../lite/sample';
 
 export class ClipPlayer {
   readonly video: HTMLVideoElement;
@@ -35,18 +36,28 @@ export class ClipPlayer {
         cleanup();
         resolve(new ClipPlayer(video, url));
       };
-      const fail = () => {
+      const fail = (message: string) => {
         cleanup();
         URL.revokeObjectURL(url);
-        reject(new Error('This browser cannot decode the video'));
+        reject(new Error(message));
       };
+      const onError = () => fail('This browser cannot play this video. Try an mp4 (H.264) or webm file.');
+      // A file that never reports its length would otherwise leave the page waiting for ever
+      const timer = window.setTimeout(() => fail('The video took too long to open.'), 20000);
       const cleanup = () => {
+        window.clearTimeout(timer);
         video.removeEventListener('loadedmetadata', ok);
-        video.removeEventListener('error', fail);
+        video.removeEventListener('error', onError);
       };
       video.addEventListener('loadedmetadata', ok);
-      video.addEventListener('error', fail);
+      video.addEventListener('error', onError);
     });
+  }
+
+  /** The clip's first frame as particles with flat depth: shown at once, before any depth is built. */
+  async previewSample(particles: number): Promise<LiteSample> {
+    await seekTo(this.video, this.range.start);
+    return sampleLite(frameCanvas(this.video), null, 0, 0, Math.min(particles, VIDEO_PARTICLE_CAP));
   }
 
   /** Set the in point to the current playhead. Keeps the clip within the length cap. */

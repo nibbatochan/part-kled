@@ -1,41 +1,20 @@
+/* Two fonts for the whole site: Tektur for the logo, Martian Mono (variable, 100-800) for everything else.
+   Both are self-hosted Latin subsets in public/fonts. */
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Tektur';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 900;
   font-display: swap;
-  src: url('/fonts/manrope-latin-400-normal.woff2') format('woff2');
+  src: url('/fonts/tektur-latin-wght-normal.woff2') format('woff2');
 }
 
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Martian Mono';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 100 800;
+  font-stretch: 75% 100%;
   font-display: swap;
-  src: url('/fonts/manrope-latin-500-normal.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Manrope';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/manrope-latin-600-normal.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+  src: url('/fonts/martian-mono-latin-wght-normal.woff2') format('woff2');
 }
 
 :root {
@@ -55,8 +34,9 @@
   --light-red: #ff4a3d;
   --light-green: #3fe0b0;
   --light-violet: #8e6bff;
-  --font-ui: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --font-display: 'Tektur', 'Martian Mono', monospace; /* logo only */
+  --font-ui: 'Martian Mono', ui-monospace, monospace; /* body, labels, buttons */
+  --font-mono: 'Martian Mono', ui-monospace, monospace; /* numbers: same family, tabular-nums */
   --label-size: 10.5px;
   --label-track: 0.12em;  /* uppercase everywhere */
   --console-w: clamp(374px, 28.6vw, 484px); /* 10% wider than before */
@@ -81,7 +61,8 @@ html, body {
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
-  text-transform: uppercase;
+  font-variant-numeric: tabular-nums; /* digits keep their width while a value moves */
+  text-transform: lowercase; /* the body reads in lowercase; headings opt back in to uppercase */
   letter-spacing: var(--label-track);
   font-size: var(--label-size);
 }

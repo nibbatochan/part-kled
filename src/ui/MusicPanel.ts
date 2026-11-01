@@ -6,6 +6,7 @@ import { AudioMapper } from '../audio/AudioMap';
 import { paletteFrom, type Rgb } from '../audio/palette';
 import type { AudioFeatures } from '../audio/features';
 import type { WebEngine } from '../web/WebEngine';
+import { desktopApi } from '../desktop';
 
 const SOURCE_LABEL: Record<AudioSource, string> = { file: 'FILE', tab: 'TAB SOUND' };
 
@@ -41,6 +42,23 @@ export class MusicPanel {
       this.setState();
       this.say('SHARING STOPPED');
     };
+
+    // Desktop app: no sound capture while paused (locked, minimised, asleep, full-screen app)
+    let resumeTab = false;
+    desktopApi()?.onPause((p) => {
+      if (p && this.feed.kind === 'tab') {
+        resumeTab = true;
+        this.stop();
+      } else if (!p && resumeTab) {
+        resumeTab = false;
+        void this.start('tab', () => this.feed.useTab());
+      }
+    });
+    // Desktop app: the system sound follows the wallpaper switch
+    desktopApi()?.onWallpaper((on) => {
+      if (on) void this.start('tab', () => this.feed.useTab());
+      else this.stop();
+    });
 
     this.setState();
     (window as unknown as { __music: MusicPanel }).__music = this; // for checks from the console, like __engine

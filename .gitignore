@@ -3,3 +3,8 @@ dist/
 dist-hero/
 .DS_Store
 *.local
+
+# desktop app build output
+desktop/node_modules/
+desktop/release/
+desktop/web/

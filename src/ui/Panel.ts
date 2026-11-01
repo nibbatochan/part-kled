@@ -1,7 +1,9 @@
 // src/ui/Panel.ts
-import { MOTION_PRESETS, defaults, withLightStart, type Params } from '../core/params';
+import { MOTION_PRESETS, defaults, lookTone, withEffectsStart, withLightStart, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
-import { STYLE_SETTINGS } from '../core/styles';
+import { CELL_RANGE, HALFTONE_CELL, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_ESSENTIALS, LOOK_PRESETS, LOOK_TITLES, STYLE_NAMES, STYLE_SETTINGS, type LookTone } from '../core/styles';
+import { XyPad } from './XyPad';
+import { scrollRow } from './ScrollRow';
 
 // Scanner cycle: the shader's mode ids. RADAR and LINES are removed from the cycle.
 const SCAN_CYCLE = [
@@ -33,6 +35,8 @@ function readKey(obj: object, key: string): unknown {
 export class Panel {
   private params: Params;
   private lineWidget: LineWidget;
+  private pads: XyPad[] = [];
+  private lookCat = 0; // the look type the LOOK box shows
   private uiLayer: HTMLElement;
   private onParamsChangeCb: (params: Params) => void;
   private groups: { keys: string[]; dot: HTMLElement }[] = [];
@@ -63,9 +67,18 @@ export class Panel {
     });
     this.lineWidget.setValue(this.params.line);
 
+    this.buildLookGrid();
     this.buildCollapsibles();
     this.bindDirectionInputs();
     this.buildStyleSettings(); // before the sliders are bound, so they get the number boxes too
+    this.buildLookExtras();
+    this.buildLightPads();
+    document.querySelectorAll<HTMLElement>('.fx-box .look-dots.sub, .fx-box .seg-wrap').forEach(scrollRow);
+    this.bindTabs('#fx-cats [data-ecat]', '.ecat-panel', 'ecat');
+    this.bindTopTabs();
+    document.getElementById('effects-reset')?.addEventListener('click', () => this.resetEffects());
+    this.bindTabs('#motion-dots [data-mcat]', '.mcat-panel', 'mcat');
+    this.bindGlowPat();
     this.bindEffects();
     this.bindValueInputs();
     this.bindToggles();
@@ -163,7 +176,14 @@ export class Panel {
     return Array.from(document.querySelectorAll<HTMLInputElement>('input[type="range"][data-path]'));
   }
 
+  /** Write a value into the chosen look's own tone (colour, ink, paper, invert, auto levels, cell). */
+  private setLook(patch: Partial<LookTone>): void {
+    const key = String(this.params.style);
+    this.params.looks = { ...this.params.looks, [key]: { ...(this.params.looks[key] ?? {}), ...patch } };
+  }
+
   private setPath(path: string, value: number): void {
+    if (path.startsWith('look.')) return this.setLook({ [path.slice(5)]: value } as Partial<LookTone>);
     const [a, b] = path.split('.');
     const root = this.params as unknown as Record<string, number | Record<string, number>>;
     if (b === undefined) root[a] = value;
@@ -171,6 +191,7 @@ export class Panel {
   }
 
   private getPath(path: string): number {
+    if (path.startsWith('look.')) return lookTone(this.params)[path.slice(5) as 'cell'];
     const [a, b] = path.split('.');
     const root = this.params as unknown as Record<string, number | Record<string, number>>;
     if (b === undefined) return root[a] as number;
@@ -249,95 +270,366 @@ export class Panel {
 
   /** STYLE: one button per look (data-style = the look's number), the shared controls, and the settings of each look. */
   private bindStyle(): void {
-    document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.params.style = Number(btn.dataset.style);
-        this.syncStyleUi();
-        this.onParamsChangeCb(this.params);
-      });
+    // One listener for every look tile: the tiles are rebuilt when the type changes, so a per-tile listener would be lost
+    document.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-style]');
+      if (!btn) return;
+      this.params.style = Number(btn.dataset.style);
+      // Every look starts with its colour on ORIGINAL when it is chosen; the dither types bring their own colours
+      const own = this.params.style === 13 || this.params.style === 17 ? LOOK_TONE_DEFAULTS[this.params.style] : null;
+      this.setLook(own ? { colour: own.colour, ink: own.ink, paper: own.paper } : { colour: 0 });
+      this.syncStyleUi();
+      this.onParamsChangeCb(this.params);
     });
     document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.params.styleColor = Number(btn.dataset.scolor);
+        this.setLook({ colour: Number(btn.dataset.scolor) });
         this.syncStyleUi();
         this.onParamsChangeCb(this.params);
       });
     });
     const color = (id: string, key: 'ink' | 'paper') => {
       document.getElementById(id)?.addEventListener('input', (e) => {
-        this.params[key] = (e.target as HTMLInputElement).value;
+        this.setLook({ [key]: (e.target as HTMLInputElement).value });
         this.onParamsChangeCb(this.params);
       });
     };
     color('in-ink', 'ink');
     color('in-paper', 'paper');
+    // Size by light or colour: a choice of the chosen look, like its colour
+    document.querySelectorAll<HTMLButtonElement>('[data-sizeby]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.setLook({ sizeBy: Number(b.dataset.sizeby) });
+        this.syncStyleUi();
+        this.onParamsChangeCb(this.params);
+      });
+    });
     // Per-look choices (data-ssk = settings key, data-ssv = value)
     document.querySelectorAll<HTMLButtonElement>('[data-ssk]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.params.ss[btn.dataset.ssk ?? ''] = Number(btn.dataset.ssv);
+        // Each HALFTONE pattern starts at the cell size that suits it
+        if (btn.dataset.ssk === 'hShape') this.setLook({ cell: HALFTONE_CELL[Number(btn.dataset.ssv)] ?? 4 });
         this.syncStyleUi();
         this.onParamsChangeCb(this.params);
       });
     });
   }
 
-  /** The controls of every look, built from the one list in core/styles.ts. Only the chosen look's are shown. */
+  /**
+   * The controls of every look, built from the one list in core/styles.ts. Two levels: the essentials
+   * (one choice and up to two values, as a pad) sit under the picture; the rest is in MORE FOR THIS LOOK.
+   */
   private buildStyleSettings(): void {
-    const host = document.getElementById('style-settings');
-    if (!host) return;
-    for (let style = 1; style <= 6; style++) {
+    const more = document.getElementById('style-settings');
+    const essentials = document.getElementById('style-essentials');
+    if (!more || !essentials) return;
+    for (let style = 1; style < STYLE_NAMES.length; style++) {
       const items = STYLE_SETTINGS.filter((s) => s.styles.includes(style));
       if (!items.length) continue;
-      const wrap = document.createElement('div');
-      wrap.className = 'style-set';
-      wrap.dataset.styleSet = String(style);
+      const ess = LOOK_ESSENTIALS[style] ?? {};
+      const essKeys = new Set<string>([...(ess.pad ?? []), ...(ess.range ?? [])]);
+      const essWrap = document.createElement('div');
+      essWrap.className = 'style-set';
+      essWrap.dataset.styleSet = String(style);
+      const moreWrap = document.createElement('div');
+      moreWrap.className = 'style-set';
+      moreWrap.dataset.styleSet = String(style);
+
+      // The essential choice first; the other choices go to MORE
       for (const it of items) {
         if (it.kind !== 'seg') continue;
-        const row = document.createElement('div');
-        row.className = 'row';
-        row.title = it.title;
-        const label = document.createElement('span');
-        label.className = 'row-label';
-        label.textContent = it.label;
-        const seg = document.createElement('div');
-        seg.className = 'seg seg-wrap';
-        it.options.forEach((name, i) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'mode-btn';
-          b.textContent = name;
-          b.dataset.ssk = it.key;
-          b.dataset.ssv = String(i);
-          seg.appendChild(b);
-        });
-        row.append(label, seg);
-        wrap.appendChild(row);
+        if (it.key === ess.seg) essWrap.appendChild(this.segRow(it, style));
+        else moreWrap.appendChild(this.segRow(it, style));
       }
+
       const pair = document.createElement('div');
       pair.className = 'pair';
+      const essPair = document.createElement('div');
+      essPair.className = 'pair';
       for (const it of items) {
         if (it.kind !== 'range') continue;
-        const g = document.createElement('div');
-        g.className = 'slider-group';
-        const id = 'ss-' + it.key;
-        const label = document.createElement('label');
-        label.htmlFor = id;
-        label.title = it.title;
-        label.textContent = it.label;
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.id = id;
-        input.dataset.path = 'ss.' + it.key;
-        input.min = String(it.min);
-        input.max = String(it.max);
-        input.step = String(it.step);
-        const out = document.createElement('output');
-        g.append(label, input, out);
-        pair.appendChild(g);
+        const g = this.sliderGroup(it);
+        if (essKeys.has(it.key)) {
+          // A pad drives its two inputs: they stay in the DOM (number boxes, bindings) but are not shown
+          if (ess.pad?.includes(it.key)) g.hidden = true;
+          essPair.appendChild(g);
+        } else {
+          pair.appendChild(g);
+        }
       }
-      if (pair.children.length) wrap.appendChild(pair);
-      host.appendChild(wrap);
+      if (essPair.children.length) essWrap.appendChild(essPair);
+      if (pair.children.length) moreWrap.appendChild(pair);
+      essentials.appendChild(essWrap);
+      more.appendChild(moreWrap);
+
+      if (ess.pad) {
+        const x = document.getElementById('ss-' + ess.pad[0]) as HTMLInputElement | null;
+        const y = document.getElementById('ss-' + ess.pad[1]) as HTMLInputElement | null;
+        const xItem = items.find((i) => i.key === ess.pad?.[0]);
+        const yItem = items.find((i) => i.key === ess.pad?.[1]);
+        if (x && y && xItem && yItem) {
+          this.pads.push(new XyPad(x, y, [xItem.label, yItem.label], `${xItem.title}. ${yItem.title}.`, essWrap));
+        }
+      }
     }
+  }
+
+  /** The LOOK picker: one dot per look type (DOTS, PIXEL, ...). Only the chosen type's looks are listed. */
+  private buildLookGrid(): void {
+    const dots = document.getElementById('look-dots');
+    if (!dots) return;
+    if (!LOOK_CATEGORIES.some((c) => c.looks.includes(this.params.style))) this.params.style = 0; // a saved look that is no longer offered
+    this.lookCat = Math.max(0, LOOK_CATEGORIES.findIndex((c) => c.looks.includes(this.params.style)));
+    LOOK_CATEGORIES.forEach((cat, i) => {
+      const b = document.createElement('button');
+      b.className = 'look-dot';
+      b.type = 'button';
+      b.dataset.cat = String(i);
+      b.title = `Show the ${cat.name} looks`;
+      b.textContent = cat.name;
+      b.addEventListener('click', () => {
+        this.lookCat = i;
+        this.showLookCat();
+        this.onParamsChangeCb(this.params); // the new tiles start blank: redraw them from the picture
+      });
+      dots.appendChild(b);
+    });
+    this.showLookCat();
+  }
+
+  /** Lists the looks of the chosen type. Showing a type does not pick a look: the top right keeps the one in use. */
+  private showLookCat(): void {
+    const grid = document.getElementById('style-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'look-cat-row';
+    for (const look of LOOK_CATEGORIES[this.lookCat].looks) {
+      const b = document.createElement('button');
+      b.className = 'mode-btn';
+      b.type = 'button';
+      b.dataset.style = String(look);
+      b.title = LOOK_TITLES[look] ?? '';
+      b.textContent = STYLE_NAMES[look];
+      row.appendChild(b);
+    }
+    grid.appendChild(row);
+    document.querySelectorAll<HTMLButtonElement>('#look-dots [data-cat]').forEach((b) => {
+      const on = Number(b.dataset.cat) === this.lookCat;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    this.syncStyleUi();
+  }
+
+  /** A seg row for one look setting: each button carries the setting key and its value. */
+  private segRow(it: Extract<(typeof STYLE_SETTINGS)[number], { kind: 'seg' }>, style: number): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.title = it.title;
+    const label = document.createElement('span');
+    label.className = 'row-label';
+    label.textContent = it.label;
+    const seg = document.createElement('div');
+    seg.className = 'seg seg-wrap';
+    it.options.forEach((opt, i) => {
+      const b = document.createElement('button');
+      b.className = 'mode-btn';
+      b.type = 'button';
+      b.textContent = opt;
+      b.dataset.ssk = it.key;
+      b.dataset.ssv = String(i);
+      b.dataset.styleSetOf = String(style);
+      seg.appendChild(b);
+    });
+    row.append(label, seg);
+    return row;
+  }
+
+  /** A range row for one look setting: the slider with its number box. */
+  private sliderGroup(it: Extract<(typeof STYLE_SETTINGS)[number], { kind: 'range' }>): HTMLElement {
+    const g = document.createElement('div');
+    g.className = 'slider-group';
+    const id = 'ss-' + it.key;
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.title = it.title;
+    label.textContent = it.label;
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.id = id;
+    input.dataset.path = 'ss.' + it.key;
+    input.min = String(it.min);
+    input.max = String(it.max);
+    input.step = String(it.step);
+    const out = document.createElement('output');
+    g.append(label, input, out);
+    return g;
+  }
+
+  /** Look presets: one row with the presets of the chosen look. INK and TONE move into MORE. */
+  private buildLookExtras(): void {
+    const more = document.getElementById('style-settings');
+    if (more) {
+      const tone = document.querySelector<HTMLElement>('[data-toggle="styleInvert"]')?.closest('.row');
+      if (tone) more.prepend(tone);
+    }
+    const seg = document.getElementById('look-preset-seg');
+    if (!seg) return;
+    for (let style = 1; style < STYLE_NAMES.length; style++) {
+      for (const pr of LOOK_PRESETS[style] ?? []) {
+        const b = document.createElement('button');
+        b.className = 'mode-btn';
+        b.type = 'button';
+        b.textContent = pr.label;
+        b.dataset.styleSet = String(style);
+        b.title = `${pr.label}: cell ${pr.cell}`;
+        b.addEventListener('click', () => {
+          this.params.style = style;
+          this.setLook({ cell: pr.cell });
+          this.params.ss = { ...this.params.ss, ...pr.values };
+          this.syncUiToParams();
+          this.onParamsChangeCb(this.params);
+        });
+        seg.appendChild(b);
+      }
+    }
+  }
+
+  /** LIGHT: a pad for each glow (strength x spread, strength x size), and the halo colour. */
+  /** The pads still in use: VHS, glitch and stack. Everything else is sliders. */
+  private buildLightPads(): void {
+    const pad = (xId: string, yId: string, labels: [string, string], title: string, hostId: string) => {
+      const x = document.getElementById(xId) as HTMLInputElement | null;
+      const y = document.getElementById(yId) as HTMLInputElement | null;
+      const host = document.getElementById(hostId);
+      if (!x || !y || !host) return;
+      x.closest('.slider-group')?.toggleAttribute('hidden', true);
+      y.closest('.slider-group')?.toggleAttribute('hidden', true);
+      const wrap = document.createElement('div');
+      host.before(wrap);
+      this.pads.push(new XyPad(x, y, labels, title, wrap));
+    };
+    pad('sl-vhs-amt', 'sl-vhs-noise', ['DISTORTION', 'NOISE'], 'VHS distortion across, noise up', 'vhs-sliders');
+    pad('sl-gl-amt', 'sl-gl-rate', ['AMOUNT', 'RATE'], 'Glitch amount across, rate up', 'glitch-sliders');
+    pad('sl-stack-n', 'sl-stack-w', ['POINTS', 'LINE'], 'Points across, line width up', 'stack-sliders');
+    document.querySelectorAll<HTMLButtonElement>('[data-mfx]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.params.motionFx = Number(b.dataset.mfx);
+        this.syncMotionFx();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+    document.querySelectorAll<HTMLButtonElement>('[data-mesh]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.params.surface = { ...this.params.surface, meshPalette: Number(b.dataset.mesh) };
+        this.syncSurface();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+    document.getElementById('in-cloud-tint')?.addEventListener('input', (e) => {
+      this.params.surface = { ...this.params.surface, cloudTint: (e.target as HTMLInputElement).value };
+      this.onParamsChangeCb(this.params);
+    });
+    document.getElementById('in-stack-col')?.addEventListener('input', (e) => {
+      this.params.graphic = { ...this.params.graphic, stackColour: (e.target as HTMLInputElement).value };
+      this.onParamsChangeCb(this.params);
+    });
+    document.getElementById('in-halo-tint')?.addEventListener('input', (e) => {
+      this.params.glow = { ...this.params.glow, haloTint: (e.target as HTMLInputElement).value };
+      this.onParamsChangeCb(this.params);
+    });
+  }
+
+  /** EFFECTS RESET: every effect off. The look, its settings and the picture stay. */
+  private resetEffects(): void {
+    this.params = withEffectsStart();
+    this.lookCat = 0;
+    this.showLookCat();
+    this.syncUiToParams();
+    this.onParamsChangeCb(this.params);
+  }
+
+  /** STACK: a glow pattern over the picture, on top of whatever look and effects are on. */
+  private bindGlowPat(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-glowpat]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.params.glow = { ...this.params.glow, glowPat: Number(b.dataset.glowpat) };
+        this.syncGlowPat();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+  }
+
+  /** EFFECT or STACK, the two views of EFFECTS. A sub-tab (LOOK, MOTION, LIGHT, SURFACE) also goes back to EFFECT. */
+  private bindTopTabs(): void {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('#effects-box [data-top]');
+    buttons.forEach((b) => b.addEventListener('click', () => this.setTop(b.dataset.top ?? 'effect')));
+    document.querySelectorAll<HTMLButtonElement>('#fx-cats [data-ecat]').forEach((b) => b.addEventListener('click', () => this.setTop('effect')));
+    this.refreshEffectView();
+  }
+
+  private setTop(top: string): void {
+    document.querySelectorAll<HTMLButtonElement>('#effects-box [data-top]').forEach((d) => {
+      const on = d.dataset.top === top;
+      d.classList.toggle('active', on);
+      d.setAttribute('aria-pressed', String(on));
+    });
+    this.refreshEffectView();
+  }
+
+  /** Shows the stack options when STACK is the view, otherwise the effect panel of the chosen sub-tab. */
+  private refreshEffectView(): void {
+    const top = document.querySelector<HTMLButtonElement>('#effects-box [data-top].active')?.dataset.top ?? 'effect';
+    // STACK shows only the glow group: the effect sub-tabs are for EFFECT
+    const cats = document.getElementById('fx-cats');
+    if (cats) cats.hidden = top === 'stack';
+    const current = document.querySelector<HTMLButtonElement>('#fx-cats .look-dot.active')?.dataset.ecat ?? '0';
+    document.querySelectorAll<HTMLElement>('.ecat-panel').forEach((p) => {
+      p.hidden = top === 'stack' ? p.dataset.ecat !== 'stack' : p.dataset.ecat !== current;
+    });
+  }
+
+  private syncGlowPat(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-glowpat]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.glowpat) === this.params.glow.glowPat);
+    });
+  }
+
+  /** A row of tabs: one dot per kind, and only the panel of the chosen kind shows. key names the data attribute. */
+  private bindTabs(dots: string, panels: string, key: 'ecat' | 'mcat'): void {
+    const buttons = document.querySelectorAll<HTMLButtonElement>(dots);
+    buttons.forEach((b) => {
+      b.addEventListener('click', () => {
+        buttons.forEach((d) => {
+          const on = d === b;
+          d.classList.toggle('active', on);
+          d.setAttribute('aria-pressed', String(on));
+        });
+        document.querySelectorAll<HTMLElement>(panels).forEach((p) => {
+          p.hidden = p.dataset[key] !== b.dataset[key];
+        });
+      });
+    });
+  }
+
+  private syncSurface(): void {
+    const v = (id: string, val: string) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el) el.value = val;
+    };
+    v('in-stack-col', this.params.graphic.stackColour);
+    v('in-cloud-tint', this.params.surface.cloudTint);
+    document.querySelectorAll<HTMLButtonElement>('[data-mesh]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.mesh) === this.params.surface.meshPalette);
+    });
+  }
+
+  private syncMotionFx(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-mfx]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.mfx) === this.params.motionFx);
+    });
   }
 
   private syncStyleUi(): void {
@@ -355,17 +647,30 @@ export class Panel {
     const show = (el: HTMLElement | null, on: boolean) => {
       if (el) el.style.display = on ? '' : 'none';
     };
+    show(document.getElementById('look-presets'), st > 0);
+    show(document.getElementById('sizeby-row'), st > 0);
+    document.querySelectorAll<HTMLButtonElement>('[data-sizeby]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.sizeby) === lookTone(this.params).sizeBy);
+    });
     show(document.getElementById('style-more'), st > 0);
     show(document.getElementById('style-more-btn'), st > 0);
-    show(document.getElementById('ink-row'), this.params.styleColor > 0);
-    show(document.getElementById('paper-field'), this.params.styleColor === 2);
+    const tone = lookTone(this.params);
     document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((b) => {
-      b.classList.toggle('active', Number(b.dataset.scolor) === this.params.styleColor);
+      b.classList.toggle('active', Number(b.dataset.scolor) === tone.colour);
     });
     const ink = document.getElementById('in-ink') as HTMLInputElement | null;
     const paper = document.getElementById('in-paper') as HTMLInputElement | null;
-    if (ink) ink.value = this.params.ink;
-    if (paper) paper.value = this.params.paper;
+    if (ink) ink.value = tone.ink;
+    if (paper) paper.value = tone.paper;
+    // Each look has its own cell range: DITHER goes finer than the others
+    const range = CELL_RANGE[st] ?? CELL_RANGE[1];
+    const cellSlider = document.getElementById('sl-cell') as HTMLInputElement | null;
+    if (cellSlider) {
+      cellSlider.min = String(range[0]);
+      cellSlider.max = String(range[1]);
+      cellSlider.value = String(tone.cell);
+      this.updateSliderOutput(cellSlider);
+    }
     document.querySelectorAll<HTMLElement>('[data-style-set]').forEach((w) => {
       w.style.display = Number(w.dataset.styleSet) === st ? '' : 'none';
     });
@@ -397,10 +702,18 @@ export class Panel {
     const toggles = document.querySelectorAll<HTMLButtonElement>('.toggle-btn');
     toggles.forEach((btn) => {
       btn.addEventListener('click', () => {
-        const key = btn.dataset.toggle as keyof Params;
-        if (key && typeof this.params[key] === 'boolean') {
-          const newVal = !this.params[key];
-          (this.params[key] as boolean) = newVal;
+        const key = btn.dataset.toggle ?? '';
+        if (key === 'styleInvert' || key === 'autoLevels') {
+          const look: Partial<LookTone> = key === 'styleInvert' ? { invert: !lookTone(this.params).invert } : { autoLevels: !lookTone(this.params).autoLevels };
+          this.setLook(look);
+          btn.classList.toggle('active', Object.values(look)[0] as boolean);
+          this.onParamsChangeCb(this.params);
+          return;
+        }
+        const field = key as keyof Params;
+        if (key && typeof this.params[field] === 'boolean') {
+          const newVal = !this.params[field];
+          (this.params[field] as boolean) = newVal;
           btn.classList.toggle('active', newVal);
           this.syncEmitUi();
           this.onParamsChangeCb(this.params);
@@ -412,7 +725,7 @@ export class Panel {
   // ---- collapsible sections: closed ones show a one-line summary of their state ----
 
   private sections = new Map<string, { sec: HTMLElement; summary: HTMLElement }>();
-  private static readonly OPEN_KEY = 'pds_sections_open_v1';
+  private static readonly OPEN_KEY = 'pds_sections_open_v2';
 
   private loadOpen(): Record<string, boolean> {
     try {
@@ -488,7 +801,8 @@ export class Panel {
         btn.setAttribute('aria-expanded', String(open));
         body.hidden = !open;
       };
-      set(saved[key] ?? false);
+      // Sections marked data-open start open; the rest start closed (a saved choice wins)
+      set(saved[key] ?? sec.dataset.open === 'true');
       btn.addEventListener('click', () => {
         set(!sec.classList.contains('is-open'));
         this.saveOpen();
@@ -507,6 +821,12 @@ export class Panel {
     const sweep = p.scan ? (SCAN_CYCLE.find((c) => c.id === p.scanMode)?.name ?? 'SWEEP') : 'OFF';
     const push = p.track ? (p.trackStyle === 'old' ? 'STRONG' : 'GENTLE') : 'OFF';
     set('reactions', `SWEEP ${sweep} · PUSH ${push}`);
+    set('surface', p.meshOn ? 'MESH' : 'OFF');
+    const fxNames = ['OFF', 'STARDUST', 'BREAKDOWN', 'DISAPPEAR', 'COSMIC'];
+    set('motion', [p.motionFx ? fxNames[p.motionFx] : '', p.cloudOn ? 'CLOUD' : '', p.vhsOn ? 'VHS' : '', p.glitchOn ? (p.glitchBeat ? 'GLITCH ON BEAT' : 'GLITCH') : '', p.stackOn ? 'GRAPHIC' : '']
+      .filter(Boolean).join(' + ') || 'OFF');
+    set('particle', `MOVE ${Math.round(p.drift * 100)}% · DEPTH ${Math.round(p.depth * 100)}%`);
+    set('light', p.bloomOn || p.haloOn || p.holoOn ? [p.bloomOn ? 'BLOOM' : '', p.haloOn ? 'HALO' : '', p.holoOn ? 'HOLO' : ''].filter(Boolean).join(' + ') : 'OFF');
     set('particles', `SIZE ${p.trailSize.toFixed(2)} · TRAILS ${Math.round(p.trail.amount * 100)}%`);
     const fx = p.fx as unknown as Record<string, number>;
     const base = defaults.fx as unknown as Record<string, number>;
@@ -730,16 +1050,26 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'styleInvert', 'autoLevels', 'emitOn', 'trails'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'emitOn', 'trails', 'bloomOn', 'haloOn', 'vhsOn', 'glitchOn', 'glitchBeat', 'holoOn', 'cloudOn', 'meshOn', 'stackOn', 'stackWords'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
     });
+    // Per-look flags: they read the look that is chosen
+    const tone = lookTone(this.params);
+    document.querySelector<HTMLButtonElement>('[data-toggle="styleInvert"]')?.classList.toggle('active', tone.invert);
+    document.querySelector<HTMLButtonElement>('[data-toggle="autoLevels"]')?.classList.toggle('active', tone.autoLevels);
 
     this.syncEffects();
     this.syncStyleUi();
     this.syncEmitUi();
     this.updateSummaries();
+    this.pads.forEach((p) => p.sync());
+    this.syncMotionFx();
+    this.syncGlowPat();
+    this.syncSurface();
+    const tint = document.getElementById('in-halo-tint') as HTMLInputElement | null;
+    if (tint) tint.value = this.params.glow.haloTint;
 
     document.querySelectorAll<HTMLButtonElement>('[data-slevel]').forEach((b) => {
       b.classList.toggle('active', Number(b.dataset.slevel) === this.params.scanLevel);

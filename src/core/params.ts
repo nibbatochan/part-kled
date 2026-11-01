@@ -1,5 +1,5 @@
 // src/core/params.ts
-import { defaultStyleValues } from './styles';
+import { LOOK_TONE_DEFAULTS, defaultStyleValues, type LookTone } from './styles';
 
 /** Colour levels / curve / hue / saturation applied to the final picture. */
 export interface FxParams {
@@ -42,17 +42,16 @@ export interface Params {
   trailSize: number; // dot size of drifting particles (multiplier)
   trailAngle: number; // degrees, trail direction turned away from the drift path
   pSat: number; // 0..2 particle saturation
-  style: number; // particle look: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES (web build)
-  cell: number; // 4..24 cell size of the cell looks, css px
+  style: number; // look: 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 LINES (web build)
   ss: Record<string, number>; // settings of each look (core/styles.ts)
   emitOn: boolean; // EMITTERS panel: region weights, spots, scatter, trail variety
   emit: Record<string, number>; // r0..r8 (3 x 3 regions, top left first, 0..2), spots, scatter, lenRand, turn
-  styleColor: number; // cell looks: 0 SOURCE colour, 1 MONO ink, 2 DUO ink on paper
-  styleInvert: boolean; // cell looks: swap light and dark
-  autoLevels: boolean; // cell looks: stretch the picture's brightness to fill the look
-  ink: string; // hex colours of MONO and DUO
-  paper: string;
+  // each cell look keeps its own cell size, colour and tone (see lookTone)
+  looks: Record<string, Partial<LookTone>>; // key = look number
   audioAmount: number; // MUSIC: 0..1 how strongly sound moves the picture
+  motionFx: number; // MOTION effect: 0 off, 1 STARDUST, 2 BREAKDOWN, 3 DISAPPEAR, 4 COSMIC
+  motionAmount: number; // 0..1 how strong
+  motionSpeed: number; // 0.2..2 how fast a cycle runs
   musicLook: number; // MUSIC look: 0 off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE
   eqStyle: number; // EQUALIZER: 0 off, 1 DOTS, 2 CROSS, 3 SPARKS (particles beside the picture)
   eqSize: number; // EQUALIZER dot size, CSS px
@@ -60,6 +59,22 @@ export interface Params {
   scan: boolean;    // sweep line
   scanLevel: number; // 1..5 scan impact (3 = the original strength)
   trails: boolean;  // fading streaks
+  bloomOn: boolean; // LIGHT: a tight soft glow around bright parts
+  haloOn: boolean;  // LIGHT: a wide tinted glow
+  vhsOn: boolean;   // SIGNAL: tape look
+  glitchOn: boolean; // SIGNAL: sliced, colour-split bursts
+  glitchBeat: boolean; // SIGNAL: bursts on the beat instead of on time
+  signal: { vhsAmount: number; vhsNoise: number; glitchAmount: number; glitchRate: number };
+  grainOn: boolean; // SURFACE: film grain
+  holoOn: boolean;  // SURFACE: iridescent sheen
+  duoOn: boolean;   // SURFACE: two-colour map of the brightness
+  cloudOn: boolean; // SURFACE: drifting haze
+  meshOn: boolean;  // SURFACE: soft gradient mesh over the picture
+  stackOn: boolean; // GRAPHIC: moving points joined by lines
+  stackWords: boolean; // GRAPHIC: a word tag at each point
+  graphic: { stackCount: number; stackWidth: number; stackColour: string };
+  surface: { grainAmount: number; grainSize: number; holoAmount: number; holoSpeed: number; duoAmount: number; duoShadow: string; duoLight: string; cloudAmount: number; cloudScale: number; cloudTint: string; meshAmount: number; meshPalette: number };
+  glow: { threshold: number; bloomAmount: number; bloomRadius: number; haloAmount: number; haloSize: number; haloTint: string; glowPat: number; glowPatAmt: number };
 
   travel: 'swarm' | 'melt';
   background: 'dark' | 'white';      // ON WHITE
@@ -74,6 +89,11 @@ export interface Params {
 
   fx: FxParams;
   trail: TrailParams;
+}
+
+/** The look's own cell size, colour and tone: its saved values over its quality defaults. */
+export function lookTone(p: Params): LookTone {
+  return { ...(LOOK_TONE_DEFAULTS[p.style] ?? LOOK_TONE_DEFAULTS[0]), ...(p.looks[String(p.style)] ?? {}) };
 }
 
 export const defaults: Params = {
@@ -97,22 +117,36 @@ export const defaults: Params = {
   trailAngle: 0,
   pSat: 1.2,
   style: 0,
-  cell: 8,
   ss: defaultStyleValues(),
   emitOn: true,
   emit: { r0: 1, r1: 1, r2: 1, r3: 1, r4: 1, r5: 1, r6: 1, r7: 1, r8: 1, spots: 0, scatter: 0.35, lenRand: 1, turn: 0.3 },
-  styleColor: 0,
-  styleInvert: false,
-  autoLevels: true,
-  ink: '#ffffff',
-  paper: '#000000',
+  looks: {},
   audioAmount: 0.7,
+  motionFx: 0,
+  motionAmount: 0.6,
+  motionSpeed: 1,
   musicLook: 0,
   eqStyle: 0,
   eqSize: 1.8,
   trackStyle: 'old',
   scanLevel: 3,
   trails: true,
+  bloomOn: false,
+  haloOn: false,
+  vhsOn: false,
+  glitchOn: false,
+  glitchBeat: false,
+  signal: { vhsAmount: 0.5, vhsNoise: 0.5, glitchAmount: 0.5, glitchRate: 0.4 },
+  grainOn: false,
+  holoOn: false,
+  duoOn: false,
+  cloudOn: false,
+  meshOn: false,
+  stackOn: false,
+  stackWords: true,
+  graphic: { stackCount: 9, stackWidth: 1, stackColour: '#ffffff' },
+  surface: { grainAmount: 0.5, grainSize: 0.3, holoAmount: 0.5, holoSpeed: 0.5, duoAmount: 0.8, duoShadow: '#1a0d4d', duoLight: '#ffd980', cloudAmount: 0.5, cloudScale: 0.4, cloudTint: '#ccd9ff', meshAmount: 0.6, meshPalette: 0 },
+  glow: { threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: '#ffd9a0', glowPat: 0, glowPatAmt: 0.8 },
 
   travel: 'swarm',
   background: 'dark',
@@ -165,6 +199,29 @@ export const presets: Record<string, Partial<Params>> = {
  * Start settings: applied on every page load and to every new picture. Values are the studio's
  * starting look (flow, direction, particles, trail, interaction, toggles).
  */
+/** The EFFECTS reset state, also the state on every load: the DOTS look, zero movement, no effects, no trails. */
+export function withEffectsStart(): Params {
+  return {
+    ...withLightStart(defaults),
+    style: 0,
+    drift: 0,
+    motionFx: 0,
+    glow: { ...defaults.glow, glowPat: 0 },
+    bloomOn: false,
+    haloOn: false,
+    holoOn: false,
+    vhsOn: false,
+    glitchOn: false,
+    glitchBeat: false,
+    grainOn: false,
+    duoOn: false,
+    cloudOn: false,
+    meshOn: false,
+    stackOn: false,
+    stackWords: false,
+  };
+}
+
 export function withLightStart(p: Params): Params {
   return {
     ...p,
@@ -205,6 +262,11 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
       ss: { ...fallback.ss, ...(parsed.ss || {}) },
       emit: { ...fallback.emit, ...(parsed.emit || {}) },
       trail: { ...fallback.trail, ...(parsed.trail || {}) },
+      looks: { ...fallback.looks, ...(parsed.looks || {}) },
+      glow: { ...fallback.glow, ...(parsed.glow || {}) },
+      signal: { ...fallback.signal, ...(parsed.signal || {}) },
+      surface: { ...fallback.surface, ...(parsed.surface || {}) },
+      graphic: { ...fallback.graphic, ...(parsed.graphic || {}) },
     };
   } catch {
     return { ...fallback };

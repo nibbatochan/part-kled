@@ -3,6 +3,7 @@
 // from the picture on screen (same particle index, same rule as the studio's morph).
 import { CELL_FRAG_SRC, CELL_VERT, EQ_VERT, FRAG_SRC, POINT_VERT, TRAIL_VERT } from './shaders';
 import { buildGlyphAtlas } from './glyphs';
+import { Post, type PostParams } from './Post';
 import { defaultStyleValues, packStyle, type StyleValues } from '../core/styles';
 import type { LiteSample } from './sample';
 
@@ -42,12 +43,14 @@ export interface LiteParams {
   opacity: number;      // 0..1 picture only
   bw: boolean;
   fx: LiteFx;
+  glow: PostParams;     // LIGHT: bloom and halo
   light: [number, number, number] | null; // tint colour, null = no tint
   scan: boolean;
   scanMode: number;     // 0 SWEEP, 1 RING, 2 RADAR, 3 LINES, 4 DEPTH, (5 BURST is the click shock)
   scanLevel: number;    // 1..5, 3 = studio strength
-  style: number;        // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 STIPPLE, 6 LINES
+  style: number;        // 0 DOTS, 1 HALFTONE, 2 MOSAIC, 3 DITHER, 4 ASCII, 5 LINES
   cell: number;         // cell size of the cell looks, css px
+  sizeBy: number;       // cell looks: 0 fixed, 1 size by light, 2 size by colour
   styleSet: StyleValues; // per-look settings (see core/styles.ts)
   emitOn: boolean;      // EMITTERS panel on
   emit: Record<string, number>; // r0..r8 region weights, spots, scatter, lenRand, turn
@@ -57,6 +60,9 @@ export interface LiteParams {
   ink: [number, number, number];
   paper: [number, number, number];
   musicLook: number; // MUSIC looks: 0 off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE
+  motionFx: number;     // MOTION effect: 0 off, 1 STARDUST, 2 BREAKDOWN, 3 DISAPPEAR, 4 COSMIC
+  motionAmount: number; // 0..1
+  motionSpeed: number;  // 0.2..2
 }
 
 /** What the sound looks like this frame (see FeatureExtractor). All zeros when no sound is on. */
@@ -71,6 +77,9 @@ export interface MusicState {
 
 export const liteDefaults: LiteParams = {
   musicLook: 0,
+  motionFx: 0,
+  motionAmount: 0.6,
+  motionSpeed: 1,
   drift: 0.6,
   angle: 0.5,
   length: 0.5,
@@ -97,12 +106,14 @@ export const liteDefaults: LiteParams = {
   opacity: 1,
   bw: false,
   fx: { black: 0, white: 1, gamma: 1, contrast: 0, hue: 0, saturation: 1 },
+  glow: { bloomOn: false, haloOn: false, threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: [1, 0.85, 0.63], vhsOn: false, vhsAmount: 0.5, vhsNoise: 0.5, glitchOn: false, glitchAmount: 0.5, glitchRate: 0.4, glitchBeat: false, grainOn: false, grainAmount: 0.5, grainSize: 0.3, holoOn: false, holoAmount: 0.5, holoSpeed: 0.5, duoOn: false, duoAmount: 0.8, duoShadow: [0.1, 0.05, 0.3], duoLight: [1, 0.85, 0.5], cloudOn: false, cloudAmount: 0.5, cloudScale: 0.4, cloudTint: [0.8, 0.85, 1], meshOn: false, meshAmount: 0.6, meshPalette: 0, stackOn: false, stackWords: true, stackCount: 9, stackWidth: 1, stackColour: [1, 1, 1], glowPat: 0, glowPatAmt: 0.8 },
   light: [0.95, 0.9, 0.79],
   scan: false,
   scanMode: 0,
   scanLevel: 3,
   style: 0,
   cell: 8,
+  sizeBy: 0,
   styleSet: defaultStyleValues(),
   emitOn: true,
   emit: { r0: 1, r1: 1, r2: 1, r3: 1, r4: 1, r5: 1, r6: 1, r7: 1, r8: 1, spots: 0, scatter: 0.35, lenRand: 1, turn: 0.3 },
@@ -183,10 +194,10 @@ const UNIFORMS = [
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
   'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
-  'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt',
+  'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt', 'uMotion', 'uMotionAmt', 'uMotionSpeed',
   // cell looks
   'uImg', 'uImg2', 'uGrid', 'uGridAng', 'uLayer', 'uTexSize', 'uLv', 'uColorMode', 'uInk', 'uPaper', 'uInvert',
-  'uStyle', 'uSP', 'uSP2',
+  'uStyle', 'uSP', 'uSP2', 'uSizeBy',
 ];
 
 interface Slot {
@@ -237,6 +248,7 @@ export class LiteEngine {
 
   private sample: LiteSample | null = null;
   private drawn = 0;
+  private post: Post | null = null;
   private maxDpr: number;
   private dpr = 1;
   private cssW = 1;
@@ -723,6 +735,13 @@ export class LiteEngine {
     // MUSIC looks: the beat fades
     if (!exact) this.mBeat *= Math.exp(-dt / 0.25);
 
+    // LIGHT: with bloom or halo on, the scene is drawn into a texture first and the glow is added after
+    const g = p.glow;
+    const lightPost = g.glowPat > 0 || g.bloomOn || g.haloOn || g.vhsOn || g.glitchOn || g.grainOn || g.holoOn || g.duoOn || g.cloudOn || g.meshOn || g.stackOn;
+    if (lightPost) {
+      this.post ??= new Post(gl);
+      this.post.begin(this.canvas.width, this.canvas.height);
+    }
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const cover = this.cover(base);
@@ -777,6 +796,9 @@ export class LiteEngine {
       gl.uniform2f(U.uFx2, hue, fx.saturation);
       gl.uniform1f(U.uBW, p.bw ? 1 : 0);
       gl.uniform1f(U.uMusic, exact ? 0 : p.musicLook); // a loop export never draws the sound
+      gl.uniform1f(U.uMotion, p.motionFx);
+      gl.uniform1f(U.uMotionAmt, p.motionAmount);
+      gl.uniform1f(U.uMotionSpeed, p.motionSpeed);
       gl.uniform1fv(U.uBands, this.mBands);
       gl.uniform1f(U.uBeat, this.mBeat);
       gl.uniform1f(U.uLevel, this.mLevel);
@@ -828,6 +850,7 @@ export class LiteEngine {
     }
     if (this.eqOn && !exact) this.drawEqualizer(dt, s);
     gl.bindVertexArray(null);
+    if (lightPost && this.post) this.post.end(p.glow, this.canvas.width, this.canvas.height, this.phase, Math.min(1, this.mBeat));
 
     if (!exact) this.adapt(dtSec * 1000);
   }
@@ -886,6 +909,7 @@ export class LiteEngine {
     gl.uniform1f(U.uStyle, p.style);
     gl.uniform4f(U.uSP, pk.sp[0], pk.sp[1], pk.sp[2], pk.sp[3]);
     gl.uniform4f(U.uSP2, pk.ramp, 0, 0, 0);
+    gl.uniform1f(U.uSizeBy, p.sizeBy);
     gl.bindVertexArray(null);
     for (const layer of [0, 1]) {
       gl.uniform1f(U.uLayer, layer);
@@ -930,6 +954,7 @@ export class LiteEngine {
 
   dispose(): void {
     const gl = this.gl;
+    this.post?.dispose();
     for (const slot of this.slots) {
       gl.deleteBuffer(slot.vbo);
       gl.deleteVertexArray(slot.vaoPoints);

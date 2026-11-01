@@ -106,12 +106,12 @@
       <aside id="ui-layer" class="console">
         <header class="con-head">
           <div class="con-title">
-            <h1 class="app-title">PARTICLE DEPTH STUDIO</h1>
+            <h1 class="app-title">PARTICLE<br />DEPTH STUDIO</h1>
             <span class="meta">DEPTH ANYTHING V2 · SUMANTH REDDY</span>
           </div>
           <div class="head-actions">
-            <a id="to-video" class="round-btn head-btn" href="?view=video" title="Video: its own page, no pictures">VIDEO ↗</a>
             <a id="to-lab" class="round-btn head-btn" href="./" title="Back to the picture lab">← LAB</a>
+            <button id="desk-wall" class="round-btn head-btn" type="button" hidden title="Use the studio as a live wallpaper behind the desktop icons">WALLPAPER</button>
             <button id="help-btn" class="round-btn head-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts" aria-expanded="false" aria-controls="help-pop">?</button>
             <button id="export-btn" class="round-btn head-btn" type="button" title="Export image or video" aria-label="Export" aria-haspopup="dialog">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
@@ -129,7 +129,12 @@
           <div class="help-row">Drag the canvas in 3D to turn, wheel to move through</div>
         </div>
 
-        <section class="box" id="source-box">
+        <div id="undo-toast" class="undo-toast" role="status" hidden>
+          <span id="undo-msg"></span>
+          <button id="undo-btn" class="toggle-btn" type="button">UNDO</button>
+        </div>
+
+        <section class="box" id="source-box" data-collapse="picture" data-open="true">
           <h2><i>01</i> PICTURE</h2>
           <div class="strip" id="thumbnail-strip">
             <div class="thumb-slot active" data-index="0">
@@ -164,39 +169,46 @@
           <output class="clip-readout" id="clip-readout">OPEN A VIDEO TO START</output>
         </section>
 
-        <section class="box">
-          <h2><i>02</i> LOOK</h2>
-          <div class="style-grid" id="style-grid">
-            <button class="mode-btn" type="button" data-style="0" title="Soft dots, the default look">DOTS</button>
-            <button class="mode-btn" type="button" data-style="1" title="Dot size follows brightness, on a turned grid">HALFTONE</button>
-            <button class="mode-btn" type="button" data-style="2" title="Square pixels">MOSAIC</button>
-            <button class="mode-btn" type="button" data-style="3" title="Ordered dither (Bayer 8x8)">DITHER</button>
-            <button class="mode-btn" type="button" data-style="4" title="Text characters, thin to dense">ASCII</button>
-            <button class="mode-btn" type="button" data-style="5" title="Small dots, density follows brightness">STIPPLE</button>
-            <button class="mode-btn" type="button" data-style="6" title="Horizontal bars, thickness follows brightness">LINES</button>
+        <section class="box fx-box" data-collapse="look" data-open="true" id="effects-box">
+          <h2><i>02</i> <button class="top-word active" type="button" data-top="effect" aria-pressed="true">EFFECTS</button><span class="top-sep"> · </span><button class="top-word" type="button" data-top="stack" aria-pressed="false">STACK</button> <button id="effects-reset" class="mini" type="button" title="Turn every effect off. The look and its settings stay.">RESET</button></h2>
+          <div class="fx-tabs" id="fx-cats" role="group" aria-label="Effect type">
+            <button class="look-dot active" type="button" data-ecat="0" aria-pressed="true">LOOK</button>
+            <button class="look-dot" type="button" data-ecat="1" aria-pressed="false">MOTION</button>
+            <button class="look-dot" type="button" data-ecat="2" aria-pressed="false">LIGHT</button>
+            <button class="look-dot" type="button" data-ecat="3" aria-pressed="false">SURFACE</button>
           </div>
+          <div class="ecat-panel" data-ecat="0">
+          <div class="look-dots sub" id="look-dots" role="group" aria-label="Look type"></div>
+          <div class="style-grid" id="style-grid"></div>
           <div class="pair single">
             <div class="slider-group" data-param="cell">
               <label for="sl-cell" title="Size of one cell, in pixels">CELL SIZE</label>
-              <input type="range" id="sl-cell" data-path="cell" min="4" max="24" step="1" />
+              <input type="range" id="sl-cell" data-path="look.cell" min="4" max="24" step="1" />
               <output></output>
             </div>
           </div>
+          <div class="row" id="sizeby-row">
+            <span class="row-label">size by</span>
+            <div class="seg">
+              <button class="mode-btn" type="button" data-sizeby="0" title="Every cell the same size">fixed</button>
+              <button class="mode-btn" type="button" data-sizeby="1" title="Brighter parts get bigger cells">light</button>
+              <button class="mode-btn" type="button" data-sizeby="2" title="More colourful parts get bigger cells">colour</button>
+            </div>
+          </div>
+          <div class="row" id="look-presets">
+            <span class="row-label">PRESET</span>
+            <div class="seg seg-wrap" id="look-preset-seg"></div>
+          </div>
+          <div id="style-essentials"></div>
           <div id="style-more" class="style-more">
             <div class="row">
               <span class="row-label">COLOURS</span>
-              <div class="seg" id="style-color">
+              <div class="seg seg-wrap" id="style-color">
                 <button class="mode-btn" type="button" data-scolor="0" title="Each cell keeps the picture's colour">ORIGINAL</button>
                 <button class="mode-btn" type="button" data-scolor="1" title="One ink colour">ONE INK</button>
                 <button class="mode-btn" type="button" data-scolor="2" title="Ink on a paper colour">INK+PAPER</button>
-              </div>
-            </div>
-            <div class="row" id="ink-row">
-              <span class="row-label">INK</span>
-              <div class="ink-fields">
-                <input type="color" id="in-ink" value="#ffffff" aria-label="Ink colour" />
-                <span id="paper-field"><span class="row-label">BACKGROUND</span>
-                <input type="color" id="in-paper" value="#000000" aria-label="Paper colour" /></span>
+                <button class="mode-btn" type="button" data-scolor="3" title="Heat-map colours from the brightness: blue, red, yellow, white">THERMAL</button>
+                <button class="mode-btn" type="button" data-scolor="4" title="Loud rainbow colours from the brightness">ACID</button>
               </div>
             </div>
             <div class="row">
@@ -209,10 +221,224 @@
           </div>
           <button class="more-btn" id="style-more-btn" type="button" aria-expanded="false" aria-controls="style-settings"><span class="sec-caret" aria-hidden="true"></span> MORE FOR THIS LOOK</button>
           <div id="style-settings" hidden></div>
+          </div>
+          <div class="ecat-panel" data-ecat="1" hidden>
+          <div class="look-dots sub" id="motion-dots" role="group" aria-label="Motion type">
+            <button class="look-dot active" type="button" data-mcat="0" aria-pressed="true">MOVE</button>
+            <button class="look-dot" type="button" data-mcat="1" aria-pressed="false">GLITCH</button>
+            <button class="look-dot" type="button" data-mcat="2" aria-pressed="false">GRAPHIC</button>
+          </div>
+          <div class="mcat-panel" data-mcat="0">
+            <div class="style-grid" id="motion-grid">
+              <div class="look-cat-row">
+                <button class="mode-btn" type="button" data-mfx="1" title="Particles lift off, twinkle and fade like dust">STARDUST</button>
+                <button class="mode-btn" type="button" data-mfx="2" title="The picture breaks apart from left to right and falls away">BREAKDOWN</button>
+                <button class="mode-btn" type="button" data-mfx="3" title="Particles drop out in a random order, then come back">DISAPPEAR</button>
+                <button class="mode-btn" type="button" data-mfx="4" title="Space bends around the middle: a swirl and a ripple">COSMIC</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">EFFECT</span>
+              <div class="seg">
+                <button class="mode-btn" type="button" data-mfx="0" title="No motion effect">OFF</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-mfx-amt" title="How strong the effect is">STRENGTH</label>
+                <input type="range" id="sl-mfx-amt" data-path="motionAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-mfx-spd" title="How fast one cycle runs">SPEED</label>
+                <input type="range" id="sl-mfx-spd" data-path="motionSpeed" min="0.2" max="2" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">CLOUD</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="cloudOn" title="A soft haze that drifts over the picture">ON</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cloud-amt" title="How thick the haze is">STRENGTH</label>
+                <input type="range" id="sl-cloud-amt" data-path="surface.cloudAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-cloud-scale" title="Large (left) to small (right) clouds">SCALE</label>
+                <input type="range" id="sl-cloud-scale" data-path="surface.cloudScale" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div class="mcat-panel" data-mcat="1" hidden>
+          <div class="row">
+            <span class="row-label">VHS</span>
+            <div class="seg"><button class="toggle-btn" type="button" data-toggle="vhsOn" title="Old tape: wobbling lines, a tracking band, colour bleed, noise">ON</button></div>
+          </div>
+          <div class="pair" id="vhs-sliders">
+            <div class="slider-group">
+              <label for="sl-vhs-amt" title="Line wobble, tracking band and colour bleed">DISTORTION</label>
+              <input type="range" id="sl-vhs-amt" data-path="signal.vhsAmount" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group">
+              <label for="sl-vhs-noise" title="Tape noise and scan lines">NOISE</label>
+              <input type="range" id="sl-vhs-noise" data-path="signal.vhsNoise" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-label">GLITCH</span>
+            <div class="seg">
+              <button class="toggle-btn" type="button" data-toggle="glitchOn" title="Slices of the picture jump sideways and the colours split, in bursts">ON</button>
+              <button class="toggle-btn" type="button" data-toggle="glitchBeat" title="Bursts on the beat of the music instead of on time">ON BEAT</button>
+            </div>
+          </div>
+          <div class="pair" id="glitch-sliders">
+            <div class="slider-group">
+              <label for="sl-gl-amt" title="How far slices jump and how much colours split">AMOUNT</label>
+              <input type="range" id="sl-gl-amt" data-path="signal.glitchAmount" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+            <div class="slider-group">
+              <label for="sl-gl-rate" title="How often a burst happens">RATE</label>
+              <input type="range" id="sl-gl-rate" data-path="signal.glitchRate" min="0" max="1" step="0.01" />
+              <output></output>
+            </div>
+          </div>
+          </div>
+          <div class="mcat-panel" data-mcat="2" hidden>
+          <div class="row">
+            <span class="row-label">STACK</span>
+            <div class="seg">
+              <button class="toggle-btn" type="button" data-toggle="stackOn" title="Points wander over the picture, joined by lines">ON</button>
+              <button class="toggle-btn" type="button" data-toggle="stackWords" title="A word tag at each point">WORDS</button>
+            </div>
+          </div>
+          <div class="pair" id="stack-sliders">
+            <div class="slider-group"><label for="sl-stack-n" title="How many points">POINTS</label><input type="range" id="sl-stack-n" data-path="graphic.stackCount" min="4" max="16" step="1" /><output></output></div>
+            <div class="slider-group"><label for="sl-stack-w" title="Line width in pixels">LINE</label><input type="range" id="sl-stack-w" data-path="graphic.stackWidth" min="0.5" max="4" step="0.1" /><output></output></div>
+          </div>
+          </div>
+          </div>
+          <div class="ecat-panel" data-ecat="2" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-glow-thr" title="Only parts brighter than this glow">THRESHOLD</label>
+                <input type="range" id="sl-glow-thr" data-path="glow.threshold" min="0.1" max="0.95" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">BLOOM</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="bloomOn" title="A tight soft glow around bright parts">ON</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-bloom-amt" title="How strong the bloom is">STRENGTH</label>
+                <input type="range" id="sl-bloom-amt" data-path="glow.bloomAmount" min="0" max="1.5" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-bloom-rad" title="Tight (left) to wide (right)">SPREAD</label>
+                <input type="range" id="sl-bloom-rad" data-path="glow.bloomRadius" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">HALO</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="haloOn" title="A wide tinted glow around bright parts">ON</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-halo-amt" title="How strong the halo is">STRENGTH</label>
+                <input type="range" id="sl-halo-amt" data-path="glow.haloAmount" min="0" max="1.5" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-halo-size" title="Wide (left) to very wide (right)">SIZE</label>
+                <input type="range" id="sl-halo-size" data-path="glow.haloSize" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">HOLO</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="holoOn" title="The picture turns iridescent, like a hologram foil">ON</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-holo-amt" title="How much of the picture turns iridescent">STRENGTH</label>
+                <input type="range" id="sl-holo-amt" data-path="surface.holoAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-holo-spd" title="How fast the colours travel">SPEED</label>
+                <input type="range" id="sl-holo-spd" data-path="surface.holoSpeed" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div class="ecat-panel" data-ecat="3" hidden>
+            <div class="row">
+              <span class="row-label">MESH</span>
+              <div class="seg seg-wrap">
+                <button class="toggle-btn" type="button" data-toggle="meshOn" title="A soft moving colour gradient laid over the picture">ON</button>
+                <button class="mode-btn" type="button" data-mesh="0" title="Violet, blue, pink, green">AURORA</button>
+                <button class="mode-btn" type="button" data-mesh="1" title="Orange, magenta, navy, gold">SUNSET</button>
+                <button class="mode-btn" type="button" data-mesh="2" title="Teal, steel, ice, mint">ICE</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-mesh-amt" title="How strongly the gradient colours the picture">STRENGTH</label>
+                <input type="range" id="sl-mesh-amt" data-path="surface.meshAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div class="ecat-panel" data-ecat="stack" hidden>
+            <div class="style-grid" id="glow-grid">
+              <div class="look-cat-row">
+                <button class="mode-btn" type="button" data-glowpat="1" title="A soft glow around the bright parts">GLOW</button>
+                <button class="mode-btn" type="button" data-glowpat="2" title="The glow sits in a dot grid">DOTS</button>
+                <button class="mode-btn" type="button" data-glowpat="3" title="The glow sits in a fine grid">GRID</button>
+                <button class="mode-btn" type="button" data-glowpat="4" title="The glow sits in scanlines">SCAN</button>
+                <button class="mode-btn" type="button" data-glowpat="5" title="A wide warm haze">HAZE</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">glow</span>
+              <div class="seg">
+                <button class="mode-btn" type="button" data-glowpat="0" title="No glow on top">OFF</button>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-glow-pat-amt" title="How strong the glow is">STRENGTH</label>
+                <input type="range" id="sl-glow-pat-amt" data-path="glow.glowPatAmt" min="0" max="1.5" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
         </section>
 
-        <section class="box">
-          <h2><i>03</i> MOTION</h2>
+
+
+
+
+
+        <section class="box" data-collapse="particle" id="particle-box">
+          <h2><i>03</i> PARTICLE EFFECTS</h2>
           <div class="row">
             <span class="row-label">PRESET</span>
             <div class="seg" id="motion-presets"></div>
@@ -237,7 +463,13 @@
         </section>
 
         <section data-collapse="reactions" class="box">
-          <h2>REACTIONS <button class="toggle-btn mini-toggle" type="button" data-toggle="scan" title="A moving band of light passes over the picture">SWEEP</button></h2>
+          <h2>REACTIONS</h2>
+          <div class="row">
+            <span class="row-label">SWEEP</span>
+            <div class="seg">
+              <button class="toggle-btn" type="button" data-toggle="scan" title="A moving band of light passes over the picture">ON</button>
+            </div>
+          </div>
           <div class="row">
             <span class="row-label">CURSOR PUSH</span>
             <div class="seg">
@@ -310,7 +542,13 @@
         </section>
 
         <section data-collapse="particles" class="box">
-          <h2>PARTICLES AND TRAILS <button class="toggle-btn mini-toggle" type="button" data-toggle="trails" title="Streaks behind the drifting particles">TRAILS</button></h2>
+          <h2>PARTICLES AND TRAILS</h2>
+          <div class="row">
+            <span class="row-label">TRAILS</span>
+            <div class="seg">
+              <button class="toggle-btn" type="button" data-toggle="trails" title="Streaks behind the drifting particles">ON</button>
+            </div>
+          </div>
           <div class="pair">
             <div class="slider-group" data-param="randomness">
               <label for="sl-random" title="How much each particle's path differs: direction and distance">VARIETY</label>
@@ -394,7 +632,13 @@
         </section>
 
         <section data-collapse="emitters" class="box" id="emit-panel">
-          <h2>EMITTERS <button class="toggle-btn mini-toggle" type="button" data-toggle="emitOn" title="Where particles leave the picture from. Off = by brightness only.">ON</button></h2>
+          <h2>EMITTERS</h2>
+          <div class="row">
+            <span class="row-label">EMITTERS</span>
+            <div class="seg">
+              <button class="toggle-btn" type="button" data-toggle="emitOn" title="Where particles leave the picture from. Off = by brightness only.">ON</button>
+            </div>
+          </div>
           <p class="emit-cap">SHED BY REGION OF THE PICTURE</p>
           <div class="emit-grid" role="group" aria-label="Emission by region of the picture">
             <label class="emit-cell"><span>TOP LEFT</span><input type="range" id="em-r0" data-path="emit.r0" min="0" max="2" step="0.01" title="TOP LEFT: how much this part of the picture sheds (1 = normal, 0 = none)" aria-label="TOP LEFT" /></label>
@@ -435,6 +679,19 @@
     <script type="module" src="/src/main.ts"></script>
   
   <!-- Export dialog: preview on the left, grouped options on the right -->
+  <div id="wall-modal" class="modal" hidden>
+    <div class="modal-card wall-card">
+      <header class="modal-head"><h2>WALLPAPER: SOUND SETTINGS</h2></header>
+      <div class="wall-body">
+        <p class="wall-note">Pick the LOOK and EQUALIZER for the sound, then start. The console hides while the wallpaper runs. Open it again from the tray icon.</p>
+        <div id="wall-slot"></div>
+        <div class="wall-actions">
+          <button id="wall-cancel" class="mode-btn" type="button">CANCEL</button>
+          <button id="wall-start" class="mode-btn" type="button">START WALLPAPER</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="export-modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ex-title">
       <header class="modal-head">
