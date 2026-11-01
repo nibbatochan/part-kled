@@ -212,6 +212,121 @@
               </div>
             </div>
           </div>
+          <div id="convulsions-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-conv-line" title="Weight of the ink contour lines along the edges">LINE</label>
+                <input type="range" id="sl-conv-line" data-path="convulsions.line" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-conv-hatch" title="Strength of the hatch strokes in the dark parts">HATCH</label>
+                <input type="range" id="sl-conv-hatch" data-path="convulsions.hatch" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-conv-jitter" title="Wobble in the strokes, like a nervous hand">JITTER</label>
+                <input type="range" id="sl-conv-jitter" data-path="convulsions.jitter" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="redmet-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-redmet-heat" title="How far the metal takes the red sky: zero is plain chrome">HEAT</label>
+                <input type="range" id="sl-redmet-heat" data-path="redmet.heat" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-redmet-rim" title="White light on the edges of the figure">RIM</label>
+                <input type="range" id="sl-redmet-rim" data-path="redmet.rim" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-redmet-bevel" title="How strongly the picture's slopes read as edges">BEVEL</label>
+                <input type="range" id="sl-redmet-bevel" data-path="redmet.bevel" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="shake-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-shake" title="How far the photo behind the letters is smeared sideways">SHAKE</label>
+                <input type="range" id="sl-shake" data-path="ss.kShake" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-shake-cover" title="How much of the picture the letters cover">COVER</label>
+                <input type="range" id="sl-shake-cover" data-path="ss.kCover" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-shake-patch" title="Scattered letters (low) or large patches (high)">PATCH SIZE</label>
+                <input type="range" id="sl-shake-patch" data-path="ss.kClump" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="blight-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-blight-spread" title="How far the grey haze bleeds out from the ink">SPREAD</label>
+                <input type="range" id="sl-blight-spread" data-path="blight.spread" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-blight-grain" title="Speckle on the paper and a ragged edge on the ink">GRAIN</label>
+                <input type="range" id="sl-blight-grain" data-path="blight.grain" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-blight-ink" title="How far the black ink reaches into the light parts">INK</label>
+                <input type="range" id="sl-blight-ink" data-path="blight.ink" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-blight-haze" title="Strength of the grey wash between ink and paper">HAZE</label>
+                <input type="range" id="sl-blight-haze" data-path="blight.haze" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="ecstasy-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-ecstasy-tint" title="The picture's colour at zero, blue resin at one">TINT</label>
+                <input type="range" id="sl-ecstasy-tint" data-path="ecstasy.tint" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-ecstasy-depth" title="How far the deep navy shadows reach">DEPTH</label>
+                <input type="range" id="sl-ecstasy-depth" data-path="ecstasy.depth" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-ecstasy-glow" title="Light glowing from within the body">GLOW</label>
+                <input type="range" id="sl-ecstasy-glow" data-path="ecstasy.glow" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-ecstasy-core" title="How far the lit parts turn pale white">CORE</label>
+                <input type="range" id="sl-ecstasy-core" data-path="ecstasy.core" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
           <div id="aura-settings" hidden>
             <div class="pair">
               <div class="slider-group">

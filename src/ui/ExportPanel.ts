@@ -9,7 +9,7 @@ import {
 import { frameSize } from '../web/frameSize';
 import type { ExportSnapshot } from '../web/WebEngine';
 
-const STYLE_NAMES = ['dots', 'halftone', 'mosaic', 'dither', 'ascii', 'lines', 'lined', 'wire', 'glass', 'crt', 'bars', 'sticker', 'blood shadow', 'scan', 'cross', 'blocks', 'cluster', 'palette', 'ink', 'dissolve', 'cga', 'stipple', 'pixel art', 'halo', 'aura'];
+const STYLE_NAMES = ['dots', 'halftone', 'mosaic', 'dither', 'ascii', 'lines', 'lined', 'wire', 'glass', 'crt', 'bars', 'sticker', 'blood shadow', 'scan', 'cross', 'blocks', 'cluster', 'palette', 'ink', 'dissolve', 'cga', 'stipple', 'pixel art', 'halo', 'aura', 'chrome', 'prismatic', 'x-ray', 'ecstasy', 'blight', 'redmet', 'shake-mask'];
 const IMAGE_FORMATS: ImageFormat[] = ['png', 'jpg', 'webp'];
 const VIDEO_FORMATS: VideoFormat[] = ['mp4', 'webm'];
 

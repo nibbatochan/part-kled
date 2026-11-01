@@ -67,6 +67,14 @@ export interface Params {
   prismatic: { length: number; spread: number; glow: number; threshold: number }; // PRISMATIC: each 0..1
   auraOn: boolean; // AURA filter: the bright parts turn white and glow ice blue, on the dots
   aura: { glow: number; reach: number; core: number; tint: number }; // AURA: each 0..1
+  ecstasyOn: boolean; // ECSTASY filter: a translucent blue resin, lit from within, on the dots
+  ecstasy: { tint: number; depth: number; glow: number; core: number }; // ECSTASY: each 0..1
+  blightOn: boolean; // BLIGHT filter: black ink washes with a grey haze and speckled edges, on the dots
+  blight: { spread: number; grain: number; ink: number; haze: number }; // BLIGHT: each 0..1
+  redmetOn: boolean; // REDMET filter: a red-hot mirror finish with white rim highlights, on the dots
+  redmet: { heat: number; rim: number; bevel: number }; // REDMET: each 0..1
+  convulsionsOn: boolean; // CONVULSIONS filter: ink contour lines and jittering hatch strokes, on the dots
+  convulsions: { line: number; hatch: number; jitter: number }; // CONVULSIONS: each 0..1
   linedOn: boolean; // LINED filter: the dots gather into vertical lines, thicker where the picture is brighter
   lined: { count: number; weight: number; contrast: number }; // LINED: lines across the picture height (20..160), weight and contrast 0..1
   bloodOn: boolean; // BLOOD SHADOW filter: black ink masses with a red plate printed off register, on the dots
@@ -149,6 +157,14 @@ export const defaults: Params = {
   prismatic: { length: 0.5, spread: 0.5, glow: 0.5, threshold: 0.4 },
   auraOn: false,
   aura: { glow: 0.5, reach: 0.5, core: 0.6, tint: 0.5 },
+  ecstasyOn: false,
+  ecstasy: { tint: 0.8, depth: 0.5, glow: 0.5, core: 0.5 },
+  blightOn: false,
+  blight: { spread: 0.5, grain: 0.5, ink: 0.5, haze: 0.5 },
+  redmetOn: false,
+  redmet: { heat: 0.7, rim: 0.6, bevel: 0.5 },
+  convulsionsOn: false,
+  convulsions: { line: 0.5, hatch: 0.5, jitter: 0.5 },
   linedOn: false,
   lined: { count: 60, weight: 0.6, contrast: 0.5 },
   bloodOn: false,
@@ -231,6 +247,10 @@ export function withEffectsStart(): Params {
     haloOn: false,
     chromeOn: false,
     auraOn: false,
+    ecstasyOn: false,
+    blightOn: false,
+    redmetOn: false,
+    convulsionsOn: false,
     prismaticOn: false,
     linedOn: false,
     bloodOn: false,

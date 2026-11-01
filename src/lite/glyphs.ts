@@ -1,7 +1,7 @@
 // src/lite/glyphs.ts
 // Glyph atlas for the ASCII look. The ramp is built by measuring: every candidate character is drawn,
 // its ink coverage counted, and the characters picked at even steps of coverage, so each step of tone
-// is the same step of ink. 16 columns by 3 rows (CLASSIC 10, DENSE 16, BINARY 3), each glyph 16 x 32 px.
+// is the same step of ink. 16 columns by 4 rows (CLASSIC 10, DENSE 16, BINARY 3, the SHAKE-MASK word), each glyph 16 x 32 px.
 
 export const GLYPH_W = 16;
 export const GLYPH_H = 32;
@@ -61,11 +61,14 @@ export function measureRamps(): string[][] {
   return [pick(10), pick(16), binary];
 }
 
+/** The word SHAKE-MASK repeats along each row of letters, so the strings read as one word. */
+export const SHAKE_WORD = 'shakemask';
+
 export function buildGlyphAtlas(): HTMLCanvasElement {
-  const ramps = measureRamps();
+  const ramps = [...measureRamps(), [...SHAKE_WORD]]; // row 3 holds the letters of the word
   const c = document.createElement('canvas');
   c.width = GLYPH_W * 16;
-  c.height = GLYPH_H * 3;
+  c.height = GLYPH_H * 4;
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, c.width, c.height);

@@ -79,6 +79,24 @@ uniform float uAuraGlow;    // AURA: 0..1 strength of the glow
 uniform float uAuraReach;   // AURA: 0..1 how far the glow reaches
 uniform float uAuraCore;    // AURA: 0..1 how far the bright parts turn white
 uniform float uAuraTint;    // AURA: 0..1 white (0) to ice blue (1)
+uniform float uEcstasy;     // ECSTASY filter on the dots: 1 on, 0 off
+uniform float uEcsTint;     // ECSTASY: 0..1 the picture's colour (0) to blue resin (1)
+uniform float uEcsDepth;    // ECSTASY: 0..1 how far the navy shadows reach
+uniform float uEcsGlow;     // ECSTASY: 0..1 light from within the body
+uniform float uEcsCore;     // ECSTASY: 0..1 how far the lit parts turn pale
+uniform float uBlight;      // BLIGHT filter on the dots: 1 on, 0 off
+uniform float uBlSpread;    // BLIGHT: 0..1 how far the grey haze bleeds out
+uniform float uBlGrain;     // BLIGHT: 0..1 speckle and ragged edge
+uniform float uBlInk;       // BLIGHT: 0..1 how far the black ink reaches
+uniform float uBlHaze;      // BLIGHT: 0..1 strength of the grey wash
+uniform float uRedmet;      // REDMET filter on the dots: 1 on, 0 off
+uniform float uRmHeat;      // REDMET: 0..1 how far the picture takes the red sky
+uniform float uRmRim;       // REDMET: 0..1 white rim highlights on edges
+uniform float uRmBevel;     // REDMET: 0..1 how far the slopes tilt the surface
+uniform float uConv;        // CONVULSIONS filter on the dots: 1 on, 0 off
+uniform float uCvLine;      // CONVULSIONS: 0..1 weight of the contour lines
+uniform float uCvHatch;     // CONVULSIONS: 0..1 strength of the hatch strokes
+uniform float uCvJitter;    // CONVULSIONS: 0..1 wobble in the strokes
 uniform float uLined;         // LINED filter on the dots: 1 on, 0 off
 uniform float uLinedCount;    // LINED: lines across the picture height
 uniform float uLinedWeight;   // LINED: 0..1 how wide the lines grow where the picture is bright
@@ -399,6 +417,90 @@ vec3 auraFinish(vec2 h, vec3 c) {
   return clamp(white + glow, 0.0, 1.0);
 }
 
+// ECSTASY: a translucent blue resin figure. The picture's light is mapped onto a blue ramp: navy shadows, azure mid
+// tones and pale white where it is lit most. A blurred copy of the picture glows from inside the body, and only where
+// the picture has light, so the ground stays dark. A light layer over the dots: positions and count are unchanged.
+vec3 ecstasyFinish(vec2 h, vec3 c) {
+  float lum = luma(c);
+  float present = smoothstep(0.03, 0.15, lum);
+  float s = clamp((lum - 0.5) * (1.0 + 2.0 * uEcsDepth) + 0.5, 0.0, 1.0);  // DEPTH: more contrast, deeper navy
+  vec3 navy = vec3(0.02, 0.10, 0.34);
+  vec3 azure = vec3(0.05, 0.58, 1.0);
+  vec3 pale = vec3(0.88, 0.96, 1.0);
+  vec3 resin = mix(mix(navy, azure, smoothstep(0.0, 0.6, s)), pale, smoothstep(0.6, 1.0, s) * uEcsCore);
+  vec3 col = mix(c, resin * present, uEcsTint);                            // TINT: the picture's colour to resin
+  float inner = lum;
+  if (uHasImg > 0.5) {
+    vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+    inner = luma(textureLod(uImg, uv, 3.0).rgb);                           // a softened copy: the light inside the body
+  }
+  vec3 glow = azure * inner * uEcsGlow * 0.8 * present * (1.0 - lum * 0.6);
+  return clamp(col + glow, 0.0, 1.0);
+}
+
+// REDMET: polished metal mirroring a red sky. The slopes of the picture's brightness give each dot a tilt: edges
+// catch white rim light, and the flat body takes the colour of the red sky above it, deepening to dark at the top.
+// Black stays black. Only colour changes: dots keep their place and count.
+vec3 redmetFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float edge = clamp(length(vec2(dx, dy)) * uRmBevel * 6.0, 0.0, 1.0);   // BEVEL: how strongly slopes read as edges
+  float lum = luma(c);
+  float present = smoothstep(0.03, 0.2, lum);
+  float sky = clamp(1.0 - uv.y, 0.0, 1.0);                               // the red sky: deep at the top, pale at the bottom
+  vec3 red = mix(vec3(0.55, 0.06, 0.03), vec3(1.0, 0.22, 0.10), sky);
+  vec3 mirror = red * (0.35 + 0.65 * lum);
+  vec3 col = mix(c, mirror, uRmHeat);                                    // HEAT: the metal takes the red sky
+  col += vec3(1.0, 0.95, 0.9) * smoothstep(0.1, 0.6, edge) * uRmRim;     // RIM: white light on the edges
+  return clamp(col * present, 0.0, 1.0);
+}
+
+// CONVULSIONS: a fine ink line drawing. Contour lines follow the picture's edges (gradient of brightness). Hatch
+// strokes run diagonally across the picture, thicker and denser where it is dark, and their wobble jitters them like
+// a nervous hand. Paper stays cream. Only colour changes: dots keep their place and count.
+vec3 convulsionsFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  vec2 e = 3.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 1.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 1.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 1.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 1.0).rgb);
+  float contour = smoothstep(0.05, 0.3, length(vec2(dx, dy)) * (1.0 + uCvLine * 4.0)); // LINE: weight of the edges
+  float dark = 1.0 - smoothstep(0.1, 0.8, luma(textureLod(uImg, uv, 1.0).rgb));
+  float wob = sin(h.y * 40.0 + h.x * 11.0) + 0.5 * sin(h.y * 97.0 - h.x * 23.0);
+  float s = (h.x * 0.6 + h.y * 0.8) * 260.0 + wob * uCvJitter * 0.8;    // JITTER: the strokes waver
+  float width = 0.12 + 0.35 * dark * uCvLine;                           // darker parts get thicker strokes
+  float hatch = (1.0 - smoothstep(0.0, width, abs(fract(s) - 0.5) * 2.0)) * dark * uCvHatch;   // HATCH: stroke strength
+  float ink = clamp(max(contour * uCvLine, hatch), 0.0, 1.0);
+  vec3 col = mix(vec3(0.94, 0.92, 0.87), vec3(0.06, 0.05, 0.05), ink);
+  return col * present;
+}
+
+// BLIGHT: black ink on paper, as a wash spreads. The dark masses print as ink with a speckled, ragged edge, a grey
+// haze bleeds out from them (a blurred copy of the picture), and the lights stay paper. Only colour changes: dots keep
+// their place and count, and dots where the picture has no light stay empty.
+float blightHash(vec2 p) { return fract(sin(dot(p, vec2(269.5, 183.3))) * 43758.5453); }
+vec3 blightFinish(vec2 h, vec3 c) {
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float soft = luma(c);
+  if (uHasImg > 0.5) {
+    vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+    soft = luma(textureLod(uImg, uv, mix(0.5, 5.0, uBlSpread)).rgb);   // SPREAD: how far the grey bleeds
+  }
+  float g = blightHash(floor(h * 360.0));
+  float rag = (g - 0.5) * 0.35 * uBlGrain;                              // ragged edge of the ink
+  float ink = 1.0 - smoothstep(mix(0.22, 0.55, uBlInk) + rag, mix(0.30, 0.65, uBlInk) + rag, soft);   // INK: how dark it goes
+  float wash = (1.0 - smoothstep(0.1, 0.9, soft)) * uBlHaze;           // HAZE: the grey wash between ink and paper
+  vec3 col = mix(vec3(0.96, 0.96, 0.94), vec3(0.55), clamp(wash, 0.0, 1.0) * (1.0 - ink));
+  col = mix(col, vec3(0.03), ink);
+  float speck = step(0.9, blightHash(floor(h * 620.0) + 3.0));          // paper speckle, grey on the paper only
+  col = mix(col, vec3(0.2), speck * uBlGrain * 0.5 * (1.0 - ink));
+  return col * present;
+}
+
 // LINED: the dots gather into vertical lines on a fixed pitch. A line grows wider where the picture is brighter and
 // thins to nothing where it is dark, so the picture reads as line weight, like a moire print. A dot keeps its own
 // colour; only the dots between the lines go dark. Positions and count are unchanged: it only masks the colour.
@@ -490,6 +592,10 @@ void main() {
   if (uChrome > 0.5) c = mix(c, hueRotate(chromeFinish(home.xy, c), uChromeHue), 1.0 - streaming);
   if (uPrism > 0.5) c = mix(c, prismaticFinish(home.xy, c), 1.0 - streaming);
   if (uAura > 0.5) c = mix(c, auraFinish(home.xy, c), 1.0 - streaming);
+  if (uEcstasy > 0.5) c = mix(c, ecstasyFinish(home.xy, c), 1.0 - streaming);
+  if (uBlight > 0.5) c = mix(c, blightFinish(home.xy, c), 1.0 - streaming);
+  if (uRedmet > 0.5) c = mix(c, redmetFinish(home.xy, c), 1.0 - streaming);
+  if (uConv > 0.5) c = mix(c, convulsionsFinish(home.xy, c), 1.0 - streaming);
   if (uLined > 0.5) c = mix(c, linedFinish(home.xy, c), 1.0 - streaming);
   if (uBlood > 0.5) c = mix(c, bloodFinish(home.xy, c), 1.0 - streaming);
   float lum = luma(c);
@@ -616,12 +722,25 @@ out float vTone;
 out float vFade;
 out vec4 vEdge;             // MOSAIC outline: left, right, bottom, top border a cell of another brightness
 flat out ivec2 vCell;
+out vec3 vKa;               // SHAKE-MASK: the motion-blurred picture at the four corners of the cell (left bottom, right bottom, left top, right top)
+out vec3 vKb;
+out vec3 vKc;
+out vec3 vKd;
 
 float toneOf(vec3 c) {
   float t = clamp((luma(c) - uLv.x) / max(uLv.y - uLv.x, 0.05), 0.0, 1.0);
   return mix(t, 1.0 - t, uInvert);
 }
 float toneAt(vec2 uv, float lod) { return toneOf(effects(textureLod(uImg2, uv, lod).rgb)); }
+// SHAKE-MASK: the picture smeared sideways over five taps, like a shaken camera
+vec3 shakeAt(vec2 uv, float lod, float len, float e) {
+  vec3 s = vec3(0.0);
+  for (int k = -2; k <= 2; k++) {
+    vec2 q = uv + vec2(float(k) * 0.5 * len, 0.0);
+    s += (3.0 - abs(float(k))) * mix(textureLod(uImg, q, lod), textureLod(uImg2, q, lod), e).rgb;
+  }
+  return effects(s / 9.0);
+}
 
 void main() {
   int nx = int(uGrid.x + 0.5);
@@ -640,6 +759,10 @@ void main() {
   vTone = 0.0;
   vFade = 0.0;
   vEdge = vec4(0.0);
+  vKa = vec3(0.0);
+  vKb = vec3(0.0);
+  vKc = vec3(0.0);
+  vKd = vec3(0.0);
 
   // Outside the picture
   if (abs(c.x) > uHalfW + 0.5 * cw.x || abs(c.y) > 0.5 + 0.5 * cw.y) {
@@ -706,6 +829,20 @@ void main() {
       vec2 uy = vec2(dy.x / aspect, -dy.y);
       vEdge = step(0.12, abs(vec4(toneAt(uv - ux, lod), toneAt(uv + ux, lod), toneAt(uv - uy, lod), toneAt(uv + uy, lod)) - tone));
     }
+  } else if (st == 31) {
+    // SHAKE-MASK: the photo behind the letters is smeared sideways (SHAKE), read at the four corners so it stays smooth across cells
+    vec2 hx = R * vec2(uGrid.z * 0.5, 0.0);
+    vec2 hy = R * vec2(0.0, uGrid.w * 0.5);
+    float len = uSP.x * 0.07;
+    float lodS = lod + 0.5 + 2.0 * uSP.x;
+    vec2 a = hx + hy;
+    vec2 b = hx - hy;
+    vKa = clamp(shakeAt(uv - vec2(a.x, -a.y) / vec2(aspect, 1.0), lodS, len, e) * uBright, 0.0, 1.0);
+    vKb = clamp(shakeAt(uv + vec2(b.x, -b.y) / vec2(aspect, 1.0), lodS, len, e) * uBright, 0.0, 1.0);
+    vKc = clamp(shakeAt(uv - vec2(b.x, -b.y) / vec2(aspect, 1.0), lodS, len, e) * uBright, 0.0, 1.0);
+    vKd = clamp(shakeAt(uv + vec2(a.x, -a.y) / vec2(aspect, 1.0), lodS, len, e) * uBright, 0.0, 1.0);
+    // local contrast: where the picture has structure the letters gather
+    vEdge = vec4(clamp(abs(tone - toneAt(uv, lod + 2.0)) * 5.0, 0.0, 1.0), 0.0, 0.0, 0.0);
   } else if (st == 22) {
     // PIXEL ART outline: a cell with a brighter neighbour sits on the dark side of an edge and is drawn in a dark shade
     vec2 dx = R * vec2(cw.x, 0.0);
@@ -734,6 +871,10 @@ in float vTone;
 in float vFade;
 in vec4 vEdge;
 flat in ivec2 vCell;
+in vec3 vKa;
+in vec3 vKb;
+in vec3 vKc;
+in vec3 vKd;
 uniform float uStyle;
 uniform float uColorMode;
 uniform vec4 uSP;
@@ -745,6 +886,12 @@ out vec4 o;
 
 float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 // Triangular remap of a uniform value to [0,1], centred on 0.5: removes the banding of a plain threshold (Wronski)
 float triRemap(float u) { return u < 0.5 ? sqrt(u * 0.5) : 1.0 - sqrt((1.0 - u) * 0.5); }
 
@@ -896,17 +1043,36 @@ void main() {
     float fl = floor(f);
     float thr = bayer(vCell, 2) + (hash21(vec2(vCell)) - 0.5) * 0.12;
     col = dissolveStop(int(fl) + int(step(thr, f - fl)));
-  } else if (st == 27) {                           // X-RAY: bone-white where the picture is bright, navy and black where it is dark
-    float r = length(p);
-    float body = 1.0 - smoothstep(0.2, 0.48, r);
+  } else if (st == 31) {                           // SHAKE-MASK: a motion-blurred photo, with letters showing through in patches
+    vec2 f = clamp(vUv, 0.0, 1.0);
+    vec3 base = mix(mix(vKa, vKb, f.x), mix(vKc, vKd, f.x), f.y);
+    // patches: smooth noise, long sideways, gathering where the picture has structure
+    vec2 cc = vec2(vCell);
+    vec2 pos = vec2(cc.x * 0.5, cc.y * 2.0) / mix(2.0, 12.0, uSP.z);
+    float field = 0.65 * vnoise(pos) + 0.35 * vnoise(pos * 2.7 + 9.0);
+    float weight = 0.35 + 0.65 * vEdge.x;
+    float score = field * (0.4 + 0.9 * weight) + (hash21(cc + 3.7) - 0.5) * 0.12;
+    float show = step(mix(0.95, 0.35, uSP.y), score);
+    show = max(show, step(1.0 - 0.03 * uSP.y, hash21(cc + 41.3)));   // a few lone letters in the clear
+    // one word along the row, each row starting at a different letter
+    float idx = mod(cc.x + floor(hash21(vec2(0.0, cc.y)) * 9.0), 9.0);
+    vec2 g = vec2((idx + mix(0.0625, 0.9375, vUv.x)) / 16.0, (3.0 + mix(0.03125, 0.96875, 1.0 - vUv.y)) / 4.0);
+    float m = smoothstep(0.2, 0.65, texture(uAtlas, g).r) * show;
+    // pale letters over dark parts, dark letters over light parts
+    vec3 lc = mix(vec3(0.97, 0.97, 0.95), vec3(0.07), smoothstep(0.38, 0.62, dot(base, vec3(0.299, 0.587, 0.114))));
+    col = mix(base, lc, m * 0.95);
+  } else if (st == 27) {                           // X-RAY: black where the picture is dark, blue scan in the middle, pale bone where bright
     float t = clamp(tone, 0.0, 1.0);
-    vec3 dark = vec3(0.02, 0.05, 0.14);
-    vec3 blue = vec3(0.22, 0.52, 0.86);
-    vec3 bone = vec3(0.86, 0.95, 1.0);
-    vec3 ramp = t < 0.55 ? mix(dark, blue, smoothstep(0.08, 0.55, t)) : mix(blue, bone, smoothstep(0.55, 1.0, t));
-    float lit = smoothstep(0.03, 0.22, t);
-    float halo = exp(-r * r * 7.0) * 0.35 * smoothstep(0.5, 1.0, t);   // a soft glow around the brightest cells
-    col = ramp * lit * (0.55 + 0.45 * body) + vec3(0.45, 0.7, 1.0) * halo * lit;
+    vec3 deep = vec3(0.0, 0.10, 0.30);
+    vec3 blue = vec3(0.04, 0.45, 0.95);
+    vec3 bone = vec3(0.62, 0.92, 1.0);
+    vec3 ramp = t < 0.2 ? mix(vec3(0.0), deep, smoothstep(0.02, 0.2, t))
+              : t < 0.55 ? mix(deep, blue, smoothstep(0.2, 0.55, t))
+              : mix(blue, bone, smoothstep(0.55, 0.85, t));
+    float r = length(p);
+    float body = 1.0 - smoothstep(0.25, 0.5, r);
+    float glow = exp(-r * r * 5.0) * 0.4 * smoothstep(0.55, 0.9, t);   // soft bloom off the bright bone cells
+    col = ramp * (0.6 + 0.4 * body) + vec3(0.2, 0.7, 1.0) * glow;
   } else if (st == 22) {                           // PIXEL ART: each cell one colour of the fixed palette
     // one palette colour per cell; an outline cell takes the dark shade of its own colour
     float edge = max(max(vEdge.x, vEdge.y), max(vEdge.z, vEdge.w));
@@ -922,7 +1088,7 @@ void main() {
   } else if (st == 4) {                            // ASCII
     float N = uSP2.x;
     float idx = floor(clamp(pow(tone, 0.8), 0.0, 0.999) * N);
-    vec2 g = vec2((idx + mix(0.0625, 0.9375, vUv.x)) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - vUv.y)) / 3.0);
+    vec2 g = vec2((idx + mix(0.0625, 0.9375, vUv.x)) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - vUv.y)) / 4.0);
     float m = smoothstep(0.2, 0.65, texture(uAtlas, g).r);
     vec3 bg = uColorMode > 1.5 ? vBg : vInk * uSP.y * tone;
     col = mix(bg, vInk, m);

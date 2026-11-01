@@ -64,6 +64,24 @@ export interface LiteParams {
   auraReach: number;    // AURA: 0..1 how far the glow reaches
   auraCore: number;     // AURA: 0..1 how far the bright parts turn white
   auraTint: number;     // AURA: 0..1 white to ice blue
+  ecstasyOn: boolean;   // ECSTASY filter on the dots
+  ecstasyTint: number;  // ECSTASY: 0..1 the picture's colour to blue resin
+  ecstasyDepth: number; // ECSTASY: 0..1 how far the navy shadows reach
+  ecstasyGlow: number;  // ECSTASY: 0..1 light from within
+  ecstasyCore: number;  // ECSTASY: 0..1 how far the lit parts turn pale
+  blightOn: boolean;    // BLIGHT filter on the dots
+  blightSpread: number; // BLIGHT: 0..1 how far the grey haze bleeds out
+  blightGrain: number;  // BLIGHT: 0..1 speckle and ragged edge
+  blightInk: number;    // BLIGHT: 0..1 how far the black ink reaches
+  blightHaze: number;   // BLIGHT: 0..1 strength of the grey wash
+  redmetOn: boolean;    // REDMET filter on the dots
+  redmetHeat: number;   // REDMET: 0..1 how far the picture takes the red sky
+  redmetRim: number;    // REDMET: 0..1 white rim highlights on edges
+  redmetBevel: number;  // REDMET: 0..1 how far the slopes tilt the surface
+  convulsionsOn: boolean;   // CONVULSIONS filter on the dots
+  convulsionsLine: number;  // CONVULSIONS: 0..1 weight of the contour lines
+  convulsionsHatch: number; // CONVULSIONS: 0..1 strength of the hatch strokes
+  convulsionsJitter: number; // CONVULSIONS: 0..1 wobble in the strokes
   linedOn: boolean;     // LINED filter on the dots
   linedCount: number;   // LINED: lines across the picture height
   linedWeight: number;  // LINED: 0..1 how wide the lines grow where the picture is bright
@@ -146,6 +164,24 @@ export const liteDefaults: LiteParams = {
   prismaticGlow: 0.5,
   prismaticThreshold: 0.4,
   auraOn: false,
+  ecstasyOn: false,
+  ecstasyTint: 0.8,
+  ecstasyDepth: 0.5,
+  ecstasyGlow: 0.5,
+  ecstasyCore: 0.5,
+  blightOn: false,
+  blightSpread: 0.5,
+  blightGrain: 0.5,
+  blightInk: 0.5,
+  blightHaze: 0.5,
+  redmetOn: false,
+  redmetHeat: 0.7,
+  redmetRim: 0.6,
+  redmetBevel: 0.5,
+  convulsionsOn: false,
+  convulsionsLine: 0.5,
+  convulsionsHatch: 0.5,
+  convulsionsJitter: 0.5,
   auraGlow: 0.5,
   auraReach: 0.5,
   auraCore: 0.6,
@@ -238,7 +274,7 @@ const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
-  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain',
+  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt', 'uMotion', 'uMotionAmt', 'uMotionSpeed',
   // cell looks
@@ -860,6 +896,24 @@ export class LiteEngine {
       gl.uniform1f(U.uAuraReach, p.auraReach);
       gl.uniform1f(U.uAuraCore, p.auraCore);
       gl.uniform1f(U.uAuraTint, p.auraTint);
+      gl.uniform1f(U.uEcstasy, p.ecstasyOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uEcsTint, p.ecstasyTint);
+      gl.uniform1f(U.uEcsDepth, p.ecstasyDepth);
+      gl.uniform1f(U.uEcsGlow, p.ecstasyGlow);
+      gl.uniform1f(U.uEcsCore, p.ecstasyCore);
+      gl.uniform1f(U.uBlight, p.blightOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uBlSpread, p.blightSpread);
+      gl.uniform1f(U.uBlGrain, p.blightGrain);
+      gl.uniform1f(U.uBlInk, p.blightInk);
+      gl.uniform1f(U.uBlHaze, p.blightHaze);
+      gl.uniform1f(U.uRedmet, p.redmetOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uRmHeat, p.redmetHeat);
+      gl.uniform1f(U.uRmRim, p.redmetRim);
+      gl.uniform1f(U.uRmBevel, p.redmetBevel);
+      gl.uniform1f(U.uConv, p.convulsionsOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uCvLine, p.convulsionsLine);
+      gl.uniform1f(U.uCvHatch, p.convulsionsHatch);
+      gl.uniform1f(U.uCvJitter, p.convulsionsJitter);
       gl.uniform1f(U.uLined, p.linedOn && p.style === 0 ? 1 : 0);
       gl.uniform1f(U.uLinedCount, p.linedCount);
       gl.uniform1f(U.uLinedWeight, p.linedWeight);

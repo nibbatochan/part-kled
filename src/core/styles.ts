@@ -3,19 +3,19 @@
 // Kept free of DOM and GL code so the studio panel, the engine and tests share one description.
 
 /** Look numbers: 0 DOTS (the point look), then the cell looks. Each look keeps its own cell, colour and tone. */
-export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
+export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY', 'ECSTASY', 'BLIGHT', 'REDMET', 'SHAKE-MASK', 'CONVULSIONS'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
 
 /** Every look sits in one category; the LOOK picker shows them grouped. */
 export const LOOK_CATEGORIES: { name: string; looks: number[] }[] = [
-  { name: 'DOTS', looks: [0, 1, 6] },
+  { name: 'DOTS', looks: [0, 1, 6, 29] },
   { name: 'PIXEL', looks: [2, 22] },
-  { name: 'TEXT', looks: [4] },
-  { name: 'METAL', looks: [25, 26] },
+  { name: 'TEXT', looks: [4, 31] },
+  { name: 'METAL', looks: [25, 26, 30] },
   { name: 'RETRO', looks: [9] },
-  { name: 'GRAPHIC', looks: [10, 11, 12] },
+  { name: 'GRAPHIC', looks: [10, 11, 12, 32] },
   { name: 'DITHER', looks: [3, 13, 17] },
   { name: 'BITMAP', looks: [18, 19, 20, 21] },
-  { name: 'HALO', looks: [23, 24, 27] },
+  { name: 'HALO', looks: [23, 24, 27, 28] },
 ];
 
 /** The HALOS tile is a filter: it turns on the halo layer (glow bitMode 5) over the dots instead of changing the look. */
@@ -30,11 +30,26 @@ export const AURA_FILTER = 24;
 /** The PRISMATIC tile is a filter on the dots: bright parts split into rainbow streaks that run outward. */
 export const PRISMATIC_FILTER = 26;
 
+/** The ECSTASY tile is a filter on the dots: a translucent blue resin figure, lit from within. */
+export const ECSTASY_FILTER = 28;
+
+/** The BLIGHT tile is a filter on the dots: black ink washes with a grey haze and speckled edges, like sumi ink on paper. */
+export const BLIGHT_FILTER = 29;
+
+/** The REDMET tile is a filter on the dots: a red-hot mirror finish, the picture reflecting a red sky, with white rim highlights. */
+export const REDMET_FILTER = 30;
+
 /** The LINED tile is a filter on the dots (it replaced the GLOW look): vertical lines, wider where the picture is brighter. */
 export const LINED_FILTER = 6;
 
 /** The BLOOD SHADOW tile is a filter on the dots (it replaced the BRUTAL look): a two-ink screenprint, black masses with a red plate printed slightly off register. */
 export const BLOOD_FILTER = 12;
+
+/** The CONVULSIONS tile is a filter on the dots in GRAPHIC: ink contour lines and jittering hatch strokes, like a fine line drawing. */
+export const CONVULSIONS_FILTER = 32;
+
+/** The SHAKE-MASK tile is a cell look in TEXT: a motion-blurred photo with a word of letters showing through in patches. */
+export const SHAKE_MASK_LOOK = 31;
 
 /** The hint shown on each look's button. */
 export const LOOK_TITLES: Record<number, string> = {
@@ -59,9 +74,14 @@ export const LOOK_TITLES: Record<number, string> = {
   22: 'Pixel art: each cell snapped to a fixed 24-colour palette, the colours of a pixel-art picture',
   23: 'Halo filter: the whole picture in amber and blue light, glowing outward, dark stays dark',
   24: 'Aura filter: the bright parts turn white and glow ice blue over the dark ground, like a figure lit from within',
-  27: 'X-ray: bright parts glow pale blue-white like bone on a scan, dark parts fall to navy and black',
+  27: 'X-ray: a blue scan on black. Bright parts glow pale like bone, mid parts run blue, dark parts go black',
   25: 'Chrome filter: the dots take a polished blue steel finish. Edges and details catch light, flat areas keep the picture',
   26: 'Prismatic filter: bright parts split into rainbow streaks that run outward, like light through a prism',
+  28: 'Ecstasy filter: a translucent blue resin figure, dark navy in the shadows, bright azure and pale white where it is lit from within',
+  29: 'Blight filter: black ink washes on paper, a grey haze bleeding out from the dark masses, with speckled edges',
+  31: 'Shake-mask: the photo smeared sideways like a shaken camera, with a word of letters showing through in patches, pale on dark and dark on light',
+  30: 'Redmet filter: polished metal that mirrors a red sky, dark silhouettes with white rim highlights on their edges',
+  32: 'Convulsions filter: fine ink contour lines and jittering hatch strokes, dense where the picture is dark, like a line drawing',
 };
 
 export type StyleSetting =
@@ -115,6 +135,10 @@ export const STYLE_SETTINGS: StyleSetting[] = [
   // STIPPLE
   { kind: 'range', key: 'pDensity', label: 'DENSITY', styles: [21], min: 0, max: 1, step: 0.01, def: 0.75, title: 'Share of cells that get a dot' },
   { kind: 'range', key: 'pSize', label: 'DOT SIZE', styles: [21], min: 0.3, max: 1, step: 0.01, def: 0.9, title: 'Largest dot, as a share of the cell' },
+  // SHAKE-MASK
+  { kind: 'range', key: 'kShake', label: 'SHAKE', styles: [31], min: 0, max: 1, step: 0.01, def: 0.5, title: 'How far the photo behind the letters is smeared sideways' },
+  { kind: 'range', key: 'kCover', label: 'COVER', styles: [31], min: 0, max: 1, step: 0.01, def: 0.3, title: 'How much of the picture the letters cover' },
+  { kind: 'range', key: 'kClump', label: 'PATCH SIZE', styles: [31], min: 0, max: 1, step: 0.01, def: 0.5, title: 'Scattered letters (low) or large patches (high)' },
 ];
 
 export type StyleValues = Record<string, number>;
@@ -154,8 +178,9 @@ export const LOOK_TONE_DEFAULTS: Record<number, LookTone> = {
   19: { cell: 3, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // DISSOLVE: the ramp replaces the colour
   20: { cell: 2, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // CGA: source colour, snapped to CGA
   21: { cell: 3, colour: 1, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 },  // STIPPLE: mono dots
-  27: { cell: 6, colour: 0, ink: '#d6ecff', paper: '#02060c', invert: false, autoLevels: true, gap: 0 }, // X-RAY: bone-white dots on a scan-dark ground
+  27: { cell: 6, colour: 0, ink: '#8fe4ff', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // X-RAY: blue scan ramp on black
   22: { cell: 8, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // PIXEL ART: the 8 px grid, palette from the picture
+  31: { cell: 7, colour: 0, ink: '#e9ecee', paper: '#000000', invert: false, autoLevels: true, gap: 0 }, // SHAKE-MASK: source colour photo, letters 7 x 14 px
 };
 
 /** The cell size (css px) at which each HALFTONE pattern reads well, in the order of its SHAPE choices. */
@@ -181,7 +206,7 @@ export const CELL_RANGE: Record<number, [number, number]> = {
   20: [2, 16],
   21: [3, 24],
   22: [4, 24],
-  27: [3, 16],
+  31: [4, 16],
 };
 
 /**
@@ -293,6 +318,8 @@ export function packStyle(style: number, v: StyleValues): PackedStyle {
       return { ...base, sp: [v.cDither, 0, 0, 0] };
     case 21:
       return { ...base, sp: [v.pDensity, v.pSize, 0, 0] };
+    case 31:
+      return { ...base, sp: [v.kShake, v.kCover, v.kClump, 0], cellAspect: 2 };
     case 4:
       return { ...base, sp: [v.aRamp, v.aPaper, 0, 0], ramp: RAMP_SIZES[Math.round(v.aRamp)] ?? 10, cellAspect: 2 };
     case 7:

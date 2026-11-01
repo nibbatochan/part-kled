@@ -5,7 +5,7 @@ import { makeEngine, type ExportFrame } from '../web/Exporter';
 import { toLiteParams, type ExportSnapshot } from '../web/WebEngine';
 import type { Params } from '../core/params';
 import type { LiteSample } from '../lite/sample';
-import { AURA_FILTER, BLOOD_FILTER, CHROME_FILTER, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER } from '../core/styles';
+import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, ECSTASY_FILTER, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER, REDMET_FILTER, CONVULSIONS_FILTER } from '../core/styles';
 
 const TILE_W = 144; // drawn at 2x the 72 x 54 css size so it stays sharp on screen
 const TILE_H = 108;
@@ -54,10 +54,10 @@ export class LookPicker {
       };
       looks.forEach((btn) => {
         const look = Number(btn.dataset.style);
-        if (look !== HALO_FILTER && look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER) tile(btn, { ...params, style: look });
+        if (look !== HALO_FILTER && look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER && look !== ECSTASY_FILTER && look !== BLIGHT_FILTER && look !== REDMET_FILTER && look !== CONVULSIONS_FILTER) tile(btn, { ...params, style: look });
       });
       // The filter tiles last: each is drawn on the DOTS base with only its own filter on
-      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false };
+      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false, ecstasyOn: false, blightOn: false, redmetOn: false, convulsionsOn: false };
       const chromeBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CHROME_FILTER}"]`);
       if (chromeBtn) tile(chromeBtn, { ...params, style: 0, ...off, chromeOn: true });
       const prismBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${PRISMATIC_FILTER}"]`);
@@ -68,6 +68,14 @@ export class LookPicker {
       if (bloodBtn) tile(bloodBtn, { ...params, style: 0, ...off, bloodOn: true });
       const auraBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${AURA_FILTER}"]`);
       if (auraBtn) tile(auraBtn, { ...params, style: 0, ...off, auraOn: true });
+      const ecstasyBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${ECSTASY_FILTER}"]`);
+      if (ecstasyBtn) tile(ecstasyBtn, { ...params, style: 0, ...off, ecstasyOn: true });
+      const blightBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${BLIGHT_FILTER}"]`);
+      if (blightBtn) tile(blightBtn, { ...params, style: 0, ...off, blightOn: true });
+      const redmetBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${REDMET_FILTER}"]`);
+      if (redmetBtn) tile(redmetBtn, { ...params, style: 0, ...off, redmetOn: true });
+      const convBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CONVULSIONS_FILTER}"]`);
+      if (convBtn) tile(convBtn, { ...params, style: 0, ...off, convulsionsOn: true });
       moves.forEach((btn) => tile(btn, { ...params, motionFx: Number(btn.dataset.mfx) }));
       glows.forEach((btn) => tile(btn, { ...params, glow: { ...params.glow, glowPat: Number(btn.dataset.glowpat), glowPatAmt: 1 } }));
       // The HALO tile last: it swaps in the treated picture, and the dots stay the plain DOTS look
