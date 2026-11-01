@@ -90,6 +90,10 @@ export interface LiteParams {
   bloodShift: number;   // BLOOD SHADOW: 0..1 how far the red plate sits off register
   bloodBleed: number;   // BLOOD SHADOW: 0..1 how far the red reaches into the mid tones
   bloodGrain: number;   // BLOOD SHADOW: 0..1 ink grain and ragged edges
+  shakeOn: boolean;     // SHAKE-MASK filter on the dots
+  shakeSmear: number;   // SHAKE-MASK: 0..1 how far the photo is smeared sideways
+  shakeCover: number;   // SHAKE-MASK: 0..1 how much of the picture the letters cover
+  shakePatch: number;   // SHAKE-MASK: 0..1 scattered letters to large patches
   cell: number;         // cell size of the cell looks, css px
   gap: number;          // cell looks: 0 touching, up to 0.6 leaves a gap between the particles
   styleSet: StyleValues; // per-look settings (see core/styles.ts)
@@ -194,6 +198,10 @@ export const liteDefaults: LiteParams = {
   bloodShift: 0.5,
   bloodBleed: 0.5,
   bloodGrain: 0.5,
+  shakeOn: false,
+  shakeSmear: 0.5,
+  shakeCover: 0.3,
+  shakePatch: 0.5,
   cell: 8,
   gap: 0,
   styleSet: defaultStyleValues(),
@@ -274,7 +282,7 @@ const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
-  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain',
+  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain', 'uShake', 'uShSmear', 'uShCover', 'uShPatch',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt', 'uMotion', 'uMotionAmt', 'uMotionSpeed',
   // cell looks
@@ -922,6 +930,10 @@ export class LiteEngine {
       gl.uniform1f(U.uBloodShift, p.bloodShift);
       gl.uniform1f(U.uBloodBleed, p.bloodBleed);
       gl.uniform1f(U.uBloodGrain, p.bloodGrain);
+      gl.uniform1f(U.uShake, p.shakeOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uShSmear, p.shakeSmear);
+      gl.uniform1f(U.uShCover, p.shakeCover);
+      gl.uniform1f(U.uShPatch, p.shakePatch);
       gl.uniform1f(U.uMusic, exact ? 0 : p.musicLook); // a loop export never draws the sound
       gl.uniform1f(U.uMotion, p.motionFx);
       gl.uniform1f(U.uMotionAmt, p.motionAmount);
@@ -936,6 +948,9 @@ export class LiteEngine {
     // The PULSE scan reads the picture's depth to find where light glances off it
     const bindPicture = (U: Record<string, WebGLUniformLocation | null>) => {
       const cur = this.slots[this.cur];
+      gl.activeTexture(gl.TEXTURE0); // the glyph atlas: SHAKE-MASK draws its letters from it
+      gl.bindTexture(gl.TEXTURE_2D, this.atlas);
+      gl.uniform1i(U.uAtlas, 0);
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, cur.tex);
       gl.uniform1i(U.uImg, 1);

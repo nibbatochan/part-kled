@@ -19,9 +19,9 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 ## 3. Timeline of major milestones
 
 ### 2026-11-02: SHAKE-MASK look (TEXT category)
-- New cell look 31: the photo smeared sideways (shaken camera) with the word "shakemask" showing through in noise patches, pale letters on dark, dark letters on light. Atlas gained a 4th glyph row for the word.
-- Why: a reference of a blurred photo with sparse repeating letters. Controls: SHAKE, COVER, PATCH SIZE.
-- Evidence: tsc and 33 tests pass; checked in the browser on sample 4. Not compared on a bright picture.
+- Filter 31 on the dots base (first built as a cell look, redone because it carried cell size and gap): the photo smeared sideways with the word "shakemask" showing through in noise patches, drawn by the dots themselves from the glyph atlas (4th row). Pale letters on dark, dark on light. No cell grid, no cell size, no gap.
+- Why: a reference of a blurred photo with sparse repeating letters. Controls: SMEAR, COVER, PATCH SIZE.
+- Evidence: tsc and 33 tests pass; checked in the browser on sample 4 (letters read as dots). Not compared on a bright picture.
 
 ### 2026-11-01: console restructure (LOOK, LIGHT, MOTION, PARTICLE EFFECTS, COLOUR)
 - LOOK: one dot per look type with its name beside it; only that type's looks are listed; the top right shows the look in use. Showing a type does not pick a look.

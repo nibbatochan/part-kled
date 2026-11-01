@@ -174,18 +174,6 @@
           <div class="ecat-panel" data-ecat="0">
           <div class="look-dots sub" id="look-dots" role="group" aria-label="Look type"></div>
           <div class="style-grid" id="style-grid"></div>
-          <div class="pair">
-            <div class="slider-group" data-param="cell">
-              <label for="sl-cell" title="Size of one cell, in pixels">CELL SIZE</label>
-              <input type="range" id="sl-cell" data-path="look.cell" min="4" max="24" step="1" />
-              <output></output>
-            </div>
-            <div class="slider-group">
-              <label for="sl-gap" title="Empty space between the particles, as a share of the cell">GAP</label>
-              <input type="range" id="sl-gap" data-path="look.gap" min="0" max="0.6" step="0.01" data-format="pct" />
-              <output></output>
-            </div>
-          </div>
           <div id="chrome-settings" hidden>
             <div class="pair">
               <div class="slider-group">
@@ -215,19 +203,19 @@
           <div id="convulsions-settings" hidden>
             <div class="pair">
               <div class="slider-group">
-                <label for="sl-conv-line" title="Weight of the ink contour lines along the edges">LINE</label>
+                <label for="sl-conv-line" title="Weight of the dark veins along the cell edges">VEIN</label>
                 <input type="range" id="sl-conv-line" data-path="convulsions.line" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
               <div class="slider-group">
-                <label for="sl-conv-hatch" title="Strength of the hatch strokes in the dark parts">HATCH</label>
+                <label for="sl-conv-hatch" title="Strength of the wavy striations inside each cell">STRIATION</label>
                 <input type="range" id="sl-conv-hatch" data-path="convulsions.hatch" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
             </div>
             <div class="pair">
               <div class="slider-group">
-                <label for="sl-conv-jitter" title="Wobble in the strokes, like a nervous hand">JITTER</label>
+                <label for="sl-conv-jitter" title="How irregular the cells are: zero is a regular grid">IRREGULAR</label>
                 <input type="range" id="sl-conv-jitter" data-path="convulsions.jitter" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
@@ -257,20 +245,20 @@
           <div id="shake-settings" hidden>
             <div class="pair">
               <div class="slider-group">
-                <label for="sl-shake" title="How far the photo behind the letters is smeared sideways">SHAKE</label>
-                <input type="range" id="sl-shake" data-path="ss.kShake" min="0" max="1" step="0.01" />
+                <label for="sl-shake" title="How far the photo behind the letters is smeared sideways">SMEAR</label>
+                <input type="range" id="sl-shake" data-path="shake.smear" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
               <div class="slider-group">
                 <label for="sl-shake-cover" title="How much of the picture the letters cover">COVER</label>
-                <input type="range" id="sl-shake-cover" data-path="ss.kCover" min="0" max="1" step="0.01" />
+                <input type="range" id="sl-shake-cover" data-path="shake.cover" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
             </div>
             <div class="pair single">
               <div class="slider-group">
                 <label for="sl-shake-patch" title="Scattered letters (low) or large patches (high)">PATCH SIZE</label>
-                <input type="range" id="sl-shake-patch" data-path="ss.kClump" min="0" max="1" step="0.01" />
+                <input type="range" id="sl-shake-patch" data-path="shake.patch" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
             </div>

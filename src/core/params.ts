@@ -79,6 +79,8 @@ export interface Params {
   lined: { count: number; weight: number; contrast: number }; // LINED: lines across the picture height (20..160), weight and contrast 0..1
   bloodOn: boolean; // BLOOD SHADOW filter: black ink masses with a red plate printed off register, on the dots
   blood: { shift: number; bleed: number; grain: number }; // BLOOD SHADOW: each 0..1
+  shakeOn: boolean; // SHAKE-MASK filter: a motion-smeared photo with a word showing through in patches, on the dots
+  shake: { smear: number; cover: number; patch: number }; // SHAKE-MASK: each 0..1
   vhsOn: boolean;   // SIGNAL: tape look
   glitchOn: boolean; // SIGNAL: sliced, colour-split bursts
   glitchBeat: boolean; // SIGNAL: bursts on the beat instead of on time
@@ -169,6 +171,8 @@ export const defaults: Params = {
   lined: { count: 60, weight: 0.6, contrast: 0.5 },
   bloodOn: false,
   blood: { shift: 0.5, bleed: 0.5, grain: 0.5 },
+  shakeOn: false,
+  shake: { smear: 0.5, cover: 0.3, patch: 0.5 },
   vhsOn: false,
   glitchOn: false,
   glitchBeat: false,
@@ -254,6 +258,7 @@ export function withEffectsStart(): Params {
     prismaticOn: false,
     linedOn: false,
     bloodOn: false,
+    shakeOn: false,
     holoOn: false,
     vhsOn: false,
     glitchOn: false,
@@ -293,6 +298,16 @@ export function serializeParams(params: Params): string {
   return JSON.stringify(params);
 }
 
+/** Cell size and gap are not set by the user any more: saved values are dropped, so every look uses its own defaults. */
+function withoutCellSettings(looks: Record<string, Partial<LookTone>>): Record<string, Partial<LookTone>> {
+  const out: Record<string, Partial<LookTone>> = {};
+  for (const [key, tone] of Object.entries(looks)) {
+    const { cell: _cell, gap: _gap, ...rest } = tone;
+    out[key] = rest;
+  }
+  return out;
+}
+
 export function parseParams(json: string, fallback: Params = defaults): Params {
   try {
     const parsed = JSON.parse(json);
@@ -307,7 +322,7 @@ export function parseParams(json: string, fallback: Params = defaults): Params {
       ss: { ...fallback.ss, ...(parsed.ss || {}) },
       emit: { ...fallback.emit, ...(parsed.emit || {}) },
       trail: { ...fallback.trail, ...(parsed.trail || {}) },
-      looks: { ...fallback.looks, ...(parsed.looks || {}) },
+      looks: withoutCellSettings({ ...fallback.looks, ...(parsed.looks || {}) }),
       glow: { ...fallback.glow, ...(parsed.glow || {}) },
       signal: { ...fallback.signal, ...(parsed.signal || {}) },
       surface: { ...fallback.surface, ...(parsed.surface || {}) },

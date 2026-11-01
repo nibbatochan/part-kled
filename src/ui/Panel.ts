@@ -1,7 +1,7 @@
 // src/ui/Panel.ts
 import { MOTION_PRESETS, defaults, lookTone, withEffectsStart, withLightStart, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
-import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CELL_RANGE, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER, SHAKE_MASK_LOOK, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
+import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CELL_RANGE, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER, SHAKE_FILTER, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
 import { XyPad } from './XyPad';
 import { scrollRow } from './ScrollRow';
 
@@ -277,10 +277,10 @@ export class Panel {
         return;
       }
       const look = Number(btn.dataset.style);
-      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER || look === ECSTASY_FILTER || look === BLIGHT_FILTER || look === REDMET_FILTER || look === CONVULSIONS_FILTER) {
-        // CHROME, PRISMATIC, LINED, BLOOD SHADOW, AURA, ECSTASY, BLIGHT, REDMET and CONVULSIONS are standalone filters on the dots base. Picking one turns the others off,
+      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER || look === ECSTASY_FILTER || look === BLIGHT_FILTER || look === REDMET_FILTER || look === CONVULSIONS_FILTER || look === SHAKE_FILTER) {
+        // CHROME, PRISMATIC, LINED, BLOOD SHADOW, AURA, ECSTASY, BLIGHT, REDMET, CONVULSIONS and SHAKE-MASK are standalone filters on the dots base. Picking one turns the others off,
         // and picking the one that is on turns it off.
-        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : look === ECSTASY_FILTER ? this.params.ecstasyOn : look === BLIGHT_FILTER ? this.params.blightOn : look === REDMET_FILTER ? this.params.redmetOn : look === CONVULSIONS_FILTER ? this.params.convulsionsOn : this.params.bloodOn;
+        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : look === ECSTASY_FILTER ? this.params.ecstasyOn : look === BLIGHT_FILTER ? this.params.blightOn : look === REDMET_FILTER ? this.params.redmetOn : look === CONVULSIONS_FILTER ? this.params.convulsionsOn : look === SHAKE_FILTER ? this.params.shakeOn : this.params.bloodOn;
         this.params.style = 0;
         this.setFilter(wasOn ? null : look);
         this.syncStyleUi();
@@ -471,6 +471,7 @@ export class Panel {
     this.params.blightOn = look === BLIGHT_FILTER;
     this.params.redmetOn = look === REDMET_FILTER;
     this.params.convulsionsOn = look === CONVULSIONS_FILTER;
+    this.params.shakeOn = look === SHAKE_FILTER;
   }
 
   private syncStyleUi(): void {
@@ -484,7 +485,7 @@ export class Panel {
     const auraBox = document.getElementById('aura-settings');
     if (auraBox) auraBox.hidden = !this.params.auraOn;
     const shakeBox = document.getElementById('shake-settings');
-    if (shakeBox) shakeBox.hidden = st !== SHAKE_MASK_LOOK;
+    if (shakeBox) shakeBox.hidden = !this.params.shakeOn;
     const bloodBox = document.getElementById('blood-settings');
     if (bloodBox) bloodBox.hidden = !this.params.bloodOn;
     const ecstasyBox = document.getElementById('ecstasy-settings');
@@ -495,7 +496,7 @@ export class Panel {
     if (redmetBox) redmetBox.hidden = !this.params.redmetOn;
     const convBox = document.getElementById('convulsions-settings');
     if (convBox) convBox.hidden = !this.params.convulsionsOn;
-    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn || this.params.ecstasyOn || this.params.blightOn || this.params.redmetOn || this.params.convulsionsOn;
+    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn || this.params.ecstasyOn || this.params.blightOn || this.params.redmetOn || this.params.convulsionsOn || this.params.shakeOn;
     document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => {
       const look = Number(b.dataset.style);
       const on = look === CHROME_FILTER ? this.params.chromeOn
@@ -507,17 +508,10 @@ export class Panel {
         : look === BLIGHT_FILTER ? this.params.blightOn
         : look === REDMET_FILTER ? this.params.redmetOn
         : look === CONVULSIONS_FILTER ? this.params.convulsionsOn
+        : look === SHAKE_FILTER ? this.params.shakeOn
         : look === st && !filtersOn;
       b.classList.toggle('active', on);
     });
-    // DOTS and X-RAY take no cell size or gap: X-RAY keeps its fixed cell from its tone defaults
-    const noCellRow = st === 0 || st === 27;
-    const cell = document.getElementById('sl-cell') as HTMLInputElement | null;
-    if (cell) {
-      cell.disabled = noCellRow;
-      const row = cell.closest<HTMLElement>('.pair');
-      if (row) row.style.display = noCellRow ? 'none' : '';
-    }
     // Shared controls only for the cell looks; ink and paper only when the colour mode uses them
     const show = (el: HTMLElement | null, on: boolean) => {
       if (el) el.style.display = on ? '' : 'none';
@@ -535,15 +529,6 @@ export class Panel {
     const paper = document.getElementById('in-paper') as HTMLInputElement | null;
     if (ink) ink.value = tone.ink;
     if (paper) paper.value = tone.paper;
-    // Each look has its own cell range: DITHER goes finer than the others
-    const range = CELL_RANGE[st] ?? CELL_RANGE[1];
-    const cellSlider = document.getElementById('sl-cell') as HTMLInputElement | null;
-    if (cellSlider) {
-      cellSlider.min = String(range[0]);
-      cellSlider.max = String(range[1]);
-      cellSlider.value = String(tone.cell);
-      this.updateSliderOutput(cellSlider);
-    }
     document.querySelectorAll<HTMLElement>('[data-style-set]').forEach((w) => {
       w.style.display = Number(w.dataset.styleSet) === st && fullSettings ? '' : 'none';
     });
