@@ -31,3 +31,22 @@ describe('isModelFile', () => {
     expect(isModelFile(new File([''], 'scene.gltf'))).toBe(false);
   });
 });
+
+describe('sampleModelCloud', () => {
+  it('puts every point on the surface of a cube fitted to the unit sphere', async () => {
+    const THREE = await import('three');
+    const { sampleModelCloud } = await import('../src/model/cloud');
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({ color: 0xff0000 }));
+    const cloud = sampleModelCloud(mesh, 500);
+    expect(cloud.positions.length).toBe(500 * 3);
+    // Cube half-size 1 over radius sqrt(3): every point sits on a face at 1/sqrt(3)
+    const face = 1 / Math.sqrt(3);
+    for (let i = 0; i < 500; i++) {
+      const m = Math.max(...[0, 1, 2].map((k) => Math.abs(cloud.positions[i * 3 + k])));
+      expect(m).toBeCloseTo(face, 4);
+    }
+    // Material colour is red, converted to sRGB (red stays 1)
+    expect(cloud.colors[0]).toBeCloseTo(1, 4);
+    expect(cloud.colors[1]).toBeCloseTo(0, 4);
+  });
+});

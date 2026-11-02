@@ -12,7 +12,8 @@ import { Panel } from './ui/Panel';
 import { MAX_IMAGES, Thumbs } from './ui/Thumbs';
 import { LookPicker } from './ui/LookPicker';
 import { processImageFile, type ProcessedImage } from './utils/image';
-import { isModelFile, modelDepthFor, processModelFile } from './model/modelInput';
+import { isModelFile, modelCloudFor, modelDepthFor, processModelFile } from './model/modelInput';
+import { CloudView } from './model/CloudView';
 import { setupKeyboardShortcuts } from './utils/keys';
 import { ClipPlayer } from './video/ClipPlayer';
 
@@ -50,6 +51,8 @@ class App {
   private dropzone!: Dropzone;
   private panel!: Panel;
   private depthEstimator = new DepthEstimator();
+  // 3D model pictures show their point cloud here, turnable, instead of the picture engine
+  private cloudView: CloudView | null = null;
 
   public images: ProcessedImage[] = [];
   private sampleCache: Map<string, CachedSample> = new Map();
@@ -203,8 +206,31 @@ class App {
     if (!wrap) return;
     new ResizeObserver(() => {
       const r = wrap.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) this.engine.resize(r.width, r.height);
+      if (r.width > 0 && r.height > 0) {
+        this.engine.resize(r.width, r.height);
+        this.cloudView?.resize(r.width, r.height);
+      }
     }).observe(wrap);
+  }
+
+  /** A model picture shows its 3D cloud on its own canvas; a photo shows the picture engine. */
+  private showCloudFor(img: ProcessedImage): void {
+    const wrap = document.getElementById('stage-wrap');
+    const cloud = modelCloudFor(img);
+    if (!cloud) {
+      this.cloudView?.hide();
+      wrap?.classList.remove('is-cloud');
+      return;
+    }
+    if (!this.cloudView) {
+      const canvas = document.getElementById('cloud') as HTMLCanvasElement | null;
+      if (!canvas) return;
+      this.cloudView = new CloudView(canvas);
+      const r = wrap?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) this.cloudView.resize(r.width, r.height);
+    }
+    this.cloudView.show(cloud);
+    wrap?.classList.add('is-cloud');
   }
 
   private loop(currentTime: number): void {
@@ -604,6 +630,7 @@ class App {
     if (this.activeIndex !== index) return;
 
     this.engine.loadSampleData(currentCached.sampleData, nextCached.sampleData);
+    this.showCloudFor(nextImg);
     this.frame.setReadout(index + 1, this.images.length, '');
     this.thumbs.setActiveIndex(index);
     this.looks?.refresh();
@@ -777,7 +804,7 @@ class App {
     this.dropzone.showOverlay(false);
     for (const f of files) {
       if (this.images.length >= MAX_IMAGES) break;
-      const proc = isModelFile(f) ? await processModelFile(f) : await processImageFile(f);
+      const proc = isModelFile(f) ? await processModelFile(f, pointBudget()) : await processImageFile(f);
       this.images.push(proc);
     }
 

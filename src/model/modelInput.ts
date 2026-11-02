@@ -5,6 +5,7 @@
 import type * as THREE from 'three';
 import { processImageFile, type ProcessedImage } from '../utils/image';
 import { renderModelPicture } from './renderModel';
+import { sampleModelCloud, type ModelCloud } from './cloud';
 
 export const MODEL_FILE_RE = /\.(glb|obj)$/i;
 
@@ -19,10 +20,16 @@ interface ModelDepth {
 }
 
 const modelDepths = new WeakMap<ProcessedImage, ModelDepth>();
+const modelClouds = new WeakMap<ProcessedImage, ModelCloud>();
 
 /** The rendered depth for a picture that came from a model, or null for a photo. */
 export function modelDepthFor(img: ProcessedImage): ModelDepth | null {
   return modelDepths.get(img) ?? null;
+}
+
+/** The 3D point cloud for a picture that came from a model, or null for a photo. */
+export function modelCloudFor(img: ProcessedImage): ModelCloud | null {
+  return modelClouds.get(img) ?? null;
 }
 
 async function loadModel(file: File): Promise<THREE.Object3D> {
@@ -41,13 +48,15 @@ function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
-/** Render a model file into a picture with its depth. Throws if the file does not parse. */
-export async function processModelFile(file: File): Promise<ProcessedImage> {
+/** Render a model file into a picture with its depth, and sample its 3D cloud. Throws if the file does not parse. */
+export async function processModelFile(file: File, cloudCount: number): Promise<ProcessedImage> {
   const model = await loadModel(file);
   const picture = renderModelPicture(model);
+  const cloud = sampleModelCloud(model, cloudCount);
   const png = await canvasToPng(picture.color);
   const base = file.name.replace(/\.[^.]+$/, '');
   const proc = await processImageFile(new File([png], `${base}.png`, { type: 'image/png' }));
   modelDepths.set(proc, { depth: picture.depth, dw: picture.width, dh: picture.height });
+  modelClouds.set(proc, cloud);
   return proc;
 }
