@@ -5,7 +5,7 @@ import { makeEngine, type ExportFrame } from '../web/Exporter';
 import { toLiteParams, type ExportSnapshot } from '../web/WebEngine';
 import type { Params } from '../core/params';
 import type { LiteSample } from '../lite/sample';
-import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, ECSTASY_FILTER, LINED_FILTER, PRISMATIC_FILTER, REDMET_FILTER, CONVULSIONS_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, CUMULUS_FILTER, ARANCIA_FILTER, ROCK_FILTER, BLEND_FILTER, CHROMA2_FILTER } from '../core/styles';
+import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, ECSTASY_FILTER, LINED_FILTER, PRISMATIC_FILTER, REDMET_FILTER, CONVULSIONS_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, CUMULUS_FILTER, ARANCIA_FILTER, ROCK_FILTER, BLEND_FILTER, CHROMA2_FILTER, VBRNT_FING_FILTER, GLASS_GREEN_FILTER, CANDY_FILTER, CABR_FILTER } from '../core/styles';
 
 const TILE_W = 144; // drawn at 2x the 72 x 54 css size so it stays sharp on screen
 const TILE_H = 108;
@@ -52,10 +52,10 @@ export class LookPicker {
       };
       looks.forEach((btn) => {
         const look = Number(btn.dataset.style);
-        if (look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER && look !== ECSTASY_FILTER && look !== BLIGHT_FILTER && look !== REDMET_FILTER && look !== CONVULSIONS_FILTER && look !== SHAKE_FILTER && look !== SOFTWORD_FILTER && look !== FUR_FILTER && look !== CUMULUS_FILTER && look !== ARANCIA_FILTER && look !== ROCK_FILTER && look !== BLEND_FILTER && look !== CHROMA2_FILTER) tile(btn, { ...params, style: look });
+        if (look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER && look !== ECSTASY_FILTER && look !== BLIGHT_FILTER && look !== REDMET_FILTER && look !== CONVULSIONS_FILTER && look !== SHAKE_FILTER && look !== SOFTWORD_FILTER && look !== FUR_FILTER && look !== CUMULUS_FILTER && look !== ARANCIA_FILTER && look !== ROCK_FILTER && look !== BLEND_FILTER && look !== CHROMA2_FILTER && look !== VBRNT_FING_FILTER && look !== GLASS_GREEN_FILTER && look !== CANDY_FILTER && look !== CABR_FILTER) tile(btn, { ...params, style: look });
       });
       // The filter tiles last: each is drawn on the DOTS base with only its own filter on
-      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false, ecstasyOn: false, blightOn: false, redmetOn: false, convulsionsOn: false, shakeOn: false, softwordOn: false, furOn: false, cumulusOn: false, aranciaOn: false, rockOn: false, blendOn: false, chroma2On: false };
+      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false, ecstasyOn: false, blightOn: false, redmetOn: false, convulsionsOn: false, shakeOn: false, softwordOn: false, furOn: false, cumulusOn: false, aranciaOn: false, rockOn: false, blendOn: false, chroma2On: false, vbrntFingOn: false, glassGreenOn: false, candyOn: false, cabrOn: false };
       const chromeBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CHROME_FILTER}"]`);
       if (chromeBtn) tile(chromeBtn, { ...params, style: 0, ...off, chromeOn: true });
       const prismBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${PRISMATIC_FILTER}"]`);
@@ -74,6 +74,14 @@ export class LookPicker {
       if (blendBtn) tile(blendBtn, { ...params, style: 0, ...off, blendOn: true });
       const chroma2Btn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CHROMA2_FILTER}"]`);
       if (chroma2Btn) tile(chroma2Btn, { ...params, style: 0, ...off, chroma2On: true });
+      const vbrntFingBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${VBRNT_FING_FILTER}"]`);
+      if (vbrntFingBtn) tile(vbrntFingBtn, { ...params, style: 0, ...off, vbrntFingOn: true });
+      const ggBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${GLASS_GREEN_FILTER}"]`);
+      if (ggBtn) tile(ggBtn, { ...params, style: 0, ...off, glassGreenOn: true });
+      const candyBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CANDY_FILTER}"]`);
+      if (candyBtn) tile(candyBtn, { ...params, style: 0, ...off, candyOn: true });
+      const cabrBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CABR_FILTER}"]`);
+      if (cabrBtn) tile(cabrBtn, { ...params, style: 0, ...off, cabrOn: true });
       const shakeBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${SHAKE_FILTER}"]`);
       if (shakeBtn) tile(shakeBtn, { ...params, style: 0, ...off, shakeOn: true });
       const softBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${SOFTWORD_FILTER}"]`);

@@ -75,6 +75,14 @@ export interface Params {
   redmet: { heat: number; rim: number; bevel: number }; // REDMET: each 0..1
   chroma2On: boolean; // CHROMA 2 filter: a dark glossy slab with a blue, orange and red spectrum and white edge light, on the dots
   chroma2: { rim: number; spectrum: number; bevel: number }; // CHROMA 2: each 0..1
+  vbrntFingOn: boolean; // VBRNT-FING filter on the dots: engraved hatching in a multi-hue palette
+  vbrntFing: { pattern: number; color: number; ink: number }; // VBRNT-FING: each 0..1
+  glassGreenOn: boolean; // GLASS GREEN filter on the dots: emerald green glass with high gloss specular highlights and rim light
+  glassGreen: { gloss: number; rim: number; depth: number; bevel: number }; // GLASS GREEN: each 0..1
+  candyOn: boolean; // CANDY filter on the dots: glossy translucent orange candy
+  candy: { gloss: number; glow: number; tone: number }; // CANDY: each 0..1
+  cabrOn: boolean; // C-ABR filter on the dots: dark obsidian glass with chromatic aberration caustics and slick specular highlights
+  cabr: { disp: number; gloss: number; rim: number }; // C-ABR: each 0..1
   softwordOn: boolean; // SOFTWORD filter: ASCII characters on the dots, picked by brightness, with a soft glow
   softword: { glow: number }; // SOFTWORD: glow 0..1
   convulsionsOn: boolean; // CONVULSIONS filter: ink contour lines and jittering hatch strokes, on the dots
@@ -181,6 +189,14 @@ export const defaults: Params = {
   redmet: { heat: 0.7, rim: 0.6, bevel: 0.5 },
   chroma2On: false,
   chroma2: { rim: 0.6, spectrum: 0.7, bevel: 0.5 },
+  vbrntFingOn: false,
+  vbrntFing: { pattern: 0.5, color: 0.5, ink: 0.5 },
+  glassGreenOn: false,
+  glassGreen: { gloss: 0.85, rim: 0.90, depth: 0.70, bevel: 0.65 },
+  candyOn: false,
+  candy: { gloss: 0.85, glow: 0.70, tone: 0.50 },
+  cabrOn: false,
+  cabr: { disp: 0.85, gloss: 0.90, rim: 0.85 },
   softwordOn: false,
   softword: { glow: 0.6 },
   convulsionsOn: false,
@@ -283,6 +299,10 @@ export function withEffectsStart(): Params {
     blightOn: false,
     redmetOn: false,
     chroma2On: false,
+    vbrntFingOn: false,
+    glassGreenOn: false,
+    candyOn: false,
+    cabrOn: false,
     convulsionsOn: false,
     softwordOn: false,
     prismaticOn: false,

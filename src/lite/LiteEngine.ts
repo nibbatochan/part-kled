@@ -1,6 +1,7 @@
 // src/lite/LiteEngine.ts
 // Raw WebGL2, no three.js, no framebuffers. Points and optional trail lines. A new picture morphs in
 // from the picture on screen (same particle index, same rule as the studio's morph).
+import { bakeVbrnt } from './vbrntBake';
 import { CELL_FRAG_SRC, CELL_VERT, EQ_VERT, FRAG_SRC, POINT_VERT, TRAIL_VERT } from './shaders';
 import { buildGlyphAtlas } from './glyphs';
 import { Post, type PostParams } from './Post';
@@ -82,6 +83,21 @@ export interface LiteParams {
   chroma2Rim: number;   // CHROMA 2: 0..1 white edge light
   chroma2Spectrum: number; // CHROMA 2: 0..1 how strongly the blue and red colour the slab
   chroma2Bevel: number; // CHROMA 2: 0..1 how far the slopes tilt the surface
+  vbrntFingOn: boolean; // VBRNT-FING filter on the dots
+  vbrntFingPattern: number; vbrntFingColor: number; vbrntFingInk: number; // VBRNT-FING: 0..1 each
+  glassGreenOn: boolean;      // GLASS GREEN filter on the dots
+  glassGreenGloss: number;    // GLASS GREEN: 0..1 specular glints
+  glassGreenRim: number;      // GLASS GREEN: 0..1 Fresnel edge and rim lighting
+  glassGreenDepth: number;    // GLASS GREEN: 0..1 refractive shadow depth in hollows
+  glassGreenBevel: number;    // GLASS GREEN: 0..1 surface curvature tilt
+  candyOn: boolean;           // CANDY filter on the dots
+  candyGloss: number;         // CANDY: 0..1 specular crest gloss
+  candyGlow: number;          // CANDY: 0..1 internal translucency / warm body glow
+  candyTone: number;          // CANDY: 0..1 flavor warmth balance
+  cabrOn: boolean;            // C-ABR filter on the dots: dark obsidian glass with chromatic aberration
+  cabrDisp: number;           // C-ABR: 0..1 chromatic dispersion
+  cabrGloss: number;          // C-ABR: 0..1 specular crest gloss
+  cabrRim: number;            // C-ABR: 0..1 spectral Fresnel rim light
   convulsionsOn: boolean;   // CONVULSIONS filter on the dots
   convulsionsLine: number;  // CONVULSIONS: 0..1 weight of the contour lines
   convulsionsHatch: number; // CONVULSIONS: 0..1 strength of the hatch strokes
@@ -212,6 +228,21 @@ export const liteDefaults: LiteParams = {
   chroma2Rim: 0.6,
   chroma2Spectrum: 0.7,
   chroma2Bevel: 0.5,
+  vbrntFingOn: false,
+  vbrntFingPattern: 0.5, vbrntFingColor: 0.5, vbrntFingInk: 0.5,
+  glassGreenOn: false,
+  glassGreenGloss: 0.85,
+  glassGreenRim: 0.90,
+  glassGreenDepth: 0.70,
+  glassGreenBevel: 0.65,
+  candyOn: false,
+  candyGloss: 0.85,
+  candyGlow: 0.70,
+  candyTone: 0.50,
+  cabrOn: false,
+  cabrDisp: 0.85,
+  cabrGloss: 0.90,
+  cabrRim: 0.85,
   convulsionsOn: false,
   convulsionsLine: 0.5,
   convulsionsHatch: 0.5,
@@ -334,7 +365,7 @@ const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
-  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uSoftword', 'uSwGlow', 'uCumulus', 'uCuPuff', 'uCuGlow', 'uCuSoft', 'uBnOn', 'uBnAmt', 'uBnWarm', 'uBnSoft', 'uC2On', 'uC2Rim', 'uC2Spec', 'uC2Bevel', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain', 'uShake', 'uShSmear', 'uShCover', 'uShPatch', 'uFur', 'uFurPile', 'uFurLength', 'uFurFuzz', 'uAr', 'uArPores', 'uArWeb', 'uArGloss', 'uRock', 'uRkCracks', 'uRkGrain', 'uRkWear',
+  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uSoftword', 'uSwGlow', 'uCumulus', 'uCuPuff', 'uCuGlow', 'uCuSoft', 'uBnOn', 'uBnAmt', 'uBnWarm', 'uBnSoft', 'uC2On', 'uC2Rim', 'uC2Spec', 'uC2Bevel', 'uVbrntFingOn', 'uVbrntFingPattern', 'uVbrntFingColor', 'uVbrntFingInk', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain', 'uShake', 'uShSmear', 'uShCover', 'uShPatch', 'uFur', 'uFurPile', 'uFurLength', 'uFurFuzz', 'uAr', 'uArPores', 'uArWeb', 'uArGloss', 'uRock', 'uRkCracks', 'uRkGrain', 'uRkWear', 'uGlassGreen', 'uGgGloss', 'uGgRim', 'uGgDepth', 'uGgBevel', 'uCandy', 'uCdGloss', 'uCdGlow', 'uCdTone', 'uCabr', 'uCabrDisp', 'uCabrGloss', 'uCabrRim',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt', 'uMotion', 'uMotionAmt', 'uMotionSpeed',
   // cell looks
@@ -436,6 +467,8 @@ export class LiteEngine {
   onQuality?: (info: { drawn: number; dpr: number; trails: boolean }) => void;
   private trailsAllowed = true;
   private atlas: WebGLTexture | null = null;
+  /** VBRNT-FING: baked into the picture's pixels on upload, so the hatch is drawn at picture resolution. */
+  private vbrnt = { on: false, pattern: 0.5, color: 0.5, ink: 0.5 };
   /** Export: device px per css px of the live view, so dots and cells keep their look at any output size. */
   private fixedScale: number | null = null;
   private refScale: number | null = null;
@@ -583,7 +616,9 @@ export class LiteEngine {
       gl.bindTexture(gl.TEXTURE_2D, slot.tex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); // alpha is depth
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, s.grid.w, s.grid.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, s.grid.rgba);
+      // VBRNT-FING bakes its engraving into the picture's pixels here (alpha, the depth, is kept)
+      const px = this.vbrnt.on ? bakeVbrnt(s.grid.rgba, s.grid.w, s.grid.h, this.vbrnt) : s.grid.rgba;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, s.grid.w, s.grid.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
       gl.generateMipmap(gl.TEXTURE_2D);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -640,6 +675,17 @@ export class LiteEngine {
 
   setParams(p: Partial<LiteParams>): void {
     this.params = { ...this.params, ...p, fx: { ...this.params.fx, ...(p.fx ?? {}) } };
+    const v = this.vbrnt;
+    const next = {
+      on: this.params.vbrntFingOn,
+      pattern: this.params.vbrntFingPattern,
+      color: this.params.vbrntFingColor,
+      ink: this.params.vbrntFingInk,
+    };
+    if (next.on !== v.on || next.pattern !== v.pattern || next.color !== v.color || next.ink !== v.ink) {
+      this.vbrnt = next;
+      if (this.sample) this.upload(this.slots[this.cur], this.sample); // re-bake the picture with the new settings
+    }
   }
 
   setLayout(l: Partial<LiteLayout>): void {
@@ -974,6 +1020,10 @@ export class LiteEngine {
       gl.uniform1f(U.uC2Rim, p.chroma2Rim);
       gl.uniform1f(U.uC2Spec, p.chroma2Spectrum);
       gl.uniform1f(U.uC2Bevel, p.chroma2Bevel);
+      gl.uniform1f(U.uVbrntFingOn, p.vbrntFingOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uVbrntFingPattern, p.vbrntFingPattern);
+      gl.uniform1f(U.uVbrntFingColor, p.vbrntFingColor);
+      gl.uniform1f(U.uVbrntFingInk, p.vbrntFingInk);
       gl.uniform1f(U.uConv, p.convulsionsOn && p.style === 0 ? 1 : 0);
       gl.uniform1f(U.uCvLine, p.convulsionsLine);
       gl.uniform1f(U.uCvHatch, p.convulsionsHatch);
@@ -1012,6 +1062,19 @@ export class LiteEngine {
       gl.uniform1f(U.uBnAmt, p.blendAmount);
       gl.uniform1f(U.uBnWarm, p.blendWarm);
       gl.uniform1f(U.uBnSoft, p.blendSoft);
+      gl.uniform1f(U.uGlassGreen, p.glassGreenOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uGgGloss, p.glassGreenGloss);
+      gl.uniform1f(U.uGgRim, p.glassGreenRim);
+      gl.uniform1f(U.uGgDepth, p.glassGreenDepth);
+      gl.uniform1f(U.uGgBevel, p.glassGreenBevel);
+      gl.uniform1f(U.uCandy, p.candyOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uCdGloss, p.candyGloss);
+      gl.uniform1f(U.uCdGlow, p.candyGlow);
+      gl.uniform1f(U.uCdTone, p.candyTone);
+      gl.uniform1f(U.uCabr, p.cabrOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uCabrDisp, p.cabrDisp);
+      gl.uniform1f(U.uCabrGloss, p.cabrGloss);
+      gl.uniform1f(U.uCabrRim, p.cabrRim);
       gl.uniform1f(U.uMusic, exact ? 0 : p.musicLook); // a loop export never draws the sound
       gl.uniform1f(U.uMotion, p.motionFx);
       gl.uniform1f(U.uMotionAmt, p.motionAmount);

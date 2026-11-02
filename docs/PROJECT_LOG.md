@@ -18,6 +18,14 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-02: C-ABR filter (GLASS category)
+- New category GLASS in LOOK_CATEGORIES. Filter on the dots, slot 42: dark smoked obsidian glass with prismatic chromatic aberration caustics and slick high-gloss specular reflections derived from the classical bust paired reference. Curvature and depth gradients tilt dots into surface normals; wavelength-dependent refractive dispersion splits internal transmission along slopes and draped folds into vivid spectral rainbow bands (cyan, amber, magenta, cobalt), while razor-sharp specular crests and dual-tinted Fresnel rim lighting catch curved ridges. Controls: DISPERSION, GLOSS, RIM with presets (FAITHFUL, SUBTLE, EXPRESSIVE).
+- Evidence: tsc and 39 tests pass; automated headless browser test (`scripts/verify-cabr.mjs`) verified in Chromium with zero WebGL errors and screenshots saved to `docs/screenshots/cabr/`.
+
+### 2026-11-02: CANDY filter (SURFACE category)
+- Filter on the dots, slot 41: glossy translucent orange candy / molded gelatinous resin derived from the paired classical bust reference. High internal volume scattering (subsurface transmission) illuminates thin features, deep caramelized amber shadows, slick specular highlights, and curved Fresnel rim glints along crests and folds. Pure black grounds stay untouched. Controls: GLOSS, GLOW, TONE with presets (FAITHFUL, SUBTLE, EXPRESSIVE).
+- Evidence: tsc and 39 tests pass; automated headless browser test (`scripts/verify-candy.mjs`) verified with zero WebGL errors and screenshots saved in `docs/screenshots/candy/`.
+
 ### 2026-11-02: ROCK remade from the marble-to-dark-stone pair
 - ROCK now reads the pair (white marble bust, same bust as dark weathered granite): the picture's form through a steep curve, lit from the upper left (warm grey faces, near-black shadow, pale crest highlights), mottled granite with pale and dark mineral flecks, chipped pale edges, and dark fissures with a pale chipped lip that gather along edges and in patches. Controls keep their names: CRACKS, GRAIN, WEAR.
 - Evidence: tsc and 38 tests pass; checked in the browser on slot 5 (the statue). Not tried on non-statue subjects after the remake.

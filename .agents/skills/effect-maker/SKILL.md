@@ -3,225 +3,215 @@ name: effect-maker
 description: Translate a paired source image and same-subject target-style image into a non-destructive effect for an existing image-to-particle system. Use when the user supplies two images, source first and style-transformed target second.
 ---
 
-# Universal Effect Maker — Paired Image Edition
+# Autonomous Effect Maker — Paired Image Edition
 
 ## Purpose
 
-Translate the visual transformation between two related images into a reusable effect for the user's existing image-to-particle system.
+Translate the visual material transformation between two related images into a reusable, real-time particle shader effect for Particle Depth Studio.
 
-- **IMAGE 1 — SOURCE:** authority for subject, shape, pose, proportions, silhouette, composition, and particle placement.
-- **IMAGE 2 — TARGET STYLE:** ideally the same subject, pose, camera, crop, and composition, transformed into the desired design language. It is the authority for appearance: material, palette, lighting, texture, shading, reflections, edges, and atmosphere.
+- **IMAGE 1 — SOURCE:** Authority for subject, geometry, silhouette, pose, proportions, and particle placement.
+- **IMAGE 2 — TARGET STYLE:** Authority for material appearance: color palette, lighting, reflectivity, roughness, and micro-texture.
 
-Example: Image 1 is a normal 3D dog render; Image 2 is the same dog in the same view, reimagined as polished chrome. Make the source dog's particles look chrome while retaining the source dog's structure.
+> **Zero-Friction Rule:** The user should only have to supply the two images. Do NOT ask the user to run commands, paste GLSL, or edit files. Execute the entire pipeline end-to-end autonomously.
 
-**Never replace Image 1 with Image 2. Never copy Image 2's geometry, silhouette, pose, or particle positions into the source.**
+---
 
-## Input contract
+## Autonomous Execution Protocol (Run in Sequence)
 
-- First attachment = SOURCE. Second attachment = TARGET STYLE.
-- If only one image is supplied, ask for the missing image; do not guess.
-- If roles are unclear with multiple images, ask one short question.
-- The pair should depict the same subject. Matching pose, camera, crop, and scale make the comparison more reliable.
-- If views differ, treat Image 2 as a style reference only. Do not warp Image 1 to force alignment. State that exact region correspondence is less reliable.
+Whenever the user provides two images (attached files or file paths) and asks to create an effect, follow these exact 6 steps:
 
-## Core rule: separate content from style
+### Step 1: Save & Locate the Images
+- If images are provided as file paths in the workspace, use those paths directly.
+- If images are provided as chat attachments, save Image 1 to `scratch/source.png` and Image 2 to `scratch/reference.png`.
 
-### Image 1 controls CONTENT
+### Step 2: Extract Color Palette & Light Direction (Automated)
+Run the automated extraction script:
+```bash
+node scripts/extract-style-inputs.mjs <path-to-image1> <path-to-image2>
+```
+The script aligns the subject bounding boxes, samples 5 luminance tiers, and outputs ready-to-paste GLSL constants:
+- `deepShadow` (deep crevices / occlusions)
+- `shadowCol` (unlit diffuse body)
+- `midCol` (base material albedo)
+- `crestCol` (lit crests facing key light)
+- `glintCol` (specular glints / Fresnel rim)
+- `L1` (normalized 3D key light vector)
 
-Preserve:
-- Subject identity/category, geometry, silhouette, pose, proportions, and anatomy
-- Camera, crop, perspective, and composition
-- Important internal shapes, markings, and structural details
-- Source-to-particle coordinate mapping
-- Particle count, distribution, density, and topology unless explicitly asked to change them
+### Step 3: Choose Name, Category & Controls
+1. **Name:** Pick an evocative, concise uppercase name based on the material (e.g. `JADE`, `OBSIDIAN`, `BRONZE`, `MARBLE`, `VELVET`, `CORAL`, `ICE`).
+2. **Category:** Default to `'SURFACE'` (or `'METAL'` for raw polished metals).
+3. **Controls:** Pick 2 to 3 primary controls:
+   - For Glass/Gems: `gloss,rim,refract`
+   - For Stone/Granite: `cracks,grain,wear`
+   - For Metal/Chrome: `bevel,spec,rim`
+   - For Translucent/Organic: `gloss,glow,tone`
 
-### Image 2 controls STYLE
+### Step 4: Scaffold the 9 Files in 1 Second (Automated)
+Run the scaffolder CLI tool:
+```bash
+node scripts/scaffold-effect.mjs --name "<NAME>" --category "<CATEGORY>" --controls "<c1>,<c2>,<c3>"
+```
+This automatically updates all 9 files in the engine ([`styles.ts`](src/core/styles.ts), [`params.ts`](src/core/params.ts), [`LiteEngine.ts`](src/lite/LiteEngine.ts), [`WebEngine.ts`](src/web/WebEngine.ts), [`shaders.ts`](src/lite/shaders.ts), [`Panel.ts`](src/ui/Panel.ts), [`LookPicker.ts`](src/ui/LookPicker.ts), [`index.html`](index.html), and [`ExportPanel.ts`](src/ui/ExportPanel.ts)) and stubs out `<name>Finish()` in [`src/lite/shaders.ts`](src/lite/shaders.ts).
 
-Extract:
-- Colour palette and colour relationships
-- Material appearance (metal, glass, liquid, ceramic, fabric, organic, etc.)
-- Light direction, quality, intensity, and falloff
-- Shadow treatment and tonal contrast
-- Specular highlights and reflections
-- Surface texture, roughness, grain, and micro-detail
-- Edge/rim lighting, contours, bevels, and outlines
-- Glow, bloom, atmosphere, and post-processing
-- Stylisation level and rendering/detail character
+### Step 5: Fill the Shader Math in `src/lite/shaders.ts`
+Open [`src/lite/shaders.ts`](src/lite/shaders.ts) and locate the newly generated `vec3 <name>Finish(vec2 h, vec3 c)`.  
+Paste the extracted palette constants and light vector from Step 2 into one of the 4 canonical material archetypes:
 
-**Apply Image 2's appearance to Image 1's content. Whenever they disagree, Image 1's geometry wins.**
+#### Archetype 1: Dielectric Glass / Crystal / Gem
+```glsl
+vec3 <name>Finish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
 
-## Workflow
+  float k = 8.0 + 8.0 * u<Name><Ctrl2>; // e.g. bevel/refract
+  vec3 n = normalize(vec3(-(dx + zx * 2.5) * k, (dy + zy * 2.5) * k, 1.0));
+  float form = smoothstep(0.08, 0.90, lum);
 
-### 1. Inspect the project
+  // Base palette ramp
+  vec3 body = mix(deepShadow, shadowCol, smoothstep(0.0, 0.35, form));
+  body = mix(body, midCol, smoothstep(0.35, 0.75, form));
+  body = mix(body, crestCol, smoothstep(0.75, 1.0, form));
 
-When project code is available:
-- Locate source-image ingestion, particle sampling/mapping, particle geometry, renderer, existing effects, and controls.
-- Identify the current framework and rendering path; reuse them.
-- Determine available particle attributes (position, source UV, colour, size, depth, normal, velocity, etc.).
-- Keep the particle engine intact. Do not replace it or introduce a new stack.
+  // Translucent volume transmission
+  float inner = luma(textureLod(uImg, uv, 3.0).rgb);
+  body += midCol * inner * 0.6;
 
-If code is unavailable, give a compact implementation-ready recipe. Do not claim to have implemented anything.
+  // Specular + Fresnel rim
+  vec3 H1 = normalize(L1 + vec3(0.0, 0.0, 1.0));
+  float spec = pow(max(dot(n, H1), 0.0), 55.0) * u<Name><Ctrl1>; // e.g. gloss
+  float fresnel = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 2.5);
+  body += glintCol * (spec * 1.5 + fresnel * u<Name><Ctrl3>); // e.g. rim
 
-### 2. Analyse the pair
+  return clamp(body * present, 0.0, 1.0);
+}
+```
 
-First check whether aspect ratio, crop, view, pose, orientation, and scale match.
+#### Archetype 2: Carved Stone / Granite / Matte Mineral
+```glsl
+vec3 <name>Finish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
 
-If they match closely, compare corresponding subject regions to infer the visual transformation. If they do not, do not use pixel-to-pixel differencing; compare style at the material/subject level instead. Never deform the source to force correspondence.
+  float form = pow(smoothstep(0.25, 0.95, lum), 1.45);
+  vec3 n = normalize(vec3(-(dx + zx * 2.0) * 8.0, (dy + zy * 2.0) * 8.0, 1.0));
+  float lit = clamp((dot(n, L1) - 0.45) * 3.0, 0.0, 1.0);
 
-Build two conceptual analyses:
+  vec3 stone = mix(deepShadow, shadowCol, smoothstep(0.0, 0.45, form * (0.4 + 0.8 * lit)));
+  stone = mix(stone, midCol, smoothstep(0.28, 0.85, form * (0.4 + 0.9 * lit)));
+  stone = mix(stone, crestCol, smoothstep(0.55, 1.0, lit) * smoothstep(0.35, 0.9, form) * 0.3);
 
-**A. Source structure**
-- Subject/foreground mask if available
-- Silhouette and boundary map
-- Luminance and local contrast
-- Important internal edges and markings
-- Semantic/material regions when useful (for example fur, eyes, nose, collar, background)
-- Existing particle coverage and density
+  // Mottling & mineral flecks
+  stone *= 0.65 + 0.7 * shNoise(h * 55.0);
+  float gr = shHash(floor(h * 560.0));
+  stone *= 1.0 + (gr - 0.5) * 1.5 * u<Name><Ctrl2>; // e.g. grain
 
-**B. Target appearance**
-- Dominant/supporting colours and highlight/shadow colours
-- Material response
-- Lighting direction and softness
-- Reflection and shading patterns
-- Texture frequency and roughness
-- Edge treatment
-- Glow/atmosphere
-- Detail and contrast characteristics
+  // Chipped lips / fissures
+  vec2 v = arVor(h * 7.0 + 0.9 * vec2(shNoise(h * 17.0)));
+  float d = v.y - v.x;
+  float core = 1.0 - smoothstep(0.0, 0.026, d);
+  float lip = (1.0 - smoothstep(0.0, 0.07, d)) - core;
+  stone = mix(stone, crestCol, lip * u<Name><Ctrl1> * 0.8); // e.g. cracks
+  stone = mix(stone, deepShadow * 0.5, core * u<Name><Ctrl1> * 0.95);
 
-Describe the transformation as appearance changes applied to corresponding source regions, not as a replacement image.
+  return clamp(stone * present, 0.0, 1.0);
+}
+```
 
-### 3. Extract a compact transformation recipe
+#### Archetype 3: Slick Polished Metal / Chrome
+```glsl
+vec3 <name>Finish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
 
-Translate visible differences into concrete rendering changes. Examples:
-- Replace diffuse shading with a narrow specular response.
-- Convert neutral highlights into cyan-white reflections.
-- Deepen shadow regions while preserving their location.
-- Add broad directional reflection bands.
-- Apply subtle roughness variation.
-- Add thresholded glow around bright regions only.
+  float k = 10.0 + 10.0 * u<Name><Ctrl1>; // e.g. bevel
+  vec3 n = normalize(vec3(-(dx + zx * 2.5) * k, (dy + zy * 2.5) * k, 1.0));
+  float form = smoothstep(0.12, 0.92, lum);
 
-Do not invent physical properties that the image pair cannot support. Use real depth/normals only when available and reliable. Otherwise use stable 2D lighting, source gradients, density fields, masks, and reflection bands.
+  float lit = clamp((dot(n, L1) - 0.45) * 3.5, 0.0, 1.0);
+  vec3 body = deepShadow + midCol * lit * (0.35 + 0.95 * form);
 
-### 4. Apply the style to particles
+  // Sharp specular crests
+  vec3 H1 = normalize(L1 + vec3(0.0, 0.0, 1.0));
+  float spec = pow(max(dot(n, H1), 0.0), 65.0) * u<Name><Ctrl2>; // e.g. spec
+  float fresnel = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 3.0);
+  body += glintCol * (spec * 1.5 + fresnel * 0.5) * u<Name><Ctrl3>; // e.g. rim
 
-Use the minimum existing renderer capabilities needed:
-- Per-particle material/colour response
-- Colour ramps and luminance remapping
-- Directional light/reflection bands
-- Source edge/silhouette masks
-- Local contrast/detail preservation
-- Optional depth/normal response only if reliable
-- Separate highlight, edge-light, texture, and bloom passes when useful
-- Animation only when requested or visibly required
+  return clamp(body * present, 0.0, 1.0);
+}
+```
 
-Use Image 1's particle locations and source mapping to place the effect. Use Image 2 to infer appearance only.
+#### Archetype 4: Translucent Organic / Gelatinous / Candy
+```glsl
+vec3 <name>Finish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
 
-### 5. Implement non-destructively
+  vec3 n = normalize(vec3(-(dx + zx * 2.5) * 9.0, (dy + zy * 2.5) * 9.0, 1.0));
+  float form = smoothstep(0.06, 0.92, lum);
+  float candyBody = pow(form, 1.15);
 
-When code is available:
-- Add the effect as an isolated, toggleable material/effect preset.
-- Do not modify source pixels or particle geometry.
-- Prefer GPU shader uniforms and cached analysis textures.
-- Avoid per-frame CPU processing, duplicated pipelines, unnecessary dependencies, and large assets.
-- Reuse shared utilities and existing controls.
-- Add only controls that matter for this particular image pair.
-- Keep geometry deformation off unless explicitly requested.
-- Run available build/type-check/tests and report only checks actually performed.
+  vec3 body = mix(deepShadow, shadowCol, smoothstep(0.0, 0.4, candyBody));
+  body = mix(body, midCol, smoothstep(0.4, 0.85, candyBody));
+  body = mix(body, crestCol, smoothstep(0.85, 1.0, candyBody));
 
-If similar effects already exist, extend shared capabilities or create a preset/configuration rather than duplicate the renderer.
+  // Subsurface inner scatter
+  float inner = luma(textureLod(uImg, uv, 3.5).rgb);
+  body += midCol * inner * u<Name><Ctrl2>; // e.g. glow
 
-## Preservation defaults
+  // Wet specular
+  vec3 H1 = normalize(L1 + vec3(0.0, 0.0, 1.0));
+  float spec = pow(max(dot(n, H1), 0.0), 45.0) * u<Name><Ctrl1>; // e.g. gloss
+  body += glintCol * spec;
 
-- Particle coordinates: unchanged
-- Source UV/pixel mapping: unchanged
-- Particle count/topology: unchanged
-- Source crop/aspect ratio: unchanged
-- Silhouette/composition: unchanged
-- Geometry displacement: off
-- Generative reconstruction: off
-- Glow/bloom: separate, thresholded pass
-- Background: follow source unless a mask and explicit background treatment are available
+  return clamp(body * present, 0.0, 1.0);
+}
+```
 
-The effect may change particle colour, brightness, material response, reflections, highlights, controlled opacity, and optional surface texture. Particle size changes must be optional and off unless essential to the target style.
+### Step 6: Verify Code Integrity
+Run the standard verification commands:
+```bash
+cmd.exe /c npm test
+cmd.exe /c npx tsc --noEmit
+```
+Both must pass with zero errors.
 
-Do not use face-specific rules. Protect important visual information generically through source edges, local contrast, silhouette, masks, and source luminance. This must work for animals, people, objects, products, architecture, and illustrations.
-
-## Controls
-
-Do not create an enormous control panel. Start with 4–8 primary controls; put secondary settings under Advanced. Choose only controls supported by the visual evidence in the pair.
-
-Possible controls:
-- Style strength / blend
-- Palette strength, colour stops, hue, saturation
-- Light direction and intensity
-- Reflection direction, width, softness, intensity
-- Highlight threshold, sharpness, and intensity
-- Shadow depth and contrast
-- Roughness, smoothness, or surface texture
-- Edge/rim treatment
-- Refraction or appearance distortion (never particle movement)
-- Glow/bloom threshold, radius, and intensity
-- Animation speed/phase
-- Source-detail preservation
-- Background/subject-mask influence
-- Variation amount and seed
-
-Use clear labels, meaningful ranges, and starting values inferred from the target. Do not add sliders with no visual purpose for this effect.
-
-## Controlled variations
-
-When useful, create 2–3 alternatives:
-- **Faithful:** closest match to Image 2
-- **Subtle:** same design language at lower intensity
-- **Expressive:** stronger material/lighting while preserving source structure
-
-Variation may change palette accents, light placement, reflection position, or texture. It must never change source geometry, particle positions/count, pose, or silhouette. Use a stable seed for reproducibility.
-
-## Output behaviour
-
-### If project code is available
-
-Implement the effect and report briefly:
-- Effect name
-- How Image 1 content and Image 2 appearance were interpreted
-- What was implemented
-- Controls/presets added
-- Files changed
-- Build/test status
-- Genuine remaining limitations
-
-Do not produce a long specification or separate large document unless asked.
-
-### If only the image pair is available
-
-Return a concise recipe:
-
-**Source:** structure to preserve.
-**Target style:** appearance extracted from Image 2.
-**Transformation:** concrete appearance changes.
-**Particle implementation:** minimal shader/material/rendering approach.
-**Controls:** 4–8 relevant controls with suggested values/ranges.
-**Preservation:** geometry/detail safeguards.
-**Uncertainty:** any view/pose/crop mismatch that limits correspondence.
-
-Do not claim the simulator was modified unless its project code was actually changed.
-
-## Quality checks
-
-Before finishing, verify:
-1. Image 1 remains authority for subject, pose, proportions, silhouette, and composition.
-2. Image 2's design language is recognisable.
-3. The result translates appearance rather than replacing the source with Image 2.
-4. Particle coordinates, count, and mapping remain unchanged by default.
-5. Important details and negative spaces remain readable.
-6. Reflections/highlights/texture/glow are coherent, not random noise.
-7. The method works for non-human subjects.
-8. The implementation reuses the existing particle system and stays lightweight.
-9. The effect can be toggled, adjusted, and reset independently.
-
-## Invocation reminder
-
-**Image 1 = what must stay the same.**
-**Image 2 = how it should look.**
-
-Apply Image 2's visual language to Image 1's existing particle representation. Preserve Image 1's geometry.
+### Step 7: Report Back to User
+Report in 6 brief bullet points:
+1. **Effect name & category:** (e.g. `JADE` in `SURFACE`, slot N)
+2. **Visual transformation:** (e.g. Translucent imperial green jade with subsurface scatter and glossy crests)
+3. **Controls added:** (e.g. GLOSS, GLOW, RIM)
+4. **Files changed:** List of files modified
+5. **Verification status:** Tests and TypeScript checks passed
+6. **How to test in browser:** Slot and tile instructions

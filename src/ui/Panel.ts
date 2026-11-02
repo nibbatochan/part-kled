@@ -1,7 +1,7 @@
 // src/ui/Panel.ts
 import { MOTION_PRESETS, defaults, lookTone, withEffectsStart, withLightStart, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
-import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, LINED_FILTER, PRISMATIC_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, ARANCIA_FILTER, ROCK_FILTER, CUMULUS_FILTER, BLEND_FILTER, CHROMA2_FILTER, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
+import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, LINED_FILTER, PRISMATIC_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, ARANCIA_FILTER, ROCK_FILTER, CUMULUS_FILTER, BLEND_FILTER, CHROMA2_FILTER, VBRNT_FING_FILTER, GLASS_GREEN_FILTER, GLASS_GREEN_PRESETS, CANDY_FILTER, CANDY_PRESETS, CABR_FILTER, CABR_PRESETS, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
 import { XyPad } from './XyPad';
 import { scrollRow } from './ScrollRow';
 
@@ -270,16 +270,19 @@ export class Panel {
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-style]');
       if (!btn) return;
       const look = Number(btn.dataset.style);
-      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER || look === ECSTASY_FILTER || look === BLIGHT_FILTER || look === REDMET_FILTER || look === CONVULSIONS_FILTER || look === SHAKE_FILTER || look === SOFTWORD_FILTER || look === FUR_FILTER || look === CUMULUS_FILTER || look === ARANCIA_FILTER || look === ROCK_FILTER || look === BLEND_FILTER || look === CHROMA2_FILTER) {
+      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER || look === ECSTASY_FILTER || look === BLIGHT_FILTER || look === REDMET_FILTER || look === CONVULSIONS_FILTER || look === SHAKE_FILTER || look === SOFTWORD_FILTER || look === FUR_FILTER || look === CUMULUS_FILTER || look === ARANCIA_FILTER || look === ROCK_FILTER || look === BLEND_FILTER || look === CHROMA2_FILTER || look === VBRNT_FING_FILTER || look === GLASS_GREEN_FILTER || look === CANDY_FILTER || look === CABR_FILTER) {
         // CHROME, PRISMATIC, LINED, BLOOD SHADOW, AURA, ECSTASY, BLIGHT, REDMET, CONVULSIONS and SHAKE-MASK are standalone filters on the dots base. Picking one turns the others off,
         // and picking the one that is on turns it off.
-        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : look === ECSTASY_FILTER ? this.params.ecstasyOn : look === BLIGHT_FILTER ? this.params.blightOn : look === REDMET_FILTER ? this.params.redmetOn : look === CONVULSIONS_FILTER ? this.params.convulsionsOn : look === SHAKE_FILTER ? this.params.shakeOn : look === SOFTWORD_FILTER ? this.params.softwordOn : look === FUR_FILTER ? this.params.furOn : look === ARANCIA_FILTER ? this.params.aranciaOn : look === ROCK_FILTER ? this.params.rockOn : look === CUMULUS_FILTER ? this.params.cumulusOn : look === BLEND_FILTER ? this.params.blendOn : look === CHROMA2_FILTER ? this.params.chroma2On : this.params.bloodOn;
+        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : look === ECSTASY_FILTER ? this.params.ecstasyOn : look === BLIGHT_FILTER ? this.params.blightOn : look === REDMET_FILTER ? this.params.redmetOn : look === CONVULSIONS_FILTER ? this.params.convulsionsOn : look === SHAKE_FILTER ? this.params.shakeOn : look === SOFTWORD_FILTER ? this.params.softwordOn : look === FUR_FILTER ? this.params.furOn : look === ARANCIA_FILTER ? this.params.aranciaOn : look === ROCK_FILTER ? this.params.rockOn : look === CUMULUS_FILTER ? this.params.cumulusOn : look === BLEND_FILTER ? this.params.blendOn : look === CHROMA2_FILTER ? this.params.chroma2On
+        : look === VBRNT_FING_FILTER ? this.params.vbrntFingOn : look === GLASS_GREEN_FILTER ? this.params.glassGreenOn : look === CANDY_FILTER ? this.params.candyOn : look === CABR_FILTER ? this.params.cabrOn : this.params.bloodOn;
         this.params.style = 0;
         this.setFilter(wasOn ? null : look);
         this.syncStyleUi();
+        this.syncEffects();
         this.onParamsChangeCb(this.params);
         return;
       }
+
       this.setFilter(null);
       this.params.style = Number(btn.dataset.style);
       // Every look starts with its colour on ORIGINAL when it is chosen; the dither types bring their own colours
@@ -287,6 +290,39 @@ export class Panel {
       this.setLook(own ? { colour: own.colour, ink: own.ink, paper: own.paper } : { colour: 0 });
       this.syncStyleUi();
       this.onParamsChangeCb(this.params);
+    });
+    document.querySelectorAll<HTMLButtonElement>('#gg-presets button[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pKey = btn.dataset.preset as keyof typeof GLASS_GREEN_PRESETS;
+        const vals = GLASS_GREEN_PRESETS[pKey];
+        if (!vals) return;
+        this.params.glassGreen = { ...vals };
+        document.querySelectorAll<HTMLButtonElement>('#gg-presets button').forEach((b) => b.classList.toggle('active', b === btn));
+        this.syncEffects();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+    document.querySelectorAll<HTMLButtonElement>('#candy-presets button[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pKey = btn.dataset.preset as keyof typeof CANDY_PRESETS;
+        const vals = CANDY_PRESETS[pKey];
+        if (!vals) return;
+        this.params.candy = { ...vals };
+        document.querySelectorAll<HTMLButtonElement>('#candy-presets button').forEach((b) => b.classList.toggle('active', b === btn));
+        this.syncEffects();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+    document.querySelectorAll<HTMLButtonElement>('#cabr-presets button[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pKey = btn.dataset.preset as keyof typeof CABR_PRESETS;
+        const vals = CABR_PRESETS[pKey];
+        if (!vals) return;
+        this.params.cabr = { ...vals };
+        document.querySelectorAll<HTMLButtonElement>('#cabr-presets button').forEach((b) => b.classList.toggle('active', b === btn));
+        this.syncEffects();
+        this.onParamsChangeCb(this.params);
+      });
     });
     document.querySelectorAll<HTMLButtonElement>('[data-scolor]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -472,6 +508,10 @@ export class Panel {
     this.params.cumulusOn = look === CUMULUS_FILTER;
     this.params.blendOn = look === BLEND_FILTER;
     this.params.chroma2On = look === CHROMA2_FILTER;
+    this.params.vbrntFingOn = look === VBRNT_FING_FILTER;
+    this.params.glassGreenOn = look === GLASS_GREEN_FILTER;
+    this.params.candyOn = look === CANDY_FILTER;
+    this.params.cabrOn = look === CABR_FILTER;
   }
 
   private syncStyleUi(): void {
@@ -496,6 +536,14 @@ export class Panel {
     if (blendBox) blendBox.hidden = !this.params.blendOn;
     const chroma2Box = document.getElementById('chroma2-settings');
     if (chroma2Box) chroma2Box.hidden = !this.params.chroma2On;
+    const vbrntFingBox = document.getElementById('vbrnt-fing-settings');
+    if (vbrntFingBox) vbrntFingBox.hidden = !this.params.vbrntFingOn;
+    const ggBox = document.getElementById('glass-green-settings');
+    if (ggBox) ggBox.hidden = !this.params.glassGreenOn;
+    const cdBox = document.getElementById('candy-settings');
+    if (cdBox) cdBox.hidden = !this.params.candyOn;
+    const cabrBox = document.getElementById('cabr-settings');
+    if (cabrBox) cabrBox.hidden = !this.params.cabrOn;
     const shakeBox = document.getElementById('shake-settings');
     if (shakeBox) shakeBox.hidden = !this.params.shakeOn;
     const bloodBox = document.getElementById('blood-settings');
@@ -510,7 +558,7 @@ export class Panel {
     if (convBox) convBox.hidden = !this.params.convulsionsOn;
     const softBox = document.getElementById('softword-settings');
     if (softBox) softBox.hidden = !this.params.softwordOn;
-    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn || this.params.ecstasyOn || this.params.blightOn || this.params.redmetOn || this.params.convulsionsOn || this.params.shakeOn || this.params.softwordOn || this.params.furOn || this.params.cumulusOn || this.params.aranciaOn || this.params.rockOn || this.params.blendOn || this.params.chroma2On;
+    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn || this.params.ecstasyOn || this.params.blightOn || this.params.redmetOn || this.params.convulsionsOn || this.params.shakeOn || this.params.softwordOn || this.params.furOn || this.params.cumulusOn || this.params.aranciaOn || this.params.rockOn || this.params.blendOn || this.params.chroma2On || this.params.vbrntFingOn || this.params.glassGreenOn || this.params.candyOn || this.params.cabrOn;
     document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => {
       const look = Number(b.dataset.style);
       const on = look === CHROME_FILTER ? this.params.chromeOn
@@ -530,6 +578,9 @@ export class Panel {
         : look === CUMULUS_FILTER ? this.params.cumulusOn
         : look === BLEND_FILTER ? this.params.blendOn
         : look === CHROMA2_FILTER ? this.params.chroma2On
+        : look === GLASS_GREEN_FILTER ? this.params.glassGreenOn
+        : look === CANDY_FILTER ? this.params.candyOn
+        : look === CABR_FILTER ? this.params.cabrOn
         : look === st && !filtersOn;
       b.classList.toggle('active', on);
     });

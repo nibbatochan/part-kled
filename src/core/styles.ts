@@ -3,7 +3,7 @@
 // Kept free of DOM and GL code so the studio panel, the engine and tests share one description.
 
 /** Look numbers: 0 DOTS (the point look), then the cell looks. Each look keeps its own cell, colour and tone. */
-export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY', 'ECSTASY', 'BLIGHT', 'REDMET', 'SHAKE-MASK', 'CONVULSIONS', 'SOFTWORD', 'FUR', 'CLOUD', 'ARANCIA', 'BLEND', 'ROCK', 'CHROMA 2'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
+export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY', 'ECSTASY', 'BLIGHT', 'REDMET', 'SHAKE-MASK', 'CONVULSIONS', 'SOFTWORD', 'FUR', 'CLOUD', 'ARANCIA', 'BLEND', 'ROCK', 'CHROMA 2', 'GLASS GREEN', 'CANDY', 'C-ABR', 'VBRNT-FING'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
 
 /** Every look sits in one category; the LOOK picker shows them grouped. */
 export const LOOK_CATEGORIES: { name: string; looks: number[] }[] = [
@@ -12,11 +12,12 @@ export const LOOK_CATEGORIES: { name: string; looks: number[] }[] = [
   { name: 'TEXT', looks: [4, 31] },
   { name: 'METAL', looks: [25, 26, 30, 39] },
   { name: 'RETRO', looks: [9] },
-  { name: 'GRAPHIC', looks: [10, 11, 12, 32] },
+  { name: 'GRAPHIC', looks: [10, 11, 12, 32, 43] },
   { name: 'DITHER', looks: [3, 13, 17] },
   { name: 'BITMAP', looks: [18, 19, 20, 21] },
   { name: 'GLOW', looks: [24, 27, 28] },
-  { name: 'SURFACE', looks: [34, 35, 36, 38] },
+  { name: 'SURFACE', looks: [34, 35, 36, 38, 41] },
+  { name: 'GLASS', looks: [40, 42] },
 ];
 
 /** The CHROME tile is a filter too: it puts a metal finish on the dots (chromeOn) and keeps the dots base, with no cell. */
@@ -55,6 +56,15 @@ export const ARANCIA_FILTER = 36;
 /** The CHROMA 2 tile is a filter on the dots, in METAL: a dark glossy slab, its surface lit blue, orange and red, with white edge light. */
 export const CHROMA2_FILTER = 39;
 
+/** The GLASS GREEN tile is a filter on the dots, in SURFACE: emerald green glass with high gloss specular highlights, deep refractive shadows, and a vivid lime rim light. */
+export const GLASS_GREEN_FILTER = 40;
+
+/** The CANDY tile is a filter on the dots, in SURFACE: glossy translucent orange candy with slick specular crests, deep amber shadows, and warm internal glow. */
+export const CANDY_FILTER = 41;
+
+/** The C-ABR tile is a filter on the dots, in GLASS: dark obsidian glass with chromatic aberration caustics, prismatic spectral dispersion, and slick specular crests. */
+export const CABR_FILTER = 42;
+
 /** The ROCK tile is a filter on the dots, in SURFACE: carved stone. Charcoal faces, fine light grain, chipped edges and pale cracks. */
 export const ROCK_FILTER = 38;
 
@@ -69,6 +79,9 @@ export const CONVULSIONS_FILTER = 32;
 
 /** The SHAKE-MASK tile is a filter on the dots (in TEXT): a motion-smeared photo with a word of letters, drawn by the dots, showing through in patches. */
 export const SHAKE_FILTER = 31;
+/** The VBRNT-FING tile is a filter on the dots, in GRAPHIC. */
+export const VBRNT_FING_FILTER = 43;
+
 
 /** The hint shown on each look's button. */
 export const LOOK_TITLES: Record<number, string> = {
@@ -103,6 +116,9 @@ export const LOOK_TITLES: Record<number, string> = {
   35: 'Cloud filter: a puffy white cloud lit from above, blue-grey in its hollows, with warm light from nearby bleeding into it',
   37: 'Blend filter: a dark form dissolved in coloured spray, acid lime at the top shifting to magenta at the foot, with film grain',
   39: 'Chroma 2 filter: a dark glossy slab. Blue on the upper-left faces, orange and red on the lower-right, white edge light split by colour',
+  40: 'Glass green filter: emerald green glass with high gloss specular highlights, deep refractive shadows, and a vivid lime rim light',
+  41: 'Candy filter: glossy translucent orange candy with slick specular crests, deep amber shadows, and warm internal glow',
+  42: 'C-abr filter: dark obsidian glass with chromatic aberration caustics, prismatic spectral dispersion, and slick specular crests',
   31: 'Shake-mask filter: the photo smeared sideways like a shaken camera, with a word of letters made of dots showing through in patches, pale on dark and dark on light',
   30: 'Redmet filter: polished metal that mirrors a red sky, dark silhouettes with white rim highlights on their edges',
   32: 'Convulsions filter: the inside of a butterfly wing, irregular cells with dark veins and wavy striations in each membrane',
@@ -302,6 +318,24 @@ export const LOOK_PRESETS: Record<number, LookPreset[]> = {
     { label: 'CHUNKY', cell: 20, values: { sBorder: 0.15, sShadow: 0.8, sRound: 0.26 } },
   ],
 };
+
+export const GLASS_GREEN_PRESETS = {
+  faithful: { gloss: 0.85, rim: 0.90, depth: 0.70, bevel: 0.65 },
+  subtle: { gloss: 0.40, rim: 0.50, depth: 0.45, bevel: 0.45 },
+  expressive: { gloss: 1.00, rim: 1.00, depth: 0.85, bevel: 0.85 },
+} as const;
+
+export const CANDY_PRESETS = {
+  faithful: { gloss: 0.85, glow: 0.70, tone: 0.50 },
+  subtle: { gloss: 0.50, glow: 0.45, tone: 0.40 },
+  expressive: { gloss: 1.00, glow: 0.90, tone: 0.65 },
+} as const;
+
+export const CABR_PRESETS = {
+  faithful: { disp: 0.85, gloss: 0.90, rim: 0.85 },
+  subtle: { disp: 0.45, gloss: 0.55, rim: 0.50 },
+  expressive: { disp: 1.00, gloss: 1.00, rim: 1.00 },
+} as const;
 
 /** Characters in each ASCII ramp: CLASSIC, DENSE, BINARY. */
 export const RAMP_SIZES = [10, 16, 3];

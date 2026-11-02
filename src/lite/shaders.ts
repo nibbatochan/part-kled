@@ -97,6 +97,10 @@ uniform float uC2On;        // CHROMA 2 filter on the dots: 1 on, 0 off
 uniform float uC2Rim;       // CHROMA 2: 0..1 white edge light
 uniform float uC2Spec;      // CHROMA 2: 0..1 how strongly the blue, orange and red colour the slab
 uniform float uC2Bevel;     // CHROMA 2: 0..1 how far the slopes tilt the surface
+uniform float uVbrntFingOn;
+uniform float uVbrntFingPattern;
+uniform float uVbrntFingColor;
+uniform float uVbrntFingInk;
 uniform float uConv;        // CONVULSIONS filter on the dots: 1 on, 0 off
 uniform float uCvLine;      // CONVULSIONS: 0..1 weight of the contour lines
 uniform float uCvHatch;     // CONVULSIONS: 0..1 strength of the hatch strokes
@@ -135,6 +139,19 @@ uniform float uBnOn;          // BLEND filter on the dots: 1 on, 0 off
 uniform float uBnAmt;         // BLEND: 0..1 how far the soft-light blend goes
 uniform float uBnWarm;        // BLEND: 0..1 warm tint from the light
 uniform float uBnSoft;        // BLEND: 0..1 how broad the softened copy is
+uniform float uGlassGreen;    // GLASS GREEN filter on the dots: 1 on, 0 off
+uniform float uGgGloss;       // GLASS GREEN: 0..1 specular glints
+uniform float uGgRim;         // GLASS GREEN: 0..1 Fresnel edge and rim lighting
+uniform float uGgDepth;       // GLASS GREEN: 0..1 refractive shadow depth in hollows
+uniform float uGgBevel;       // GLASS GREEN: 0..1 surface curvature tilt
+uniform float uCandy;         // CANDY filter on the dots: 1 on, 0 off
+uniform float uCdGloss;       // CANDY: 0..1 specular crest gloss
+uniform float uCdGlow;        // CANDY: 0..1 internal translucency / warm body glow
+uniform float uCdTone;        // CANDY: 0..1 flavor warmth balance
+uniform float uCabr;          // C-ABR filter on the dots: 1 on, 0 off
+uniform float uCabrDisp;      // C-ABR: 0..1 chromatic aberration dispersion strength
+uniform float uCabrGloss;     // C-ABR: 0..1 obsidian specular crest gloss
+uniform float uCabrRim;       // C-ABR: 0..1 spectral Fresnel edge rim light
 uniform sampler2D uAtlas;     // glyph atlas (see glyphs.ts): row 3 holds the letters of the SHAKE-MASK word
 uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
 // MUSIC looks: the sound moves the particles themselves (0 = off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE)
@@ -629,9 +646,247 @@ vec3 blendFinish(vec2 h, vec3 c) {
   return clamp(col, 0.0, 1.0);
 }
 
+// GLASS GREEN: emerald green glass with high gloss specular highlights, deep refractive shadows,
+// and a vivid lime rim light. The picture's form and depth gradients tilt every dot into a normal.
+// Internal light transmission and volumetric absorption create dark obsidian emerald in hollows,
+// while sharp specular reflections and Fresnel rim lighting catch curved crests, curls and edges.
+vec3 glassGreenFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 3.0 / uTexSize;
+  vec2 f = 8.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
+
+  // Surface normal from lighting gradients & depth
+  float k = uGgBevel * 12.0 + 4.0;
+  vec3 n = normalize(vec3(-(dx + zx * 2.2) * k, (dy + zy * 2.2) * k, 1.0));
+
+  // Form mapping: marble brightness mapped to glass density & hollow absorption.
+  // In sculpted glass, hollows and crevices absorb light and fall to dark emerald obsidian.
+  float crevice = smoothstep(0.10, 0.82, lum);
+  float form = pow(crevice, 1.3 + uGgDepth * 1.5);
+
+  // Dual key lights:
+  // Key light 1 from upper-left (lights forehead, left cheek, left shoulder and toga)
+  vec3 L1 = normalize(vec3(-0.52, 0.58, 0.62));
+  // Key light 2 from right (accent fill and right contour)
+  vec3 L2 = normalize(vec3(0.72, 0.22, 0.66));
+
+  float dot1 = clamp((dot(n, L1) - 0.20) * 1.6, 0.0, 1.0);
+  float dot2 = clamp((dot(n, L2) - 0.20) * 1.6, 0.0, 1.0);
+
+  // Specular reflections: high-gloss glints on curved crests
+  vec3 V = vec3(0.0, 0.0, 1.0);
+  vec3 H1 = normalize(L1 + V);
+  vec3 H2 = normalize(L2 + V);
+  float spec1 = pow(max(dot(n, H1), 0.0), 55.0);
+  float spec2 = pow(max(dot(n, H2), 0.0), 40.0);
+  float spec = (spec1 * 1.6 + spec2 * 1.0) * uGgGloss;
+
+  // Fresnel edge and contour rim lighting:
+  // Concentrated along silhouettes, creases, and laurel leaves
+  float fresnel = pow(1.0 - max(dot(n, V), 0.0), 2.2);
+  float edge = clamp(length(vec2(dx, dy)) * k * 0.45, 0.0, 1.0);
+  float rim = (fresnel * 0.88 + smoothstep(0.20, 0.75, edge) * 0.68) * uGgRim;
+
+  // Pure calibrated emerald color ramps (calibrated for screen blending stack):
+  vec3 deepShadow = vec3(0.005, 0.045, 0.007);
+  vec3 midEmerald = vec3(0.040, 0.260, 0.040);
+  vec3 litEmerald = vec3(0.100, 0.480, 0.085);
+  vec3 limeRim = vec3(0.380, 0.760, 0.200);
+  vec3 glintCore = vec3(0.800, 0.950, 0.720);
+
+  // Composite body:
+  vec3 body = mix(deepShadow, midEmerald, form);
+  body += litEmerald * (dot1 * 0.72 + dot2 * 0.28) * form;
+
+  // Rims and glints on crested surfaces
+  float formGate = smoothstep(0.05, 0.40, form);
+  body += limeRim * rim * (0.25 + 0.75 * formGate);
+  body += glintCore * spec * (0.20 + 0.80 * formGate);
+
+  return clamp(body * present, 0.0, 1.0);
+}
+
 // BLIGHT: black ink on paper, as a wash spreads. The dark masses print as ink with a speckled, ragged edge, a grey
 // haze bleeds out from them (a blurred copy of the picture), and the lights stay paper. Only colour changes: dots keep
 // their place and count, and dots where the picture has no light stay empty.
+// CANDY: glossy translucent orange candy with slick specular highlights, deep amber shadows,
+// and warm internal subsurface transmission. The picture's form and depth gradients tilt every dot into a normal.
+// Internal volume scattering illuminates thin features like curls and draped folds, while crisp specular
+// glints and curved Fresnel highlights catch high crests and edges.
+vec3 candyFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
+
+  float k = 10.0;
+  vec3 n = normalize(vec3(-(dx + zx * 2.5) * k, (dy + zy * 2.5) * k, 1.0));
+
+  // Internal translucent light transmission (subsurface scattering / soft copy):
+  float inner = luma(textureLod(uImg, uv, 3.5).rgb);
+
+  // Candy Orange Palette:
+  // tone shifts from deep caramelized blood-orange (0.0) through vivid tangerine (0.5) to golden peach candy (1.0)
+  vec3 darkAmber   = mix(vec3(0.24, 0.04, 0.01), vec3(0.36, 0.07, 0.01), uCdTone);
+  vec3 deepOrange  = mix(vec3(0.65, 0.12, 0.02), vec3(0.85, 0.22, 0.02), uCdTone);
+  vec3 brightCandy = mix(vec3(0.98, 0.36, 0.02), vec3(1.00, 0.52, 0.05), uCdTone);
+  vec3 goldAmber   = mix(vec3(1.00, 0.60, 0.08), vec3(1.00, 0.78, 0.20), uCdTone);
+  vec3 glowCol     = mix(vec3(1.00, 0.44, 0.04), vec3(1.00, 0.70, 0.14), uCdTone);
+
+  // Form mapping: smooth, continuous gelatinous volume
+  float form = smoothstep(0.06, 0.92, lum);
+  float candyBody = pow(form, 1.15);
+
+  vec3 body = mix(darkAmber, deepOrange, smoothstep(0.0, 0.4, candyBody));
+  body = mix(body, brightCandy, smoothstep(0.4, 0.85, candyBody));
+  body = mix(body, goldAmber, smoothstep(0.85, 1.0, candyBody));
+
+  // Internal volume translucency / subsurface scattering:
+  body += glowCol * inner * uCdGlow * 0.85 * (1.0 - form * 0.35);
+
+  // Lighting: Key lights from top-left and top-right
+  vec3 L1 = normalize(vec3(-0.55, 0.55, 0.65));
+  vec3 L2 = normalize(vec3(0.70, 0.30, 0.60));
+  float lit1 = clamp((dot(n, L1) - 0.25) * 2.2, 0.0, 1.0);
+  float lit2 = clamp((dot(n, L2) - 0.25) * 2.2, 0.0, 1.0);
+  body += brightCandy * (lit1 * 0.45 + lit2 * 0.30) * form;
+
+  // Specular highlights: high-gloss slick reflections on curved crests
+  vec3 H1 = normalize(L1 + vec3(0.0, 0.0, 1.0));
+  vec3 H2 = normalize(L2 + vec3(0.0, 0.0, 1.0));
+  float spec1 = pow(max(dot(n, H1), 0.0), 65.0);
+  float spec2 = pow(max(dot(n, H2), 0.0), 45.0);
+  float spec = (spec1 * 1.6 + spec2 * 0.9) * uCdGloss;
+
+  // Fresnel edge and contour rim lighting:
+  float fresnel = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 2.8);
+  float edge = clamp(length(vec2(dx, dy)) * k * 0.5, 0.0, 1.0);
+  float rim = (fresnel * 0.8 + smoothstep(0.35, 0.9, edge) * 0.7) * uCdGloss;
+
+  // Glint highlights: bright white-gold cores on specular peaks and rims
+  vec3 glintCol = mix(vec3(1.0, 0.92, 0.82), vec3(1.0, 1.0, 1.0), 0.7);
+  body += glintCol * spec * 1.5 * smoothstep(0.08, 0.45, form + 0.15);
+  body += mix(goldAmber, glintCol, 0.6) * rim * 0.6 * smoothstep(0.05, 0.4, form + 0.1);
+
+  return clamp(body * present, 0.0, 1.0);
+}
+
+// C-ABR: dark obsidian glass with chromatic aberration caustics, prismatic spectral dispersion,
+// and slick high-gloss specular crests. Wavelength-dependent refractive dispersion splits internal
+// caustics across curved crests into vivid rainbow spectral bands (electric cyan, amber-yellow, neon magenta,
+// and deep cobalt), while razor-sharp specular glints catch high ridges on a deep smoked obsidian glass volume.
+vec3 cabrSpectrum(float h) {
+  // Pure spectral rainbow: 0=Red, 0.17=Yellow, 0.33=Green, 0.5=Cyan, 0.67=Blue, 0.83=Magenta
+  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(vec3(h) + K.xyz) * 6.0 - vec3(K.w));
+  return clamp(p - vec3(1.0), 0.0, 1.0);
+}
+
+vec3 cabrFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 3.5 / uTexSize;
+  vec2 f = 9.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float lum = luma(c);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
+
+  float k = 8.0;
+  vec3 n = normalize(vec3(-(dx + zx * 2.5) * k, (dy + zy * 2.5) * k, 1.0));
+  float edgeGrad = length(vec2(dx, dy));
+  float depthGrad = length(vec2(zx, zy));
+
+  // Deep obsidian smoked glass base:
+  float form = smoothstep(0.08, 0.90, lum);
+  vec3 obsidian = vec3(0.012, 0.014, 0.020);
+  float innerLuma = luma(textureLod(uImg, uv, 3.5).rgb);
+  obsidian += vec3(0.022, 0.026, 0.038) * innerLuma;
+  vec3 body = obsidian;
+
+  // Key lighting: soft subtle directional shading to define volume
+  vec3 L1 = normalize(vec3(-0.48, 0.52, 0.65));
+  vec3 L2 = normalize(vec3(0.68, 0.28, 0.68));
+  float lit1 = clamp((dot(n, L1) - 0.20) * 1.8, 0.0, 1.0);
+  float lit2 = clamp((dot(n, L2) - 0.20) * 1.8, 0.0, 1.0);
+  body *= (0.6 + 0.4 * lit1 + 0.2 * lit2);
+
+  // PROTECT FACE & CHEST PLATE:
+  // Face mask in normalized bust coordinates:
+  float faceRegion = smoothstep(-0.02, 0.06, h.y) * (1.0 - smoothstep(0.26, 0.34, h.y)) * (1.0 - smoothstep(0.12, 0.18, abs(h.x)));
+  float faceMask = faceRegion * smoothstep(0.55, 0.85, n.z);
+  // Chest plate (pectoral mass on right side of viewer): smooth surface facing camera
+  float chestRegion = smoothstep(-0.16, -0.04, h.y) * (1.0 - smoothstep(0.02, 0.12, h.y)) * smoothstep(-0.25, -0.05, h.x) * (1.0 - smoothstep(0.05, 0.15, h.x));
+  float chestMask = chestRegion * smoothstep(0.70, 0.92, n.z);
+
+  // CHROMATIC ABERRATION DISPERSION (Strictly Selective Refractive Caustics):
+  // 1. Toga drapery folds (chest & shoulder sweep: h.y in [-0.28, 0.08])
+  // Only deep creases and ridges trigger the prism effect
+  float draperyZone = smoothstep(-0.28, -0.20, h.y) * (1.0 - smoothstep(0.04, 0.12, h.y));
+  float foldSteepness = smoothstep(0.042, 0.11, depthGrad * 2.2 + edgeGrad * 0.9);
+  float foldRainbow = draperyZone * foldSteepness;
+
+  // 2. Pedestal bottom torus ring ONLY (strictly h.y < -0.37)
+  // Protects the column flutes from rainbow contamination
+  float baseRing = smoothstep(-0.45, -0.41, h.y) * (1.0 - smoothstep(-0.38, -0.35, h.y));
+  float ringRainbow = baseRing * smoothstep(0.02, 0.07, edgeGrad + depthGrad);
+
+  // 3. Laurel leaves on head crown (h.y > 0.30)
+  float crownZone = smoothstep(0.30, 0.36, h.y);
+  float leafRainbow = crownZone * smoothstep(0.05, 0.11, edgeGrad);
+
+  float totalRainbow = clamp(foldRainbow * 1.3 + ringRainbow * 1.1 + leafRainbow * 0.95, 0.0, 1.0);
+  // Zero out rainbow on face and smooth chest plate!
+  totalRainbow *= (1.0 - faceMask) * (1.0 - chestMask * 0.9);
+
+  // Physically oriented prismatic dispersion across fold slopes:
+  // Slopes facing upper-left light catch warm golden/amber spectrum;
+  // Slopes facing away catch cool cyan/blue/magenta spectrum.
+  float foldAngle = dot(n.xy, normalize(vec2(-0.7, 0.7))) * 0.5 + 0.5;
+  float foldPhase = foldAngle * 0.85 + (zx * 2.5 - zy * 1.8) + h.x * 0.35;
+  vec3 spectralColor = cabrSpectrum(fract(foldPhase));
+  body += spectralColor * totalRainbow * 0.52 * uCabrDisp;
+
+  // HIGH-GLOSS SPECULAR CRESTS:
+  // Razor-sharp white hairline reflections along curved crests (exponent 90..120)
+  vec3 H1 = normalize(L1 + vec3(0.0, 0.0, 1.0));
+  vec3 H2 = normalize(L2 + vec3(0.0, 0.0, 1.0));
+  float spec1 = pow(max(dot(n, H1), 0.0), 95.0);
+  float spec2 = pow(max(dot(n, H2), 0.0), 65.0);
+  float spec = (spec1 * 2.0 + spec2 * 1.0) * uCabrGloss;
+  vec3 specColor = vec3(0.95, 0.98, 1.0);
+  body += specColor * spec * 0.65 * smoothstep(0.08, 0.40, form);
+
+  // Column shaft vertical flutes highlight:
+  float columnShaft = smoothstep(-0.38, -0.34, h.y) * (1.0 - smoothstep(-0.20, -0.16, h.y));
+  float fluteSpec = pow(max(dot(n, H2), 0.0), 45.0) * columnShaft * uCabrGloss;
+  body += vec3(0.9, 0.95, 1.0) * fluteSpec * 0.45;
+
+  // FRESNEL RIM LIGHTING (SILHOUETTE GRAZING EDGES ONLY):
+  // Steep grazing falloff (power 4.5) prevents rim wash from invading face/body
+  float grazing = pow(1.0 - max(dot(n, vec3(0.0, 0.0, 1.0)), 0.0), 4.5);
+  float rim = grazing * smoothstep(0.02, 0.08, edgeGrad) * uCabrRim * (1.0 - faceMask * 0.7);
+  // Ice-cyan on left silhouette, warm amber on right silhouette
+  vec3 rimColor = mix(vec3(0.25, 0.85, 1.0), vec3(1.0, 0.55, 0.25), clamp(n.x * 0.5 + 0.5, 0.0, 1.0));
+  body += mix(rimColor, vec3(1.0), 0.5) * rim * 0.35;
+
+  return clamp(body * present, 0.0, 1.0);
+}
 float blightHash(vec2 p) { return fract(sin(dot(p, vec2(269.5, 183.3))) * 43758.5453); }
 vec3 blightFinish(vec2 h, vec3 c) {
   float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
@@ -989,6 +1244,9 @@ void main() {
   if (uRock > 0.5) c = mix(c, rockFinish(home.xy, c), 1.0 - streaming);
   if (uCumulus > 0.5) c = mix(c, cumulusFinish(home.xy, c), 1.0 - streaming);
   if (uBnOn > 0.5) c = mix(c, blendFinish(home.xy, c), 1.0 - streaming);
+  if (uGlassGreen > 0.5) c = mix(c, glassGreenFinish(home.xy, c), 1.0 - streaming);
+  if (uCandy > 0.5) c = mix(c, candyFinish(home.xy, c), 1.0 - streaming);
+  if (uCabr > 0.5) c = mix(c, cabrFinish(home.xy, c), 1.0 - streaming);
   float lum = luma(c);
 
   // PULSE scan: a wave of light travels through the depth, front to back, and lights the dots it passes
@@ -1003,6 +1261,7 @@ void main() {
   }
   // TRAIL SIZE: drifting dots are sized by it. The pulse makes the lit dots bigger.
   gl_PointSize = mix(uPointPx, max(1.0, uPointPx * uTrailSize), streaming) + pulse * 0.8;
+  if (uCabr > 0.5) gl_PointSize = max(gl_PointSize, uPointPx * 1.7);
 
   // Screen blending k overlapping dots gives 1-(1-o)^k; pick o so the stack lands on the source colour
   vec3 cb = clamp(c * uBright, 0.0, 1.0);

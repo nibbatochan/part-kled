@@ -294,6 +294,89 @@
               </div>
             </div>
           </div>
+          <div id="glass-green-settings" hidden>
+            <div class="seg" id="gg-presets" style="margin-bottom: 6px;">
+              <button type="button" class="mode-btn active" data-preset="faithful" title="Closest match to the target style">FAITHFUL</button>
+              <button type="button" class="mode-btn" data-preset="subtle" title="Same design language at lower intensity">SUBTLE</button>
+              <button type="button" class="mode-btn" data-preset="expressive" title="Stronger material, gloss and rim light">EXPRESSIVE</button>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-gg-gloss" title="Sharpness and brilliance of glossy specular crests">GLOSS</label>
+                <input type="range" id="sl-gg-gloss" data-path="glassGreen.gloss" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-gg-rim" title="Vivid lime and white Fresnel edge lighting along contours">RIM</label>
+                <input type="range" id="sl-gg-rim" data-path="glassGreen.rim" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-gg-depth" title="Rich dark emerald refractive shadow depth in hollows">DEPTH</label>
+                <input type="range" id="sl-gg-depth" data-path="glassGreen.depth" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-gg-bevel" title="Surface curvature tilt and depth relief">BEVEL</label>
+                <input type="range" id="sl-gg-bevel" data-path="glassGreen.bevel" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="candy-settings" hidden>
+            <div class="seg" id="candy-presets" style="margin-bottom: 6px;">
+              <button type="button" class="mode-btn active" data-preset="faithful" title="Closest match to the target style">FAITHFUL</button>
+              <button type="button" class="mode-btn" data-preset="subtle" title="Same design language at lower intensity">SUBTLE</button>
+              <button type="button" class="mode-btn" data-preset="expressive" title="Stronger material, gloss and amber glow">EXPRESSIVE</button>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cd-gloss" title="Sharpness and brilliance of glossy specular crests">GLOSS</label>
+                <input type="range" id="sl-cd-gloss" data-path="candy.gloss" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-cd-glow" title="Warm translucent amber subsurface volume glow">GLOW</label>
+                <input type="range" id="sl-cd-glow" data-path="candy.glow" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cd-tone" title="Flavor warmth balance from deep caramelized blood-orange to golden tangerine">TONE</label>
+                <input type="range" id="sl-cd-tone" data-path="candy.tone" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="cabr-settings" hidden>
+            <div class="seg" id="cabr-presets" style="margin-bottom: 6px;">
+              <button type="button" class="mode-btn active" data-preset="faithful" title="Closest match to the target style">FAITHFUL</button>
+              <button type="button" class="mode-btn" data-preset="subtle" title="Same design language at lower intensity">SUBTLE</button>
+              <button type="button" class="mode-btn" data-preset="expressive" title="Maximum rainbow dispersion and high gloss">EXPRESSIVE</button>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cb-disp" title="Prismatic chromatic dispersion and spectral rainbow caustics">DISPERSION</label>
+                <input type="range" id="sl-cb-disp" data-path="cabr.disp" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-cb-gloss" title="Razor-sharp specular crest reflections on black glass">GLOSS</label>
+                <input type="range" id="sl-cb-gloss" data-path="cabr.gloss" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cb-rim" title="Electric cyan and golden-magenta Fresnel edge rim lighting">RIM</label>
+                <input type="range" id="sl-cb-rim" data-path="cabr.rim" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
           <div id="cumulus-settings" hidden>
             <div class="pair">
               <div class="slider-group">
@@ -328,6 +411,28 @@
                 <output></output>
               </div>
             </div>
+
+          <div id="vbrnt-fing-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-vbrnt-fing-pattern">PATTERN</label>
+                <input type="range" id="sl-vbrnt-fing-pattern" data-path="vbrntFing.pattern" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-vbrnt-fing-color">COLOR</label>
+                <input type="range" id="sl-vbrnt-fing-color" data-path="vbrntFing.color" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-vbrnt-fing-ink">INK</label>
+                <input type="range" id="sl-vbrnt-fing-ink" data-path="vbrntFing.ink" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
             <div class="pair single">
               <div class="slider-group">
                 <label for="sl-rk-wear" title="Chipped edges, pockmarks and the roughness of the surface">WEAR</label>
