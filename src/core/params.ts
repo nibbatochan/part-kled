@@ -73,6 +73,10 @@ export interface Params {
   blight: { spread: number; grain: number; ink: number; haze: number }; // BLIGHT: each 0..1
   redmetOn: boolean; // REDMET filter: a red-hot mirror finish with white rim highlights, on the dots
   redmet: { heat: number; rim: number; bevel: number }; // REDMET: each 0..1
+  chroma2On: boolean; // CHROMA 2 filter: a dark glossy slab with a blue, orange and red spectrum and white edge light, on the dots
+  chroma2: { rim: number; spectrum: number; bevel: number }; // CHROMA 2: each 0..1
+  softwordOn: boolean; // SOFTWORD filter: ASCII characters on the dots, picked by brightness, with a soft glow
+  softword: { glow: number }; // SOFTWORD: glow 0..1
   convulsionsOn: boolean; // CONVULSIONS filter: ink contour lines and jittering hatch strokes, on the dots
   convulsions: { line: number; hatch: number; jitter: number }; // CONVULSIONS: each 0..1
   linedOn: boolean; // LINED filter: the dots gather into vertical lines, thicker where the picture is brighter
@@ -81,6 +85,16 @@ export interface Params {
   blood: { shift: number; bleed: number; grain: number }; // BLOOD SHADOW: each 0..1
   shakeOn: boolean; // SHAKE-MASK filter: a motion-smeared photo with a word showing through in patches, on the dots
   shake: { smear: number; cover: number; patch: number }; // SHAKE-MASK: each 0..1
+  furOn: boolean; // FUR filter: a short felt pile with fine fibres and a frayed edge, on the dots
+  fur: { pile: number; length: number; fuzz: number }; // FUR: each 0..1
+  aranciaOn: boolean; // ARANCIA filter: a citrus skin with pores, a pith web and a gloss, on the dots
+  arancia: { pores: number; web: number; gloss: number }; // ARANCIA: each 0..1
+  rockOn: boolean; // ROCK filter: carved stone with grain, cracks and chipped edges, on the dots
+  rock: { cracks: number; grain: number; wear: number }; // ROCK: each 0..1
+  cumulusOn: boolean; // CLOUD filter: a puffy white cloud lit from above, warm light bleeding into it, on the dots
+  cumulus: { puff: number; glow: number; soft: number }; // CLOUD: each 0..1
+  blendOn: boolean; // BLEND filter: soft-light blend of each dot with a softened copy of the picture, on the dots
+  blend: { amount: number; warm: number; soft: number }; // BLEND: each 0..1
   vhsOn: boolean;   // SIGNAL: tape look
   glitchOn: boolean; // SIGNAL: sliced, colour-split bursts
   glitchBeat: boolean; // SIGNAL: bursts on the beat instead of on time
@@ -165,6 +179,10 @@ export const defaults: Params = {
   blight: { spread: 0.5, grain: 0.5, ink: 0.5, haze: 0.5 },
   redmetOn: false,
   redmet: { heat: 0.7, rim: 0.6, bevel: 0.5 },
+  chroma2On: false,
+  chroma2: { rim: 0.6, spectrum: 0.7, bevel: 0.5 },
+  softwordOn: false,
+  softword: { glow: 0.6 },
   convulsionsOn: false,
   convulsions: { line: 0.5, hatch: 0.5, jitter: 0.5 },
   linedOn: false,
@@ -173,6 +191,16 @@ export const defaults: Params = {
   blood: { shift: 0.5, bleed: 0.5, grain: 0.5 },
   shakeOn: false,
   shake: { smear: 0.5, cover: 0.3, patch: 0.5 },
+  furOn: false,
+  fur: { pile: 0.6, length: 0.4, fuzz: 0.5 },
+  aranciaOn: false,
+  arancia: { pores: 0.6, web: 0.6, gloss: 0.5 },
+  rockOn: false,
+  rock: { cracks: 0.5, grain: 0.6, wear: 0.5 },
+  cumulusOn: false,
+  cumulus: { puff: 0.5, glow: 0.5, soft: 0.5 },
+  blendOn: false,
+  blend: { amount: 0.6, warm: 0.4, soft: 0.5 },
   vhsOn: false,
   glitchOn: false,
   glitchBeat: false,
@@ -254,11 +282,18 @@ export function withEffectsStart(): Params {
     ecstasyOn: false,
     blightOn: false,
     redmetOn: false,
+    chroma2On: false,
     convulsionsOn: false,
+    softwordOn: false,
     prismaticOn: false,
     linedOn: false,
     bloodOn: false,
     shakeOn: false,
+    furOn: false,
+    aranciaOn: false,
+    rockOn: false,
+    cumulusOn: false,
+    blendOn: false,
     holoOn: false,
     vhsOn: false,
     glitchOn: false,

@@ -1,7 +1,7 @@
 // src/ui/Panel.ts
 import { MOTION_PRESETS, defaults, lookTone, withEffectsStart, withLightStart, type Params } from '../core/params';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
-import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CELL_RANGE, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER, SHAKE_FILTER, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
+import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, LINED_FILTER, PRISMATIC_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, ARANCIA_FILTER, ROCK_FILTER, CUMULUS_FILTER, BLEND_FILTER, CHROMA2_FILTER, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
 import { XyPad } from './XyPad';
 import { scrollRow } from './ScrollRow';
 
@@ -269,18 +269,11 @@ export class Panel {
     document.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-style]');
       if (!btn) return;
-      if (Number(btn.dataset.style) === HALO_FILTER) {
-        // HALOS is a filter, not a look: the dots stay as they are and the halo layer goes over them
-        this.params.glow = { ...this.params.glow, bitMode: 5 };
-        this.syncBitmode();
-        this.onParamsChangeCb(this.params);
-        return;
-      }
       const look = Number(btn.dataset.style);
-      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER || look === ECSTASY_FILTER || look === BLIGHT_FILTER || look === REDMET_FILTER || look === CONVULSIONS_FILTER || look === SHAKE_FILTER) {
+      if (look === CHROME_FILTER || look === PRISMATIC_FILTER || look === LINED_FILTER || look === BLOOD_FILTER || look === AURA_FILTER || look === ECSTASY_FILTER || look === BLIGHT_FILTER || look === REDMET_FILTER || look === CONVULSIONS_FILTER || look === SHAKE_FILTER || look === SOFTWORD_FILTER || look === FUR_FILTER || look === CUMULUS_FILTER || look === ARANCIA_FILTER || look === ROCK_FILTER || look === BLEND_FILTER || look === CHROMA2_FILTER) {
         // CHROME, PRISMATIC, LINED, BLOOD SHADOW, AURA, ECSTASY, BLIGHT, REDMET, CONVULSIONS and SHAKE-MASK are standalone filters on the dots base. Picking one turns the others off,
         // and picking the one that is on turns it off.
-        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : look === ECSTASY_FILTER ? this.params.ecstasyOn : look === BLIGHT_FILTER ? this.params.blightOn : look === REDMET_FILTER ? this.params.redmetOn : look === CONVULSIONS_FILTER ? this.params.convulsionsOn : look === SHAKE_FILTER ? this.params.shakeOn : this.params.bloodOn;
+        const wasOn = look === CHROME_FILTER ? this.params.chromeOn : look === PRISMATIC_FILTER ? this.params.prismaticOn : look === LINED_FILTER ? this.params.linedOn : look === AURA_FILTER ? this.params.auraOn : look === ECSTASY_FILTER ? this.params.ecstasyOn : look === BLIGHT_FILTER ? this.params.blightOn : look === REDMET_FILTER ? this.params.redmetOn : look === CONVULSIONS_FILTER ? this.params.convulsionsOn : look === SHAKE_FILTER ? this.params.shakeOn : look === SOFTWORD_FILTER ? this.params.softwordOn : look === FUR_FILTER ? this.params.furOn : look === ARANCIA_FILTER ? this.params.aranciaOn : look === ROCK_FILTER ? this.params.rockOn : look === CUMULUS_FILTER ? this.params.cumulusOn : look === BLEND_FILTER ? this.params.blendOn : look === CHROMA2_FILTER ? this.params.chroma2On : this.params.bloodOn;
         this.params.style = 0;
         this.setFilter(wasOn ? null : look);
         this.syncStyleUi();
@@ -471,7 +464,14 @@ export class Panel {
     this.params.blightOn = look === BLIGHT_FILTER;
     this.params.redmetOn = look === REDMET_FILTER;
     this.params.convulsionsOn = look === CONVULSIONS_FILTER;
+    this.params.softwordOn = look === SOFTWORD_FILTER;
     this.params.shakeOn = look === SHAKE_FILTER;
+    this.params.furOn = look === FUR_FILTER;
+    this.params.aranciaOn = look === ARANCIA_FILTER;
+    this.params.rockOn = look === ROCK_FILTER;
+    this.params.cumulusOn = look === CUMULUS_FILTER;
+    this.params.blendOn = look === BLEND_FILTER;
+    this.params.chroma2On = look === CHROMA2_FILTER;
   }
 
   private syncStyleUi(): void {
@@ -484,6 +484,18 @@ export class Panel {
     if (linedBox) linedBox.hidden = !this.params.linedOn;
     const auraBox = document.getElementById('aura-settings');
     if (auraBox) auraBox.hidden = !this.params.auraOn;
+    const rockBox = document.getElementById('rock-settings');
+    if (rockBox) rockBox.hidden = !this.params.rockOn;
+    const aranciaBox = document.getElementById('arancia-settings');
+    if (aranciaBox) aranciaBox.hidden = !this.params.aranciaOn;
+    const furBox = document.getElementById('fur-settings');
+    if (furBox) furBox.hidden = !this.params.furOn;
+    const cumulusBox = document.getElementById('cumulus-settings');
+    if (cumulusBox) cumulusBox.hidden = !this.params.cumulusOn;
+    const blendBox = document.getElementById('blend-settings');
+    if (blendBox) blendBox.hidden = !this.params.blendOn;
+    const chroma2Box = document.getElementById('chroma2-settings');
+    if (chroma2Box) chroma2Box.hidden = !this.params.chroma2On;
     const shakeBox = document.getElementById('shake-settings');
     if (shakeBox) shakeBox.hidden = !this.params.shakeOn;
     const bloodBox = document.getElementById('blood-settings');
@@ -496,7 +508,9 @@ export class Panel {
     if (redmetBox) redmetBox.hidden = !this.params.redmetOn;
     const convBox = document.getElementById('convulsions-settings');
     if (convBox) convBox.hidden = !this.params.convulsionsOn;
-    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn || this.params.ecstasyOn || this.params.blightOn || this.params.redmetOn || this.params.convulsionsOn || this.params.shakeOn;
+    const softBox = document.getElementById('softword-settings');
+    if (softBox) softBox.hidden = !this.params.softwordOn;
+    const filtersOn = this.params.chromeOn || this.params.prismaticOn || this.params.linedOn || this.params.bloodOn || this.params.auraOn || this.params.ecstasyOn || this.params.blightOn || this.params.redmetOn || this.params.convulsionsOn || this.params.shakeOn || this.params.softwordOn || this.params.furOn || this.params.cumulusOn || this.params.aranciaOn || this.params.rockOn || this.params.blendOn || this.params.chroma2On;
     document.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => {
       const look = Number(b.dataset.style);
       const on = look === CHROME_FILTER ? this.params.chromeOn
@@ -508,7 +522,14 @@ export class Panel {
         : look === BLIGHT_FILTER ? this.params.blightOn
         : look === REDMET_FILTER ? this.params.redmetOn
         : look === CONVULSIONS_FILTER ? this.params.convulsionsOn
+        : look === SOFTWORD_FILTER ? this.params.softwordOn
         : look === SHAKE_FILTER ? this.params.shakeOn
+        : look === FUR_FILTER ? this.params.furOn
+        : look === ARANCIA_FILTER ? this.params.aranciaOn
+        : look === ROCK_FILTER ? this.params.rockOn
+        : look === CUMULUS_FILTER ? this.params.cumulusOn
+        : look === BLEND_FILTER ? this.params.blendOn
+        : look === CHROMA2_FILTER ? this.params.chroma2On
         : look === st && !filtersOn;
       b.classList.toggle('active', on);
     });

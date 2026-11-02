@@ -18,6 +18,24 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-02: ROCK filter (SURFACE)
+- Filter on the dots, slot 38: carved stone like a chiselled concrete letter. Charcoal shade, warm grey lit faces, fine salt-and-pepper grain, pockmarks, pale chipped edges where the picture's planes meet, and pale jagged cracks branching through the dark in patches (warped cell net plus a finer branch net). Controls: CRACKS, GRAIN, WEAR.
+- Evidence: tsc and 33 tests pass; checked in the browser on samples 1 and 4. Not compared on a block-letter subject like the reference.
+
+### 2026-11-02: SURFACE filters rebuilt as real materials (ARANCIA, FUR, CLOUD)
+- Problem: all three only nudged the source colours with small noise, so no surface showed. Fix: each now builds its own surface in the dot shader. A procedural height field gives normals, light comes from the upper left, and the picture supplies form (brightness) and where the material is.
+- ARANCIA: orange albedo ramp, lit pit pores, cracked pith ridges and juicy pulp patches, wet spec. FUR: dark undercoat, thin strands that follow a swirling direction field, lit sides and bright tips. CLOUD: billowing warped-noise height, wrapped light, white tops and blue-grey hollows, feathered edges.
+- Evidence: tsc and 33 tests pass; checked in the browser. The pane's dot cloud is sparse, so grain looks speckled there. Not compared against the reference photos on matching subjects.
+
+### 2026-11-02: ARANCIA filter (SURFACE)
+- Filter on the dots, slot 36: a citrus skin. Fine dimpled pores, a pale pith web cracking over the pulp in patches, a soft wet gloss. It acts on the coloured parts only, so grey grounds stay as they are. Controls: PORES, WEB, GLOSS.
+- Decision: slot 35 belongs to CLOUD (built in parallel), so ARANCIA took 36 and STYLE_NAMES got a CLOUD placeholder at 35 to keep the indexes aligned.
+- Evidence: tsc and 33 tests pass; checked in the browser on sample 3. Not compared on an orange fruit.
+
+### 2026-11-02: SURFACE category, FUR filter
+- New category SURFACE with one filter on the dots, FUR (slot 34): a short felt pile like a tennis ball. Fibres lie in smooth swirls, tips catch light, gaps shade, bright edges against dark fray. Controls: PILE, LENGTH, FUZZ.
+- Evidence: tsc and 33 tests pass; checked in the browser on sample 4 (fibre grain and a frayed edge show). Not compared on a bright, round subject.
+
 ### 2026-11-02: SHAKE-MASK look (TEXT category)
 - Filter 31 on the dots base (first built as a cell look, redone because it carried cell size and gap): the photo smeared sideways with the word "shakemask" showing through in noise patches, drawn by the dots themselves from the glyph atlas (4th row). Pale letters on dark, dark on light. No cell grid, no cell size, no gap.
 - Why: a reference of a blurred photo with sparse repeating letters. Controls: SMEAR, COVER, PATCH SIZE.

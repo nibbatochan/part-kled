@@ -200,6 +200,15 @@
               </div>
             </div>
           </div>
+          <div id="softword-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-soft-glow" title="Warm glow spreading past the edge of each character">GLOW</label>
+                <input type="range" id="sl-soft-glow" data-path="softword.glow" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
           <div id="convulsions-settings" hidden>
             <div class="pair">
               <div class="slider-group">
@@ -238,6 +247,132 @@
               <div class="slider-group">
                 <label for="sl-redmet-bevel" title="How strongly the picture's slopes read as edges">BEVEL</label>
                 <input type="range" id="sl-redmet-bevel" data-path="redmet.bevel" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="blend-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-bn-amount" title="How far each dot blends with the softened picture">AMOUNT</label>
+                <input type="range" id="sl-bn-amount" data-path="blend.amount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-bn-warm" title="Fine film grain over the picture">GRAIN</label>
+                <input type="range" id="sl-bn-warm" data-path="blend.warm" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-bn-soft" title="How broad the softened copy is">SOFT</label>
+                <input type="range" id="sl-bn-soft" data-path="blend.soft" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="chroma2-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-c2-rim" title="White light on the edges, the hot core of each contour">RIM</label>
+                <input type="range" id="sl-c2-rim" data-path="chroma2.rim" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-c2-spectrum" title="How strongly blue, orange and red colour the slab: zero is grey">SPECTRUM</label>
+                <input type="range" id="sl-c2-spectrum" data-path="chroma2.spectrum" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-c2-bevel" title="How steep the slopes of the picture read as bevelled faces">BEVEL</label>
+                <input type="range" id="sl-c2-bevel" data-path="chroma2.bevel" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="cumulus-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cu-puff" title="How deep the puffs shade their hollows blue-grey">PUFF</label>
+                <input type="range" id="sl-cu-puff" data-path="cumulus.puff" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-cu-glow" title="How much warm light from nearby bleeds into the cloud">GLOW</label>
+                <input type="range" id="sl-cu-glow" data-path="cumulus.glow" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-cu-soft" title="Broad soft puffs (high) or fine ones (low)">SOFT</label>
+                <input type="range" id="sl-cu-soft" data-path="cumulus.soft" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="rock-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-rk-cracks" title="How much of the stone is cracked, pale lines branching through the dark">CRACKS</label>
+                <input type="range" id="sl-rk-cracks" data-path="rock.cracks" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-rk-grain" title="Fine light grain on the stone faces">GRAIN</label>
+                <input type="range" id="sl-rk-grain" data-path="rock.grain" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-rk-wear" title="Chipped edges, pockmarks and the roughness of the surface">WEAR</label>
+                <input type="range" id="sl-rk-wear" data-path="rock.wear" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="arancia-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-ar-pores" title="Depth of the fine dimpled pores of the skin">PORES</label>
+                <input type="range" id="sl-ar-pores" data-path="arancia.pores" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-ar-web" title="How much pale pith web cracks across the pulp">WEB</label>
+                <input type="range" id="sl-ar-web" data-path="arancia.web" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-ar-gloss" title="Soft wet highlights on the bright parts">GLOSS</label>
+                <input type="range" id="sl-ar-gloss" data-path="arancia.gloss" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+          </div>
+          <div id="fur-settings" hidden>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-fur-pile" title="How deep the fibres shade the gaps between them and catch light on their tips">PILE</label>
+                <input type="range" id="sl-fur-pile" data-path="fur.pile" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-fur-length" title="Fine flecks (low) or long strands (high)">LENGTH</label>
+                <input type="range" id="sl-fur-length" data-path="fur.length" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-fur-fuzz" title="How far the edge frays into loose fibres">FUZZ</label>
+                <input type="range" id="sl-fur-fuzz" data-path="fur.fuzz" min="0" max="1" step="0.01" />
                 <output></output>
               </div>
             </div>
@@ -418,6 +553,7 @@
                 <button class="mode-btn" type="button" data-glowpat="3" title="The glow sits in a fine grid">GRID</button>
                 <button class="mode-btn" type="button" data-glowpat="4" title="The glow sits in scanlines">SCAN</button>
                 <button class="mode-btn" type="button" data-glowpat="5" title="A wide warm haze">HAZE</button>
+                <button class="mode-btn" type="button" data-glowpat="6" title="Warm light spills onto the dark around it. Red and orange light glows, blue sky does not">SPILL</button>
               </div>
             </div>
             <div class="row">
@@ -441,7 +577,6 @@
                 <button class="mode-btn" type="button" data-bitmode="2" title="Pixel cells with a dithered gradient that breaks into dots, and a glow from the hot parts">DISSOLVE</button>
                 <button class="mode-btn" type="button" data-bitmode="3" title="CGA 16-colour palette, dithered between the two nearest colours">CGA</button>
                 <button class="mode-btn" type="button" data-bitmode="4" title="Stipple dots over the picture">STIPPLE</button>
-                <button class="mode-btn" type="button" data-bitmode="5" title="Halo: the whole picture in amber and blue light, glowing outward">HALO</button>
               </div>
             </div>
             <div class="pair">

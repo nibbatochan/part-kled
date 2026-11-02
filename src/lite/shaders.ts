@@ -93,10 +93,16 @@ uniform float uRedmet;      // REDMET filter on the dots: 1 on, 0 off
 uniform float uRmHeat;      // REDMET: 0..1 how far the picture takes the red sky
 uniform float uRmRim;       // REDMET: 0..1 white rim highlights on edges
 uniform float uRmBevel;     // REDMET: 0..1 how far the slopes tilt the surface
+uniform float uC2On;        // CHROMA 2 filter on the dots: 1 on, 0 off
+uniform float uC2Rim;       // CHROMA 2: 0..1 white edge light
+uniform float uC2Spec;      // CHROMA 2: 0..1 how strongly the blue, orange and red colour the slab
+uniform float uC2Bevel;     // CHROMA 2: 0..1 how far the slopes tilt the surface
 uniform float uConv;        // CONVULSIONS filter on the dots: 1 on, 0 off
 uniform float uCvLine;      // CONVULSIONS: 0..1 weight of the contour lines
 uniform float uCvHatch;     // CONVULSIONS: 0..1 strength of the hatch strokes
 uniform float uCvJitter;    // CONVULSIONS: 0..1 wobble in the strokes
+uniform float uSoftword;    // SOFTWORD filter on the dots: 1 on, 0 off
+uniform float uSwGlow;      // SOFTWORD: 0..1 glow around each character
 uniform float uLined;         // LINED filter on the dots: 1 on, 0 off
 uniform float uLinedCount;    // LINED: lines across the picture height
 uniform float uLinedWeight;   // LINED: 0..1 how wide the lines grow where the picture is bright
@@ -109,6 +115,26 @@ uniform float uShake;         // SHAKE-MASK filter on the dots: 1 on, 0 off
 uniform float uShSmear;       // SHAKE-MASK: 0..1 how far the photo is smeared sideways
 uniform float uShCover;       // SHAKE-MASK: 0..1 how much of the picture the letters cover
 uniform float uShPatch;       // SHAKE-MASK: 0..1 scattered letters (low) to large patches (high)
+uniform float uAr;            // ARANCIA filter on the dots: 1 on, 0 off
+uniform float uArPores;       // ARANCIA: 0..1 depth of the dimpled pores
+uniform float uArWeb;         // ARANCIA: 0..1 how much pale pith web crosses the pulp
+uniform float uArGloss;       // ARANCIA: 0..1 soft wet highlights
+uniform float uRock;          // ROCK filter on the dots: 1 on, 0 off
+uniform float uRkCracks;      // ROCK: 0..1 how much of the stone is cracked
+uniform float uRkGrain;       // ROCK: 0..1 fine light grain on the faces
+uniform float uRkWear;        // ROCK: 0..1 chipped edges, pockmarks and relief
+uniform float uFur;           // FUR filter on the dots: 1 on, 0 off
+uniform float uFurPile;       // FUR: 0..1 how deep the fibres shade the gaps and catch light
+uniform float uFurLength;     // FUR: 0..1 fine flecks (low) to long strands (high)
+uniform float uFurFuzz;       // FUR: 0..1 how far the edge frays
+uniform float uCumulus;       // CLOUD filter on the dots: 1 on, 0 off
+uniform float uCuPuff;        // CLOUD: 0..1 how deep the puffs shade their hollows
+uniform float uCuGlow;        // CLOUD: 0..1 warm light bleeding into the cloud
+uniform float uCuSoft;        // CLOUD: 0..1 how broad the puffs are
+uniform float uBnOn;          // BLEND filter on the dots: 1 on, 0 off
+uniform float uBnAmt;         // BLEND: 0..1 how far the soft-light blend goes
+uniform float uBnWarm;        // BLEND: 0..1 warm tint from the light
+uniform float uBnSoft;        // BLEND: 0..1 how broad the softened copy is
 uniform sampler2D uAtlas;     // glyph atlas (see glyphs.ts): row 3 holds the letters of the SHAKE-MASK word
 uniform float uGridA;      // 1 while drawing the resting cells of a cell look (no shimmer, so cells stay edge to edge)
 // MUSIC looks: the sound moves the particles themselves (0 = off, 1 EQUALIZER, 2 LISTEN, 3 BLOOM, 4 RIPPLE)
@@ -443,6 +469,43 @@ vec3 ecstasyFinish(vec2 h, vec3 c) {
   return clamp(col + glow, 0.0, 1.0);
 }
 
+// CHROMA 2: a dark glossy slab lit by the picture. The slopes of its brightness tilt each dot: faces turned to the upper
+// left take cobalt blue, the picture's middle takes orange, and the lower right runs to hot red. The flat body falls to
+// near-black. The edges carry a hot white core, with blue on the upper-left side and red on the lower-right side.
+// Black stays black. Only colour and light change: dots keep their place and count.
+vec3 chroma2Finish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  vec2 e = 4.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float lum = luma(c);
+  float present = smoothstep(0.03, 0.2, lum);
+  // The slope as a normal in the picture plane: +1 faces the upper left, -1 faces the lower right, flat faces neither
+  vec2 n = vec2(-dx, dy) * uC2Bevel * 6.0;
+  float slope = length(n);
+  float facing = dot(n / max(slope, 1e-3), vec2(-0.7, 0.7)) * smoothstep(0.0, 0.3, slope);
+  // The light of the picture: cobalt upper left, orange in the middle, hot red at the lower right
+  vec2 p = vec2(uv.x, 1.0 - uv.y);                                  // 0..1, y up
+  float diag = clamp((p.x + (1.0 - p.y)) * 0.5, 0.0, 1.0);          // 0 at the upper left, 1 at the lower right
+  vec3 cobalt = vec3(0.08, 0.28, 0.95);
+  vec3 orange = vec3(1.0, 0.5, 0.14);
+  vec3 hotRed = vec3(1.0, 0.2, 0.16);
+  vec3 ramp = mix(cobalt, orange, smoothstep(0.2, 0.55, diag));
+  ramp = mix(ramp, hotRed, smoothstep(0.6, 0.95, diag));
+  ramp = mix(vec3(lum), ramp, uC2Spec);                             // SPECTRUM: grey at zero, full colour at one
+  float lit = 0.55 + 0.45 * clamp(facing, -1.0, 1.0);               // faces turned to the light glow brighter
+  vec3 navy = vec3(0.01, 0.03, 0.09);
+  vec3 body = mix(navy, ramp * lit, smoothstep(0.05, 0.5, lum));
+  // Edges: the colour of the side the edge faces, then a hot white core on the crest
+  float edge = clamp(length(vec2(dx, dy)) * uC2Bevel * 6.0, 0.0, 1.0);
+  vec3 fringe = mix(cobalt, hotRed, smoothstep(-0.3, 0.3, -facing));
+  vec3 col = mix(body, fringe, smoothstep(0.1, 0.5, edge) * uC2Spec);
+  float core = smoothstep(0.35, 0.85, edge) * uC2Rim;
+  col = mix(col, vec3(1.0, 0.96, 0.92), core);
+  return clamp(col * present, 0.0, 1.0);
+}
+
 // REDMET: polished metal mirroring a red sky. The slopes of the picture's brightness give each dot a tilt: edges
 // catch white rim light, and the flat body takes the colour of the red sky above it, deepening to dark at the top.
 // Black stays black. Only colour changes: dots keep their place and count.
@@ -505,6 +568,57 @@ vec3 convulsionsFinish(vec2 h, vec3 c) {
   float ink = clamp(max(vein, stri), 0.0, 1.0);
   vec3 col = mix(vec3(0.94, 0.92, 0.87), vec3(0.06, 0.05, 0.05), ink);
   return col * present;
+}
+
+// SOFTWORD: ASCII characters laid on the dots. A fixed grid of characters, twice as tall as wide as in ASCII art, covers
+// the picture. Each character is picked by the brightness under it (the CLASSIC ramp, atlas row 0) and drawn in the dot's
+// own colour, with a soft glow spreading past its edge. The grid is fixed, not a setting. Only colour changes: dots keep
+// their place and count.
+float swGlyph(float idx, vec2 f) {
+  vec2 q = clamp(f, 0.0, 1.0);
+  return textureLod(uAtlas, vec2((idx + mix(0.0625, 0.9375, q.x)) / 16.0, mix(0.03125, 0.96875, 1.0 - q.y) / 4.0), 0.0).r;
+}
+vec3 softwordFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  const vec2 CH = vec2(0.02, 0.04);
+  vec2 wp = vec2(h.x + uHalfW, 0.5 - h.y);
+  vec2 cc = floor(wp / CH);
+  vec2 fr = fract(wp / CH);
+  vec2 cuv = vec2((cc.x + 0.5) * CH.x / (uHalfW * 2.0), (cc.y + 0.5) * CH.y);
+  float tone = luma(textureLod(uImg, cuv, 3.0).rgb);
+  float idx = floor(clamp(pow(tone, 0.8), 0.0, 0.999) * 10.0);
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float core = smoothstep(0.2, 0.65, swGlyph(idx, fr));
+  // the halo: the same character read a quarter of its width to each side, so the light spreads past the edge
+  float halo = (swGlyph(idx, fr + vec2(0.25, 0.0)) + swGlyph(idx, fr - vec2(0.25, 0.0))
+              + swGlyph(idx, fr + vec2(0.0, 0.25)) + swGlyph(idx, fr - vec2(0.0, 0.25))) * 0.25;
+  float glow = halo * uSwGlow;                                       // GLOW: how far the warm light spreads
+  vec3 col = mix(c * 0.12, c * 1.2, core) + c * glow * 0.6 * (1.0 - core);
+  return clamp(col, 0.0, 1.0) * present;
+}
+
+
+// BLEND: a dark form dissolved in spray. Its core is near-black; the soft fringe around it turns to saturated colour that
+// shifts down the picture (acid lime at the top, orange at the sides, magenta at the foot). The light parts keep a cream
+// tone and the pale ground stays pale. Fine grain sits over everything. Only colour changes: dots keep their place and count.
+float blHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 blendFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float soft = luma(textureLod(uImg, uv, mix(1.0, 5.0, uBnSoft)).rgb);     // SOFT: how far the spray spreads
+  float dark = 1.0 - smoothstep(0.15, 0.45, soft);                          // the dark core: near-black
+  float fringe = smoothstep(0.2, 0.5, soft) * (1.0 - smoothstep(0.55, 0.85, soft));   // the coloured spray zone
+  float t = clamp(uv.y, 0.0, 1.0);
+  vec3 lime = vec3(0.80, 1.00, 0.12);
+  vec3 orange = vec3(1.00, 0.55, 0.15);
+  vec3 pink = vec3(0.95, 0.42, 0.82);
+  vec3 halo = t < 0.4 ? mix(lime, orange, t / 0.4) : mix(orange, pink, (t - 0.4) / 0.6);
+  vec3 cream = mix(vec3(0.86, 0.85, 0.90), vec3(1.00, 1.00, 0.94), smoothstep(0.5, 0.9, soft));
+  vec3 col = mix(cream, halo, fringe * uBnAmt);                             // AMOUNT: how strong the coloured spray is
+  col = mix(col, vec3(0.02, 0.02, 0.03), dark);
+  float grain = blHash(floor(h * 520.0)) - 0.5;                             // GRAIN: fine film grain
+  col *= 1.0 + grain * 0.30 * uBnWarm;
+  return clamp(col, 0.0, 1.0);
 }
 
 // BLIGHT: black ink on paper, as a wash spreads. The dark masses print as ink with a speckled, ragged edge, a grey
@@ -612,6 +726,182 @@ vec3 shakeFinish(vec2 h, vec3 c) {
   vec3 lc = mix(vec3(0.97, 0.97, 0.95), vec3(0.07), smoothstep(0.38, 0.62, Lc));   // pale over dark, dark over light
   return mix(base, lc, m * 0.95);
 }
+
+// CLOUD: a puffy white cumulus. The cloud is built here: a billowing height field (warped noise, rounded tops, creased
+// between them) lit from above with wrapped light, white on the tops and blue-grey in the hollows, with a faint warm
+// glow through the thin parts. The picture decides how much cloud there is (its brightness) and so where the edges feather.
+// Warm light in the picture (a bolt, a sunset) bleeds into the cloud near it. Black stays black. Only colour changes:
+// dots keep their place and count.
+float cuHeight(vec2 h, float sc, float body) {
+  vec2 p = h * sc;
+  p += 0.9 * vec2(shNoise(p * 0.7 + 3.0), shNoise(p * 0.7 + 9.0));   // warp: the puffs curl instead of lining up
+  float f = 0.5 * shNoise(p) + 0.28 * shNoise(p * 2.1 + 5.0) + 0.14 * shNoise(p * 4.3 + 1.0) + 0.08 * shNoise(p * 8.7 + 8.0);
+  float billow = 1.0 - abs(2.0 * f - 1.0);                            // rounded tops, creased between them
+  return billow * (0.4 + 0.6 * smoothstep(0.0, 0.5, body));
+}
+vec3 cumulusFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float body = luma(textureLod(uImg, uv, 1.5).rgb);                   // the picture's brightness is how much cloud there is
+  float sc = mix(16.0, 5.0, uCuSoft);                                 // SOFT: broad puffs (high) or fine (low)
+  vec2 e = vec2(0.004, 0.0);
+  float hc = cuHeight(h, sc, body);
+  float hx = cuHeight(h + e.xy, sc, body) - cuHeight(h - e.xy, sc, body);
+  float hy = cuHeight(h + e.yx, sc, body) - cuHeight(h - e.yx, sc, body);
+  float k = 4.0 + 14.0 * uCuPuff;                                     // PUFF: how far the puffs tilt
+  vec3 n = normalize(vec3(-hx * k, -hy * k, 1.0));
+  float lit = dot(n, normalize(vec3(-0.35, 0.65, 0.7))) * 0.5 + 0.5; // wrapped light: clouds never go black
+  vec3 hollow = vec3(0.50, 0.59, 0.76);                               // blue-grey in the shadowed hollows
+  vec3 cloud = mix(hollow, vec3(1.0, 0.995, 0.98), smoothstep(0.32, 0.88, lit));
+  cloud += vec3(1.0, 0.82, 0.62) * pow(clamp(lit, 0.0, 1.0), 5.0) * 0.12;   // light through the thin tops
+  // wispy edge: thin cloud breaks up where the picture fades, so the outline feathers instead of cutting off
+  float mass = smoothstep(0.14, 0.7, body * (0.55 + 0.9 * hc));
+  vec3 wv = textureLod(uImg, uv, 4.0).rgb;
+  float warm = smoothstep(0.03, 0.25, wv.r - wv.b) * smoothstep(0.15, 0.6, luma(wv));
+  vec3 bleed = mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.78, 0.5), luma(wv)) * warm * uCuGlow;   // GLOW: warm light bleeding in
+  return clamp(cloud * mass + bleed * mass, 0.0, 1.0) * present;
+}
+
+// ARANCIA: a citrus skin. Fine dimpled pores darken the surface in small cells; a pale pith web, the edges of a cracked
+// cell net, crosses the picture in patches and reads as the white membrane over the pulp; the bright parts take a soft
+// wet gloss. The picture keeps its colour. Only colour changes: dots keep their place and count.
+vec2 arVor(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float d1 = 8.0;
+  float d2 = 8.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      float d = length(g + vec2(shHash(i + g), shHash(i + g + 19.1)) - f);
+      if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+    }
+  }
+  return vec2(d1, d2);
+}
+float arSkin(vec2 h, float zone) {
+  vec2 pv = arVor(h * 95.0);
+  float pit = smoothstep(0.0, 0.5, pv.x);                            // a bowl: low in the middle of each pore
+  vec2 wp = h * 26.0 + 0.8 * vec2(shNoise(h * 38.0), shNoise(h * 38.0 + 5.0));
+  vec2 wv = arVor(wp);
+  float net = 1.0 - smoothstep(0.0, 0.16, wv.y - wv.x);              // the web: ridges along the cell edges
+  float ves = smoothstep(0.0, 0.7, arVor(h * 70.0 + 11.0).x);        // juicy vesicles in the pulp
+  return mix(pit * 0.7, 0.25 * ves + 0.75 * net, zone);
+}
+vec3 aranciaFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float L = luma(c);
+  // the picture gives the form (how light falls over it); the skin is built here, in orange
+  float form = pow(clamp(L * 1.4, 0.0, 1.0), 1.25);
+  // PEEL or PULP: broad patches, pulp where the picture is lit
+  float zone = smoothstep(0.42, 0.6, shNoise(uv * 3.0 + 2.0) + 0.35 * (L - 0.5)) * uArWeb;
+  vec2 e = vec2(0.0035, 0.0);
+  // height: pits in the peel; raised pith ridges between juicy vesicles in the pulp
+  float hc = arSkin(h, zone);
+  float hx = arSkin(h + e.xy, zone) - arSkin(h - e.xy, zone);
+  float hy = arSkin(h + e.yx, zone) - arSkin(h - e.yx, zone);
+  float k = 7.0 + 9.0 * uArPores;
+  vec3 n = normalize(vec3(-hx * k, -hy * k, 1.0));
+  vec3 Ld = normalize(vec3(-0.5, 0.6, 0.62));
+  float diff = clamp(dot(n, Ld) * 0.8 + 0.3, 0.0, 1.3);
+  float spec = pow(clamp(dot(n, normalize(Ld + vec3(0.0, 0.0, 1.0))), 0.0, 1.0), 38.0) * uArGloss;
+  // colours: deep red-orange in shade, bright orange lit, amber on the highlights; the pith is cream
+  vec3 peel = mix(vec3(0.46, 0.10, 0.01), vec3(1.0, 0.50, 0.06), smoothstep(0.05, 0.6, form));
+  peel = mix(peel, vec3(1.0, 0.70, 0.22), smoothstep(0.65, 1.0, form) * 0.7);
+  vec3 pulp = mix(vec3(0.62, 0.17, 0.02), vec3(1.0, 0.46, 0.04), smoothstep(0.05, 0.6, form));
+  float ridge = smoothstep(0.55, 0.9, hc) * zone;                    // the raised pith
+  vec3 alb = mix(peel, pulp, zone);
+  alb = mix(alb, vec3(1.0, 0.93, 0.80) * (0.7 + 0.4 * form), ridge * 0.9);
+  vec3 col = alb * (0.35 + 1.0 * diff) * (0.2 + 1.25 * form) + vec3(1.0, 0.95, 0.8) * spec * (0.3 + 0.7 * form);
+  return clamp(col, 0.0, 1.0) * present;
+}
+
+// ROCK: carved stone, like a chiselled concrete letter. The faces are charcoal in shade and warm grey where lit, covered in
+// a fine light grain; pits pock the surface; the picture's edges chip pale where planes meet; and pale cracks branch through
+// the dark in patches, jagged because the crack net is warped. A rough height field shades the grain from the upper left.
+// The picture gives the form. Only colour changes: dots keep their place and count.
+float rkRough(vec2 h) { return 0.6 * shNoise(h * 120.0) + 0.4 * shNoise(h * 310.0 + 2.0); }
+vec3 rockFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float L = luma(c);
+  float form = clamp(L * 1.15, 0.0, 1.0);
+  // the stone: near-black in shade, warm grey on lit faces
+  vec3 stone = mix(vec3(0.035, 0.035, 0.037), vec3(0.27, 0.265, 0.255), smoothstep(0.0, 0.55, form));
+  stone = mix(stone, vec3(0.50, 0.485, 0.455), smoothstep(0.5, 1.0, form));
+  // relief: the fine roughness, lit from the upper left
+  vec2 e = vec2(0.0025, 0.0);
+  float gx = rkRough(h + e.xy) - rkRough(h - e.xy);
+  float gy = rkRough(h + e.yx) - rkRough(h - e.yx);
+  float shade = 1.0 - (0.5 + 2.4 * uRkWear) * (gx * -0.6 + gy * 0.7);
+  // grain: salt and pepper, strongest on the lit faces, plus coarser clumps
+  float gr = shHash(floor(h * 620.0));
+  float grain = uRkGrain * (0.15 + 0.85 * smoothstep(0.1, 0.6, form));
+  stone *= shade * (1.0 + (gr - 0.5) * 1.1 * grain + (shNoise(h * 170.0) - 0.5) * 0.5 * grain);
+  // pockmarks: small dark pits, a few per patch
+  vec2 pc = h * 150.0;
+  vec2 pf = fract(pc);
+  vec2 po = vec2(shHash(floor(pc) + 1.0), shHash(floor(pc) + 2.0)) * 0.5 + 0.25;
+  float pit = step(0.9 - 0.08 * uRkWear, shHash(floor(pc))) * (1.0 - smoothstep(0.05, 0.2, length(pf - po)));
+  stone *= 1.0 - 0.7 * pit;
+  // chipped edges: where the picture changes brightness fast, planes meet and the edge breaks pale
+  float ed = abs(L - luma(textureLod(uImg, uv, 3.0).rgb));
+  float chip = smoothstep(0.03, 0.2, ed) * step(0.3, shNoise(h * 90.0)) * (0.35 + 0.65 * uRkWear);
+  stone = mix(stone, vec3(0.72, 0.70, 0.66) * (0.5 + 0.5 * form), chip * 0.6);
+  // cracks: a warped cell net's edges, thin and jagged, in patches; a finer net branches off it
+  vec2 cp = h * 7.0 + 0.9 * vec2(shNoise(h * 17.0), shNoise(h * 17.0 + 4.0)) + 0.25 * vec2(shNoise(h * 53.0), shNoise(h * 53.0 + 9.0));
+  vec2 v1 = arVor(cp);
+  vec2 v2 = arVor(h * 19.0 + 0.5 * vec2(shNoise(h * 41.0), shNoise(h * 41.0 + 6.0)) + 3.0);
+  float line = max(1.0 - smoothstep(0.0, 0.042, v1.y - v1.x), 0.7 * (1.0 - smoothstep(0.0, 0.035, v2.y - v2.x)));
+  float zn = 0.7 * shNoise(uv * 4.0 + 7.0) + 0.3 * shNoise(uv * 12.0 + 1.0);
+  float zone = smoothstep(0.62 - 0.35 * uRkCracks, 0.78 - 0.35 * uRkCracks, zn);
+  float crack = line * zone;
+  vec3 crackCol = mix(vec3(0.80, 0.78, 0.74), vec3(0.03), smoothstep(0.35, 0.62, form));   // pale dust in the dark, a dark seam on lit faces
+  vec3 col = mix(stone, crackCol, crack * 0.9);
+  return clamp(col, 0.0, 1.0) * present;
+}
+
+// FUR: a short felt pile, like a tennis ball. Fine fibres lie in coherent swirls; their tips catch light and the gaps between
+// them fall into shade, so the surface keeps the picture's colour but reads as fuzzy. Bright edges against dark fray into
+// loose fibres. Only colour changes: dots keep their place and count.
+float furStrand(vec2 h, vec2 dir) {
+  vec2 per = vec2(-dir.y, dir.x);
+  float u = dot(h, per) * 230.0;
+  float v = dot(h, dir) * 80.0 * mix(1.0, 0.28, uFurLength);
+  float id = floor(u);
+  float off = shHash(vec2(id, 3.1)) * 9.0;
+  float cell = floor(v + off);
+  float t = fract(v + off);
+  float here = step(0.22, shHash(vec2(id, cell)));                  // some strands are missing
+  float body = 1.0 - abs(fract(u) * 2.0 - 1.0);                     // round across its width
+  float lenAlong = 0.45 + 0.5 * shHash(vec2(id, cell + 7.0));
+  float along = smoothstep(0.0, 0.25, t) * (1.0 - smoothstep(lenAlong, lenAlong + 0.1, t));
+  return here * smoothstep(0.0, 0.5, body) * along * (0.6 + 0.4 * t);
+}
+vec3 furFinish(vec2 h, vec3 c) {
+  if (uHasImg < 0.5) return c;
+  vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
+  float ang = (shNoise(uv * 4.0) + 0.5 * shNoise(uv * 9.0 + 4.0)) * 4.2;   // the way the fibres lie, a smooth flow
+  vec2 dir = vec2(cos(ang), sin(ang));
+  // a strand is a thin streak along dir; its tip is brighter, some strands are missing, so the pile has depth
+  float s0 = furStrand(h, dir);
+  vec2 lv = normalize(vec2(-0.5, 0.6)) * 0.004;
+  float sl = furStrand(h + lv, dir);
+  float lit = clamp(0.55 + 5.0 * (s0 - sl), 0.0, 1.6);              // a strand facing the light is bright, its far side dark
+  float L = luma(c);
+  vec3 under = c * 0.32;                                            // the shaded undercoat between the fibres
+  vec3 tipc = mix(c, vec3(1.0), 0.1) * (1.0 + 0.4 * L);            // the tips pick up light
+  vec3 col = mix(under, tipc, clamp(s0 * lit, 0.0, 1.0) * (0.5 + 0.5 * uFurPile) + (1.0 - uFurPile) * 0.45);
+  // the frayed edge: where the picture is brighter than its surroundings, loose fibres break the outline
+  float edge = smoothstep(0.02, 0.25, L - luma(textureLod(uImg, uv, 4.0).rgb));
+  float drop = step(shHash(floor(h * 700.0) + 13.0), uFurFuzz * 0.6 * edge);
+  col = mix(col, col * 0.1, drop);
+  return clamp(col, 0.0, 1.0);
+}
 `;
 
 // Levels, curve, hue, saturation and black & white: the studio's Effects tab, applied to the picture only
@@ -665,10 +955,17 @@ void main() {
   if (uEcstasy > 0.5) c = mix(c, ecstasyFinish(home.xy, c), 1.0 - streaming);
   if (uBlight > 0.5) c = mix(c, blightFinish(home.xy, c), 1.0 - streaming);
   if (uRedmet > 0.5) c = mix(c, redmetFinish(home.xy, c), 1.0 - streaming);
+  if (uC2On > 0.5) c = mix(c, chroma2Finish(home.xy, c), 1.0 - streaming);
   if (uConv > 0.5) c = mix(c, convulsionsFinish(home.xy, c), 1.0 - streaming);
+  if (uSoftword > 0.5) c = mix(c, softwordFinish(home.xy, c), 1.0 - streaming);
   if (uLined > 0.5) c = mix(c, linedFinish(home.xy, c), 1.0 - streaming);
   if (uBlood > 0.5) c = mix(c, bloodFinish(home.xy, c), 1.0 - streaming);
   if (uShake > 0.5) c = mix(c, shakeFinish(home.xy, c), 1.0 - streaming);
+  if (uFur > 0.5) c = mix(c, furFinish(home.xy, c), 1.0 - streaming);
+  if (uAr > 0.5) c = mix(c, aranciaFinish(home.xy, c), 1.0 - streaming);
+  if (uRock > 0.5) c = mix(c, rockFinish(home.xy, c), 1.0 - streaming);
+  if (uCumulus > 0.5) c = mix(c, cumulusFinish(home.xy, c), 1.0 - streaming);
+  if (uBnOn > 0.5) c = mix(c, blendFinish(home.xy, c), 1.0 - streaming);
   float lum = luma(c);
 
   // PULSE scan: a wave of light travels through the depth, front to back, and lights the dots it passes
@@ -1103,27 +1400,6 @@ void main() {
     float m = smoothstep(0.2, 0.65, texture(uAtlas, g).r);
     vec3 bg = uColorMode > 1.5 ? vBg : vInk * uSP.y * tone;
     col = mix(bg, vInk, m);
-  } else if (st == 33) {                           // SOFTWORD: ASCII glyphs in the picture colour, with a soft glow spreading around each one
-    float N = uSP2.x;
-    float idx = floor(clamp(pow(tone, 0.8), 0.0, 0.999) * N);
-    // one glyph sample, read at a point inside the cell (0..1 across it); the row is the chosen ramp
-    float gl = 0.0;
-    vec2 at = vUv;
-    gl = texture(uAtlas, vec2((idx + mix(0.0625, 0.9375, at.x)) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - at.y)) / 4.0)).r;
-    float core = smoothstep(0.2, 0.65, gl);
-    // the halo: the same glyph read a little to each side, so the glow spreads past the letter's edge
-    vec2 o = vec2(0.22, 0.0);
-    vec2 oy = vec2(0.0, 0.22);
-    float halo = 0.0;
-    halo += texture(uAtlas, vec2((idx + mix(0.0625, 0.9375, clamp(at.x + o.x, 0.0, 1.0))) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - at.y)) / 4.0)).r;
-    halo += texture(uAtlas, vec2((idx + mix(0.0625, 0.9375, clamp(at.x - o.x, 0.0, 1.0))) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - at.y)) / 4.0)).r;
-    halo += texture(uAtlas, vec2((idx + mix(0.0625, 0.9375, at.x)) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - clamp(at.y + oy.y, 0.0, 1.0))) / 4.0)).r;
-    halo += texture(uAtlas, vec2((idx + mix(0.0625, 0.9375, at.x)) / 16.0, (uSP.x + mix(0.03125, 0.96875, 1.0 - clamp(at.y - oy.y, 0.0, 1.0))) / 4.0)).r;
-    halo *= 0.25;
-    float glow = clamp(halo * uSP.z * 0.9, 0.0, 1.0);                  // SOFT GLOW: how far the warm light spreads
-    vec3 bg = vInk * tone * 0.25;
-    col = mix(bg, vInk, clamp(core + glow * (1.0 - core), 0.0, 1.0));
-    col += vInk * glow * 0.35 * (1.0 - core);                         // a little extra light around the letter
   } else if (st == 7) {                            // WIRE: the grid as lines; brighter parts draw thicker lines
     float w = uSP.x * (0.35 + 0.65 * tone);
     float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));

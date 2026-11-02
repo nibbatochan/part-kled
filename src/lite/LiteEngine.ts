@@ -78,10 +78,16 @@ export interface LiteParams {
   redmetHeat: number;   // REDMET: 0..1 how far the picture takes the red sky
   redmetRim: number;    // REDMET: 0..1 white rim highlights on edges
   redmetBevel: number;  // REDMET: 0..1 how far the slopes tilt the surface
+  chroma2On: boolean;   // CHROMA 2 filter on the dots
+  chroma2Rim: number;   // CHROMA 2: 0..1 white edge light
+  chroma2Spectrum: number; // CHROMA 2: 0..1 how strongly the blue and red colour the slab
+  chroma2Bevel: number; // CHROMA 2: 0..1 how far the slopes tilt the surface
   convulsionsOn: boolean;   // CONVULSIONS filter on the dots
   convulsionsLine: number;  // CONVULSIONS: 0..1 weight of the contour lines
   convulsionsHatch: number; // CONVULSIONS: 0..1 strength of the hatch strokes
   convulsionsJitter: number; // CONVULSIONS: 0..1 wobble in the strokes
+  softwordOn: boolean;  // SOFTWORD filter on the dots
+  softwordGlow: number; // SOFTWORD: 0..1 glow around each character
   linedOn: boolean;     // LINED filter on the dots
   linedCount: number;   // LINED: lines across the picture height
   linedWeight: number;  // LINED: 0..1 how wide the lines grow where the picture is bright
@@ -94,6 +100,26 @@ export interface LiteParams {
   shakeSmear: number;   // SHAKE-MASK: 0..1 how far the photo is smeared sideways
   shakeCover: number;   // SHAKE-MASK: 0..1 how much of the picture the letters cover
   shakePatch: number;   // SHAKE-MASK: 0..1 scattered letters to large patches
+  furOn: boolean;       // FUR filter on the dots
+  furPile: number;      // FUR: 0..1 how deep the fibres shade the gaps and catch light
+  furLength: number;    // FUR: 0..1 fine flecks (low) to long strands (high)
+  furFuzz: number;      // FUR: 0..1 how far the edge frays
+  aranciaOn: boolean;   // ARANCIA filter on the dots
+  aranciaPores: number; // ARANCIA: 0..1 depth of the dimpled pores
+  aranciaWeb: number;   // ARANCIA: 0..1 how much pale pith web crosses the pulp
+  aranciaGloss: number; // ARANCIA: 0..1 soft wet highlights
+  rockOn: boolean;      // ROCK filter on the dots
+  rockCracks: number;   // ROCK: 0..1 how much of the stone is cracked
+  rockGrain: number;    // ROCK: 0..1 fine light grain on the faces
+  rockWear: number;     // ROCK: 0..1 chipped edges, pockmarks and relief
+  cumulusOn: boolean;   // CLOUD filter on the dots
+  cumulusPuff: number;  // CLOUD: 0..1 how deep the puffs shade their hollows
+  cumulusGlow: number;  // CLOUD: 0..1 warm light bleeding into the cloud
+  cumulusSoft: number;  // CLOUD: 0..1 how broad the puffs are (low: fine, high: soft)
+  blendOn: boolean;     // BLEND filter on the dots
+  blendAmount: number;  // BLEND: 0..1 how far the soft-light blend goes
+  blendWarm: number;    // BLEND: 0..1 warm tint from the light
+  blendSoft: number;    // BLEND: 0..1 how broad the softened copy is
   cell: number;         // cell size of the cell looks, css px
   gap: number;          // cell looks: 0 touching, up to 0.6 leaves a gap between the particles
   styleSet: StyleValues; // per-look settings (see core/styles.ts)
@@ -182,10 +208,16 @@ export const liteDefaults: LiteParams = {
   redmetHeat: 0.7,
   redmetRim: 0.6,
   redmetBevel: 0.5,
+  chroma2On: false,
+  chroma2Rim: 0.6,
+  chroma2Spectrum: 0.7,
+  chroma2Bevel: 0.5,
   convulsionsOn: false,
   convulsionsLine: 0.5,
   convulsionsHatch: 0.5,
   convulsionsJitter: 0.5,
+  softwordOn: false,
+  softwordGlow: 0.6,
   auraGlow: 0.5,
   auraReach: 0.5,
   auraCore: 0.6,
@@ -202,6 +234,26 @@ export const liteDefaults: LiteParams = {
   shakeSmear: 0.5,
   shakeCover: 0.3,
   shakePatch: 0.5,
+  furOn: false,
+  furPile: 0.6,
+  furLength: 0.4,
+  furFuzz: 0.5,
+  aranciaOn: false,
+  aranciaPores: 0.6,
+  aranciaWeb: 0.6,
+  aranciaGloss: 0.5,
+  rockOn: false,
+  rockCracks: 0.5,
+  rockGrain: 0.6,
+  rockWear: 0.5,
+  cumulusOn: false,
+  cumulusPuff: 0.5,
+  cumulusGlow: 0.5,
+  cumulusSoft: 0.5,
+  blendOn: false,
+  blendAmount: 0.6,
+  blendWarm: 0.4,
+  blendSoft: 0.5,
   cell: 8,
   gap: 0,
   styleSet: defaultStyleValues(),
@@ -282,7 +334,7 @@ const UNIFORMS = [
   'uView', 'uScale', 'uOffset', 'uTime', 'uDrift', 'uDepth', 'uSpeed', 'uDir', 'uLean', 'uHalfW',
   'uDolly', 'uRandom', 'uTrailSize', 'uTrailAngle', 'uPSat', 'uLook', 'uSway', 'uPtr', 'uPtrOn', 'uPtrVel', 'uTrackOld', 'uBurst',
   'uCover', 'uPointPx', 'uBright', 'uTrailLen', 'uTrailGain', 'uTrailAmount', 'uTrailDetail', 'uLightCol',
-  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain', 'uShake', 'uShSmear', 'uShCover', 'uShPatch',
+  'uLightOn', 'uScanOn', 'uScan', 'uScanMode', 'uScanCenter', 'uZScale', 'uOpacity', 'uMorph', 'uRole', 'uChrome', 'uChromeBevel', 'uChromeShine', 'uChromeHue', 'uChromeDepth', 'uPrism', 'uPrismLen', 'uPrismSpread', 'uPrismGlow', 'uPrismThr', 'uAura', 'uAuraGlow', 'uAuraReach', 'uAuraCore', 'uAuraTint', 'uEcstasy', 'uEcsTint', 'uEcsDepth', 'uEcsGlow', 'uEcsCore', 'uBlight', 'uBlSpread', 'uBlGrain', 'uBlInk', 'uBlHaze', 'uRedmet', 'uRmHeat', 'uRmRim', 'uRmBevel', 'uConv', 'uCvLine', 'uCvHatch', 'uCvJitter', 'uSoftword', 'uSwGlow', 'uCumulus', 'uCuPuff', 'uCuGlow', 'uCuSoft', 'uBnOn', 'uBnAmt', 'uBnWarm', 'uBnSoft', 'uC2On', 'uC2Rim', 'uC2Spec', 'uC2Bevel', 'uLined', 'uLinedCount', 'uLinedWeight', 'uLinedContrast', 'uBlood', 'uBloodShift', 'uBloodBleed', 'uBloodGrain', 'uShake', 'uShSmear', 'uShCover', 'uShPatch', 'uFur', 'uFurPile', 'uFurLength', 'uFurFuzz', 'uAr', 'uArPores', 'uArWeb', 'uArGloss', 'uRock', 'uRkCracks', 'uRkGrain', 'uRkWear',
   'uScanLevel', 'uFx1', 'uFx2', 'uBW', 'uLoop', 'uHasImg', 'uEmitW', 'uEmitX', 'uEmitOn', 'uLineW', 'uTrailFade', 'uGridA', 'uAtlas',
   'uMusic', 'uBands', 'uBeat', 'uLevel', 'uBass', 'uAmt', 'uMotion', 'uMotionAmt', 'uMotionSpeed',
   // cell looks
@@ -918,10 +970,16 @@ export class LiteEngine {
       gl.uniform1f(U.uRmHeat, p.redmetHeat);
       gl.uniform1f(U.uRmRim, p.redmetRim);
       gl.uniform1f(U.uRmBevel, p.redmetBevel);
+      gl.uniform1f(U.uC2On, p.chroma2On && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uC2Rim, p.chroma2Rim);
+      gl.uniform1f(U.uC2Spec, p.chroma2Spectrum);
+      gl.uniform1f(U.uC2Bevel, p.chroma2Bevel);
       gl.uniform1f(U.uConv, p.convulsionsOn && p.style === 0 ? 1 : 0);
       gl.uniform1f(U.uCvLine, p.convulsionsLine);
       gl.uniform1f(U.uCvHatch, p.convulsionsHatch);
       gl.uniform1f(U.uCvJitter, p.convulsionsJitter);
+      gl.uniform1f(U.uSoftword, p.softwordOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uSwGlow, p.softwordGlow);
       gl.uniform1f(U.uLined, p.linedOn && p.style === 0 ? 1 : 0);
       gl.uniform1f(U.uLinedCount, p.linedCount);
       gl.uniform1f(U.uLinedWeight, p.linedWeight);
@@ -934,6 +992,26 @@ export class LiteEngine {
       gl.uniform1f(U.uShSmear, p.shakeSmear);
       gl.uniform1f(U.uShCover, p.shakeCover);
       gl.uniform1f(U.uShPatch, p.shakePatch);
+      gl.uniform1f(U.uFur, p.furOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uFurPile, p.furPile);
+      gl.uniform1f(U.uFurLength, p.furLength);
+      gl.uniform1f(U.uFurFuzz, p.furFuzz);
+      gl.uniform1f(U.uAr, p.aranciaOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uArPores, p.aranciaPores);
+      gl.uniform1f(U.uArWeb, p.aranciaWeb);
+      gl.uniform1f(U.uArGloss, p.aranciaGloss);
+      gl.uniform1f(U.uRock, p.rockOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uRkCracks, p.rockCracks);
+      gl.uniform1f(U.uRkGrain, p.rockGrain);
+      gl.uniform1f(U.uRkWear, p.rockWear);
+      gl.uniform1f(U.uCumulus, p.cumulusOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uCuPuff, p.cumulusPuff);
+      gl.uniform1f(U.uCuGlow, p.cumulusGlow);
+      gl.uniform1f(U.uCuSoft, p.cumulusSoft);
+      gl.uniform1f(U.uBnOn, p.blendOn && p.style === 0 ? 1 : 0);
+      gl.uniform1f(U.uBnAmt, p.blendAmount);
+      gl.uniform1f(U.uBnWarm, p.blendWarm);
+      gl.uniform1f(U.uBnSoft, p.blendSoft);
       gl.uniform1f(U.uMusic, exact ? 0 : p.musicLook); // a loop export never draws the sound
       gl.uniform1f(U.uMotion, p.motionFx);
       gl.uniform1f(U.uMotionAmt, p.motionAmount);

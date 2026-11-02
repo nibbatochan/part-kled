@@ -5,7 +5,7 @@ import { makeEngine, type ExportFrame } from '../web/Exporter';
 import { toLiteParams, type ExportSnapshot } from '../web/WebEngine';
 import type { Params } from '../core/params';
 import type { LiteSample } from '../lite/sample';
-import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, ECSTASY_FILTER, HALO_FILTER, LINED_FILTER, PRISMATIC_FILTER, REDMET_FILTER, CONVULSIONS_FILTER, SHAKE_FILTER } from '../core/styles';
+import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, ECSTASY_FILTER, LINED_FILTER, PRISMATIC_FILTER, REDMET_FILTER, CONVULSIONS_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, CUMULUS_FILTER, ARANCIA_FILTER, ROCK_FILTER, BLEND_FILTER, CHROMA2_FILTER } from '../core/styles';
 
 const TILE_W = 144; // drawn at 2x the 72 x 54 css size so it stays sharp on screen
 const TILE_H = 108;
@@ -18,8 +18,6 @@ export class LookPicker {
   constructor(
     private snapshot: () => ExportSnapshot | null,
     private settings: () => Params,
-    /** The picture with HALO applied, as particles: the HALO tile is a filter, so it needs its own treated picture. */
-    private haloSample?: () => LiteSample | null,
   ) {}
 
   /** Redraw all tiles soon (debounced). Call after a change of picture, look or look setting. */
@@ -54,18 +52,32 @@ export class LookPicker {
       };
       looks.forEach((btn) => {
         const look = Number(btn.dataset.style);
-        if (look !== HALO_FILTER && look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER && look !== ECSTASY_FILTER && look !== BLIGHT_FILTER && look !== REDMET_FILTER && look !== CONVULSIONS_FILTER && look !== SHAKE_FILTER) tile(btn, { ...params, style: look });
+        if (look !== CHROME_FILTER && look !== PRISMATIC_FILTER && look !== LINED_FILTER && look !== BLOOD_FILTER && look !== AURA_FILTER && look !== ECSTASY_FILTER && look !== BLIGHT_FILTER && look !== REDMET_FILTER && look !== CONVULSIONS_FILTER && look !== SHAKE_FILTER && look !== SOFTWORD_FILTER && look !== FUR_FILTER && look !== CUMULUS_FILTER && look !== ARANCIA_FILTER && look !== ROCK_FILTER && look !== BLEND_FILTER && look !== CHROMA2_FILTER) tile(btn, { ...params, style: look });
       });
       // The filter tiles last: each is drawn on the DOTS base with only its own filter on
-      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false, ecstasyOn: false, blightOn: false, redmetOn: false, convulsionsOn: false, shakeOn: false };
+      const off = { chromeOn: false, prismaticOn: false, linedOn: false, bloodOn: false, auraOn: false, ecstasyOn: false, blightOn: false, redmetOn: false, convulsionsOn: false, shakeOn: false, softwordOn: false, furOn: false, cumulusOn: false, aranciaOn: false, rockOn: false, blendOn: false, chroma2On: false };
       const chromeBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CHROME_FILTER}"]`);
       if (chromeBtn) tile(chromeBtn, { ...params, style: 0, ...off, chromeOn: true });
       const prismBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${PRISMATIC_FILTER}"]`);
       if (prismBtn) tile(prismBtn, { ...params, style: 0, ...off, prismaticOn: true });
       const linedBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${LINED_FILTER}"]`);
       if (linedBtn) tile(linedBtn, { ...params, style: 0, ...off, linedOn: true });
+      const furBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${FUR_FILTER}"]`);
+      if (furBtn) tile(furBtn, { ...params, style: 0, ...off, furOn: true });
+      const rockBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${ROCK_FILTER}"]`);
+      if (rockBtn) tile(rockBtn, { ...params, style: 0, ...off, rockOn: true });
+      const aranciaBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${ARANCIA_FILTER}"]`);
+      if (aranciaBtn) tile(aranciaBtn, { ...params, style: 0, ...off, aranciaOn: true });
+      const cumulusBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CUMULUS_FILTER}"]`);
+      if (cumulusBtn) tile(cumulusBtn, { ...params, style: 0, ...off, cumulusOn: true });
+      const blendBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${BLEND_FILTER}"]`);
+      if (blendBtn) tile(blendBtn, { ...params, style: 0, ...off, blendOn: true });
+      const chroma2Btn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${CHROMA2_FILTER}"]`);
+      if (chroma2Btn) tile(chroma2Btn, { ...params, style: 0, ...off, chroma2On: true });
       const shakeBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${SHAKE_FILTER}"]`);
       if (shakeBtn) tile(shakeBtn, { ...params, style: 0, ...off, shakeOn: true });
+      const softBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${SOFTWORD_FILTER}"]`);
+      if (softBtn) tile(softBtn, { ...params, style: 0, ...off, softwordOn: true });
       const bloodBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${BLOOD_FILTER}"]`);
       if (bloodBtn) tile(bloodBtn, { ...params, style: 0, ...off, bloodOn: true });
       const auraBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${AURA_FILTER}"]`);
@@ -80,13 +92,6 @@ export class LookPicker {
       if (convBtn) tile(convBtn, { ...params, style: 0, ...off, convulsionsOn: true });
       moves.forEach((btn) => tile(btn, { ...params, motionFx: Number(btn.dataset.mfx) }));
       glows.forEach((btn) => tile(btn, { ...params, glow: { ...params.glow, glowPat: Number(btn.dataset.glowpat), glowPatAmt: 1 } }));
-      // The HALO tile last: it swaps in the treated picture, and the dots stay the plain DOTS look
-      const treated = this.haloSample?.();
-      const haloBtn = document.querySelector<HTMLButtonElement>(`#style-grid [data-style="${HALO_FILTER}"]`);
-      if (treated && haloBtn) {
-        engine.setSample(treated);
-        tile(haloBtn, { ...params, style: 0 });
-      }
     } catch {
       // The device cannot make the tile canvas: the buttons keep their text only
     } finally {

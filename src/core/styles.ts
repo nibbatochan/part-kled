@@ -3,23 +3,21 @@
 // Kept free of DOM and GL code so the studio panel, the engine and tests share one description.
 
 /** Look numbers: 0 DOTS (the point look), then the cell looks. Each look keeps its own cell, colour and tone. */
-export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY', 'ECSTASY', 'BLIGHT', 'REDMET', 'SHAKE-MASK', 'CONVULSIONS', 'SOFTWORD'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
+export const STYLE_NAMES = ['DOTS', 'HALFTONE', 'MOSAIC', 'DITHER', 'ASCII', 'LINES', 'LINED', 'WIRE', 'GLASS', 'CRT', 'BARS', 'STICKER', 'BLOOD SHADOW', 'SCAN', 'CROSS', 'BLOCKS', 'CLUSTER', 'PALETTE', 'INK', 'DISSOLVE', 'CGA', 'STIPPLE', 'PIXEL ART', 'HALO', 'AURA', 'CHROME', 'PRISMATIC', 'X-RAY', 'ECSTASY', 'BLIGHT', 'REDMET', 'SHAKE-MASK', 'CONVULSIONS', 'SOFTWORD', 'FUR', 'CLOUD', 'ARANCIA', 'BLEND', 'ROCK', 'CHROMA 2'] as const; // 5 (LINES) and 14 to 16 are retired: their slots stay so the numbers do not move. 25 CHROME is a filter on the dots
 
 /** Every look sits in one category; the LOOK picker shows them grouped. */
 export const LOOK_CATEGORIES: { name: string; looks: number[] }[] = [
-  { name: 'DOTS', looks: [0, 1, 6, 29, 33] },
+  { name: 'DOTS', looks: [0, 1, 6, 29, 33, 37] },
   { name: 'PIXEL', looks: [2, 22] },
   { name: 'TEXT', looks: [4, 31] },
-  { name: 'METAL', looks: [25, 26, 30] },
+  { name: 'METAL', looks: [25, 26, 30, 39] },
   { name: 'RETRO', looks: [9] },
   { name: 'GRAPHIC', looks: [10, 11, 12, 32] },
   { name: 'DITHER', looks: [3, 13, 17] },
   { name: 'BITMAP', looks: [18, 19, 20, 21] },
-  { name: 'HALO', looks: [23, 24, 27, 28] },
+  { name: 'GLOW', looks: [24, 27, 28] },
+  { name: 'SURFACE', looks: [34, 35, 36, 38] },
 ];
-
-/** The HALOS tile is a filter: it turns on the halo layer (glow bitMode 5) over the dots instead of changing the look. */
-export const HALO_FILTER = 23;
 
 /** The CHROME tile is a filter too: it puts a metal finish on the dots (chromeOn) and keeps the dots base, with no cell. */
 export const CHROME_FILTER = 25;
@@ -44,6 +42,27 @@ export const LINED_FILTER = 6;
 
 /** The BLOOD SHADOW tile is a filter on the dots (it replaced the BRUTAL look): a two-ink screenprint, black masses with a red plate printed slightly off register. */
 export const BLOOD_FILTER = 12;
+
+/** The SOFTWORD tile is a filter on the dots in DOTS: ASCII characters laid on a fixed grid, picked by brightness, with a soft glow. */
+export const SOFTWORD_FILTER = 33;
+
+/** The FUR tile is a filter on the dots, in SURFACE: a short felt pile, fine fibres catching light, a fuzzy edge, like a tennis ball. */
+export const FUR_FILTER = 34;
+
+/** The ARANCIA tile is a filter on the dots, in SURFACE: a citrus skin. Dimpled pores, a pale pith web over the pulp, a soft gloss. */
+export const ARANCIA_FILTER = 36;
+
+/** The CHROMA 2 tile is a filter on the dots, in METAL: a dark glossy slab, its surface lit blue, orange and red, with white edge light. */
+export const CHROMA2_FILTER = 39;
+
+/** The ROCK tile is a filter on the dots, in SURFACE: carved stone. Charcoal faces, fine light grain, chipped edges and pale cracks. */
+export const ROCK_FILTER = 38;
+
+/** The CLOUD tile is a filter on the dots, in SURFACE: a puffy white cloud lit from above, with warm light bleeding into it. */
+export const CUMULUS_FILTER = 35;
+
+/** The BLEND tile is a filter on the dots, in DOTS: each dot soft-light blended with a softened copy of the picture, warmed by its light. */
+export const BLEND_FILTER = 37;
 
 /** The CONVULSIONS tile is a filter on the dots in GRAPHIC: ink contour lines and jittering hatch strokes, like a fine line drawing. */
 export const CONVULSIONS_FILTER = 32;
@@ -72,17 +91,22 @@ export const LOOK_TITLES: Record<number, string> = {
   20: 'CGA 16-colour palette: nearest colour, dithered between the two closest',
   21: 'Stipple: dots placed at random, dense where the picture is bright',
   22: 'Pixel art: each cell snapped to a fixed 24-colour palette, the colours of a pixel-art picture',
-  23: 'Halo filter: the whole picture in amber and blue light, glowing outward, dark stays dark',
   24: 'Aura filter: the bright parts turn white and glow ice blue over the dark ground, like a figure lit from within',
   27: 'X-ray: a blue scan on black. Bright parts glow pale like bone, mid parts run blue, dark parts go black',
   25: 'Chrome filter: the dots take a polished blue steel finish. Edges and details catch light, flat areas keep the picture',
   26: 'Prismatic filter: bright parts split into rainbow streaks that run outward, like light through a prism',
   28: 'Ecstasy filter: a translucent blue resin figure, dark navy in the shadows, bright azure and pale white where it is lit from within',
   29: 'Blight filter: black ink washes on paper, a grey haze bleeding out from the dark masses, with speckled edges',
+  38: 'Rock filter: carved stone. Charcoal faces with a fine light grain, pale cracks branching through the dark, chipped edges and pockmarks',
+  36: 'Arancia filter: a citrus skin. Fine dimpled pores, a pale pith web cracking over the pulp, and a soft wet gloss',
+  34: 'Fur filter: a short felt pile. Fine fibres catch light and shade the gaps between them, and the edge frays, like a tennis ball',
+  35: 'Cloud filter: a puffy white cloud lit from above, blue-grey in its hollows, with warm light from nearby bleeding into it',
+  37: 'Blend filter: a dark form dissolved in coloured spray, acid lime at the top shifting to magenta at the foot, with film grain',
+  39: 'Chroma 2 filter: a dark glossy slab. Blue on the upper-left faces, orange and red on the lower-right, white edge light split by colour',
   31: 'Shake-mask filter: the photo smeared sideways like a shaken camera, with a word of letters made of dots showing through in patches, pale on dark and dark on light',
   30: 'Redmet filter: polished metal that mirrors a red sky, dark silhouettes with white rim highlights on their edges',
   32: 'Convulsions filter: the inside of a butterfly wing, irregular cells with dark veins and wavy striations in each membrane',
-  33: 'Softword: ASCII characters in the picture colour, with a soft warm glow spreading around each letter',
+  33: 'Softword filter: ASCII characters on the dots, picked by brightness, in the picture colour with a soft warm glow',
 };
 
 export type StyleSetting =
