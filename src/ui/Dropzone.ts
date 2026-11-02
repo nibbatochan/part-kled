@@ -72,7 +72,7 @@ export class Dropzone {
       this.onFilesCb([video]);
       return;
     }
-    const valid = files.filter(f => /^image\/(png|jpeg|webp)$/i.test(f.type) || /\.(png|jpe?g|webp)$/i.test(f.name));
+    const valid = files.filter(f => /^image\/(png|jpeg|webp)$/i.test(f.type) || /\.(png|jpe?g|webp|glb|obj)$/i.test(f.name));
     if (valid.length > 0) {
       this.onFilesCb(valid.slice(0, MAX_IMAGES));
     }

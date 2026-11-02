@@ -131,7 +131,7 @@ export function lookTone(p: Params): LookTone {
 }
 
 export const defaults: Params = {
-  drift: 0.6,
+  drift: 0,
   splash: 0.5,
   gather: 0.5,
   depth: 0.5,

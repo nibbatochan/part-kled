@@ -151,7 +151,7 @@ export const liteDefaults: LiteParams = {
   motionFx: 0,
   motionAmount: 0.6,
   motionSpeed: 1,
-  drift: 0.6,
+  drift: 0,
   angle: 0.5,
   length: 0.5,
   lean: 0,

@@ -1,7 +1,7 @@
 // src/main.ts
 import { defaults, loadFromStorage, saveToStorage, withEffectsStart, withLightStart, type Params } from './core/params';
 import { WebEngine, pointBudget } from './web/WebEngine';
-import { sampleLite, type HaloTreat, type LiteSample } from './lite/sample';
+import { sampleLite, type LiteSample } from './lite/sample';
 import { DEPTH_MAX_SIDE, DepthEstimator } from './depth/DepthEstimator';
 import { Dropzone } from './ui/Dropzone';
 import { Frame } from './ui/Frame';
@@ -12,6 +12,7 @@ import { Panel } from './ui/Panel';
 import { MAX_IMAGES, Thumbs } from './ui/Thumbs';
 import { LookPicker } from './ui/LookPicker';
 import { processImageFile, type ProcessedImage } from './utils/image';
+import { isModelFile, modelDepthFor, processModelFile } from './model/modelInput';
 import { setupKeyboardShortcuts } from './utils/keys';
 import { ClipPlayer } from './video/ClipPlayer';
 
@@ -108,12 +109,6 @@ class App {
         this.engine.setParams(this.params);
         saveToStorage(this.params);
         this.looks?.refresh();
-        // HALO changes the picture itself, so the particles are sampled again from the treated picture
-        const key = this.treatKey();
-        if (key !== this.lastTreatKey) {
-          this.lastTreatKey = key;
-          void this.switchImage(this.activeIndex);
-        }
       },
       () => this.nextImage(),
       () => this.panel.toggleLight(),
@@ -121,7 +116,7 @@ class App {
     );
 
     // 5a. LOOK tiles: one small drawing of the picture per look
-    this.looks = new LookPicker(() => this.engine.exportSnapshot(), () => this.params, () => this.haloTileSample());
+    this.looks = new LookPicker(() => this.engine.exportSnapshot(), () => this.params);
     this.looks.refresh(0);
     document.getElementById('undo-btn')?.addEventListener('click', () => this.undoStep());
     // Ctrl+Z steps back through the picture history (not while typing in a field)
@@ -451,37 +446,10 @@ class App {
     bar.style.width = `${Math.round(Math.min(1, Math.max(0, pct)) * 100)}%`; // never past 100%
   }
 
-  /** HALO's treatment of the picture, or undefined when the picture is shown as it is. */
-  private haloTreat(): HaloTreat | undefined {
-    const g = this.params.glow;
-    return g.bitMode === 5 ? { glow: g.bitLevel, reach: g.bitSize * 0.06, amount: g.bitAmount } : undefined;
-  }
-
-  private treatKey(): string {
-    const t = this.haloTreat();
-    return t ? `${t.glow}|${t.reach}|${t.amount}` : '';
-  }
-
-  private lastTreatKey = '';
-
-  /** A small particle set of the picture on screen with HALO applied, for the HALO tile. Kept until the picture or HALO settings change. */
-  private haloTile: { key: string; sample: LiteSample } | null = null;
-  private haloTileSample(): LiteSample | null {
-    const img = this.images[this.activeIndex];
-    const cached = img ? [...this.sampleCache.entries()].find(([k]) => k.startsWith(img.hash + '|'))?.[1] : undefined;
-    if (!img || !cached) return null;
-    const g = this.params.glow;
-    const treat: HaloTreat = { glow: g.bitLevel, reach: g.bitSize * 0.06, amount: g.bitAmount };
-    const key = `${img.hash}|${treat.glow}|${treat.reach}|${treat.amount}`;
-    if (this.haloTile?.key !== key) {
-      this.haloTile = { key, sample: sampleLite(img.canvas, cached.depth, cached.dw, cached.dh, 20000, treat) };
-    }
-    return this.haloTile.sample;
-  }
 
   public async getSampleDataForImage(img: ProcessedImage): Promise<CachedSample> {
     // Keyed by the picture's content hash and the treatment: a duplicate reuses the depth work of its original
-    const key = img.hash + '|' + this.treatKey();
+    const key = img.hash;
     if (this.sampleCache.has(key)) {
       return this.sampleCache.get(key)!;
     }
@@ -490,8 +458,15 @@ class App {
     let depthArr: Float32Array | null = null;
     let dw = 0;
     let dh = 0;
+    // A picture rendered from a 3D model already has its depth: no estimate, no baked lookup
+    const modelDepth = modelDepthFor(img);
+    if (modelDepth) {
+      depthArr = modelDepth.depth;
+      dw = modelDepth.dw;
+      dh = modelDepth.dh;
+    }
     const baseName = img.name.replace(/\.[^.]+$/, '');
-    if (baseName.startsWith('sample-')) {
+    if (!depthArr && baseName.startsWith('sample-')) {
       try {
         const bakedRes = await fetch(`/samples/${baseName}-depth.png`);
         // A missing file can answer 200 with the app's HTML (dev server fallback): only an image counts as baked depth
@@ -557,7 +532,7 @@ class App {
     });
     let sampleData: LiteSample;
     try {
-      sampleData = sampleLite(img.canvas, depthArr, dw, dh, pointBudget(), this.haloTreat());
+      sampleData = sampleLite(img.canvas, depthArr, dw, dh, pointBudget());
     } finally {
       this.setProgress(false);
     }
@@ -575,7 +550,7 @@ class App {
 
   private async initDefaultSamples(): Promise<void> {
     try {
-      const paths = ['/samples/sample-1.png', '/samples/sample-2.png', '/samples/sample-7.jpg', '/samples/sample-8.png', '/samples/sample-9.png'];
+      const paths = ['/samples/sample-1.png', '/samples/sample-2.png', '/samples/sample-7.jpg', '/samples/sample-8.png', '/samples/sample-10.png'];
       const loaded: ProcessedImage[] = [];
 
       for (const p of paths) {
@@ -802,7 +777,7 @@ class App {
     this.dropzone.showOverlay(false);
     for (const f of files) {
       if (this.images.length >= MAX_IMAGES) break;
-      const proc = await processImageFile(f);
+      const proc = isModelFile(f) ? await processModelFile(f) : await processImageFile(f);
       this.images.push(proc);
     }
 

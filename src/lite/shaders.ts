@@ -469,41 +469,49 @@ vec3 ecstasyFinish(vec2 h, vec3 c) {
   return clamp(col + glow, 0.0, 1.0);
 }
 
-// CHROMA 2: a dark glossy slab lit by the picture. The slopes of its brightness tilt each dot: faces turned to the upper
-// left take cobalt blue, the picture's middle takes orange, and the lower right runs to hot red. The flat body falls to
-// near-black. The edges carry a hot white core, with blue on the upper-left side and red on the lower-right side.
-// Black stays black. Only colour and light change: dots keep their place and count.
+// CHROMA 2: polished blue steel with a warm key light, like a chrome-plated statue in a dark studio. The picture's form
+// (its brightness slopes, and its depth when it has some) tilts every dot into a normal. Surfaces turned to the left take
+// cool blue steel, surfaces turned to the right catch an orange-red key light, and the folds between fall to deep navy.
+// Narrow white-hot highlights run along the crests, cool on the left and warm on the right. Black stays black.
+// Only colour and light change: dots keep their place and count.
 vec3 chroma2Finish(vec2 h, vec3 c) {
   if (uHasImg < 0.5) return c;
   vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
   vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
   float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
   float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
   float lum = luma(c);
-  float present = smoothstep(0.03, 0.2, lum);
-  // The slope as a normal in the picture plane: +1 faces the upper left, -1 faces the lower right, flat faces neither
-  vec2 n = vec2(-dx, dy) * uC2Bevel * 6.0;
-  float slope = length(n);
-  float facing = dot(n / max(slope, 1e-3), vec2(-0.7, 0.7)) * smoothstep(0.0, 0.3, slope);
-  // The light of the picture: cobalt upper left, orange in the middle, hot red at the lower right
-  vec2 p = vec2(uv.x, 1.0 - uv.y);                                  // 0..1, y up
-  float diag = clamp((p.x + (1.0 - p.y)) * 0.5, 0.0, 1.0);          // 0 at the upper left, 1 at the lower right
-  vec3 cobalt = vec3(0.08, 0.28, 0.95);
-  vec3 orange = vec3(1.0, 0.5, 0.14);
-  vec3 hotRed = vec3(1.0, 0.2, 0.16);
-  vec3 ramp = mix(cobalt, orange, smoothstep(0.2, 0.55, diag));
-  ramp = mix(ramp, hotRed, smoothstep(0.6, 0.95, diag));
-  ramp = mix(vec3(lum), ramp, uC2Spec);                             // SPECTRUM: grey at zero, full colour at one
-  float lit = 0.55 + 0.45 * clamp(facing, -1.0, 1.0);               // faces turned to the light glow brighter
-  vec3 navy = vec3(0.01, 0.03, 0.09);
-  vec3 body = mix(navy, ramp * lit, smoothstep(0.05, 0.5, lum));
-  // Edges: the colour of the side the edge faces, then a hot white core on the crest
-  float edge = clamp(length(vec2(dx, dy)) * uC2Bevel * 6.0, 0.0, 1.0);
-  vec3 fringe = mix(cobalt, hotRed, smoothstep(-0.3, 0.3, -facing));
-  vec3 col = mix(body, fringe, smoothstep(0.1, 0.5, edge) * uC2Spec);
-  float core = smoothstep(0.35, 0.85, edge) * uC2Rim;
-  col = mix(col, vec3(1.0, 0.96, 0.92), core);
-  return clamp(col * present, 0.0, 1.0);
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
+  float k = uC2Bevel * 12.0 + 4.0;
+  vec3 n = normalize(vec3(-(dx + zx * 2.5) * k, (dy + zy * 2.5) * k, 1.0));
+  // the form: the picture's light through a curve, so a marble-bright body becomes mid steel and its folds go deep
+  float form = smoothstep(0.12, 0.92, lum);
+  // the side: the key light sits to the right of the picture, and surfaces turned right lean to it as well
+  float xpos = clamp(smoothstep(0.25, 0.8, uv.x) + 1.6 * n.x, 0.0, 1.0);
+  vec3 Lc = normalize(vec3(-0.55, 0.5, 0.67));
+  vec3 Lw = normalize(vec3(0.7, 0.1, 0.7));
+  float litC = clamp((dot(n, Lc) - 0.5) * 3.4, 0.0, 1.0);          // contrast on the slopes: shadowed faces fall to navy
+  float litW = clamp((dot(n, Lw) - 0.5) * 3.4, 0.0, 1.0);
+  vec3 navy = vec3(0.02, 0.035, 0.09);
+  vec3 steelBlue = vec3(0.30, 0.46, 0.90);
+  vec3 steelGrey = vec3(0.46, 0.50, 0.58);
+  vec3 orange = vec3(1.0, 0.36, 0.09);
+  vec3 coolCol = mix(steelGrey, steelBlue, uC2Spec);                  // SPECTRUM: neutral steel at zero, full colour at one
+  vec3 warmCol = mix(steelGrey, orange, uC2Spec);
+  vec3 body = navy + coolCol * litC * (1.0 - xpos) * (0.3 + 0.9 * form) + warmCol * litW * xpos * (0.35 + 1.0 * form);
+  // a dim ambient keeps the shadowed side deep blue and the lit side deep red instead of dead black
+  body += mix(vec3(0.02, 0.05, 0.14), vec3(0.18, 0.05, 0.02), xpos) * (0.25 + 0.75 * form);
+  // glossy highlights: narrow, along the crests where the surface turns to the light
+  vec3 H1 = normalize(Lc + vec3(0.0, 0.0, 1.0));
+  vec3 H2 = normalize(Lw + vec3(0.0, 0.0, 1.0));
+  float spec = pow(max(dot(n, H1), 0.0), 60.0) * (1.0 - xpos) + pow(max(dot(n, H2), 0.0), 50.0) * xpos;
+  float edge = clamp(length(vec2(dx, dy)) * k * 0.5, 0.0, 1.0);
+  vec3 glint = mix(vec3(0.80, 0.90, 1.0), vec3(1.0, 0.78, 0.55), xpos);
+  body += glint * (spec * 1.4 + smoothstep(0.4, 0.95, edge) * 0.3) * uC2Rim * smoothstep(0.1, 0.5, form + 0.2);
+  return clamp(body * present, 0.0, 1.0);
 }
 
 // REDMET: polished metal mirroring a red sky. The slopes of the picture's brightness give each dot a tilt: edges
@@ -819,50 +827,65 @@ vec3 aranciaFinish(vec2 h, vec3 c) {
   return clamp(col, 0.0, 1.0) * present;
 }
 
-// ROCK: carved stone, like a chiselled concrete letter. The faces are charcoal in shade and warm grey where lit, covered in
-// a fine light grain; pits pock the surface; the picture's edges chip pale where planes meet; and pale cracks branch through
-// the dark in patches, jagged because the crack net is warped. A rough height field shades the grain from the upper left.
-// The picture gives the form. Only colour changes: dots keep their place and count.
+// ROCK: dark carved stone, like a weathered granite bust. The picture's form (brightness slopes and depth when it has some)
+// is lit from the upper left: faces turned to the light take warm grey, the rest falls to near-black charcoal. Crests
+// catch pale highlights. The stone is flecked with mineral specks, pale and dark, strongest on the lit planes. Edges
+// where planes meet chip pale, and cracks run dark with a pale chipped lip, gathering along those edges and in patches.
+// Only colour and light change: dots keep their place and count.
 float rkRough(vec2 h) { return 0.6 * shNoise(h * 120.0) + 0.4 * shNoise(h * 310.0 + 2.0); }
 vec3 rockFinish(vec2 h, vec3 c) {
   if (uHasImg < 0.5) return c;
   vec2 uv = vec2(h.x / (uHalfW * 2.0) + 0.5, 0.5 - h.y);
-  float present = smoothstep(0.015, 0.07, max(c.r, max(c.g, c.b)));
+  float present = smoothstep(0.012, 0.07, max(c.r, max(c.g, c.b)));
   float L = luma(c);
-  float form = clamp(L * 1.15, 0.0, 1.0);
-  // the stone: near-black in shade, warm grey on lit faces
-  vec3 stone = mix(vec3(0.035, 0.035, 0.037), vec3(0.27, 0.265, 0.255), smoothstep(0.0, 0.55, form));
-  stone = mix(stone, vec3(0.50, 0.485, 0.455), smoothstep(0.5, 1.0, form));
-  // relief: the fine roughness, lit from the upper left
-  vec2 e = vec2(0.0025, 0.0);
-  float gx = rkRough(h + e.xy) - rkRough(h - e.xy);
-  float gy = rkRough(h + e.yx) - rkRough(h - e.yx);
-  float shade = 1.0 - (0.5 + 2.4 * uRkWear) * (gx * -0.6 + gy * 0.7);
-  // grain: salt and pepper, strongest on the lit faces, plus coarser clumps
-  float gr = shHash(floor(h * 620.0));
-  float grain = uRkGrain * (0.15 + 0.85 * smoothstep(0.1, 0.6, form));
-  stone *= shade * (1.0 + (gr - 0.5) * 1.1 * grain + (shNoise(h * 170.0) - 0.5) * 0.5 * grain);
-  // pockmarks: small dark pits, a few per patch
+  // the form: the picture's light through a steep curve, so a pale marble becomes dark stone with its folds black
+  float form = pow(smoothstep(0.28, 0.95, L), 1.45);
+  // the lit side: slopes from brightness and depth, light from the upper left
+  vec2 e = 4.0 / uTexSize;
+  vec2 f = 10.0 / uTexSize;
+  float dx = luma(textureLod(uImg, uv + vec2(e.x, 0.0), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(e.x, 0.0), 2.0).rgb);
+  float dy = luma(textureLod(uImg, uv + vec2(0.0, e.y), 2.0).rgb) - luma(textureLod(uImg, uv - vec2(0.0, e.y), 2.0).rgb);
+  float zx = textureLod(uImg, uv + vec2(f.x, 0.0), 2.0).a - textureLod(uImg, uv - vec2(f.x, 0.0), 2.0).a;
+  float zy = textureLod(uImg, uv + vec2(0.0, f.y), 2.0).a - textureLod(uImg, uv - vec2(0.0, f.y), 2.0).a;
+  float k = 5.0 + 9.0 * uRkWear;
+  vec3 n = normalize(vec3(-(dx + zx * 2.0) * k, (dy + zy * 2.0) * k, 1.0));
+  float lit = clamp((dot(n, normalize(vec3(-0.55, 0.5, 0.67))) - 0.45) * 3.0, 0.0, 1.0);
+  // the stone: black in shadow, charcoal, warm grey where lit, pale on the crests
+  vec3 stone = mix(vec3(0.016, 0.016, 0.018), vec3(0.118, 0.120, 0.126), smoothstep(0.0, 0.45, form * (0.4 + 0.8 * lit)));
+  stone = mix(stone, vec3(0.43, 0.44, 0.455), smoothstep(0.28, 0.85, form * (0.4 + 0.9 * lit)));
+  float crest = smoothstep(0.55, 1.0, lit) * smoothstep(0.35, 0.9, form);
+  stone = mix(stone, vec3(0.62, 0.63, 0.65), crest * 0.28);   // matte rock: only a soft pale crest, no polish
+  // mottling: broad cloudy variation in the stone itself
+  stone *= 0.55 + 0.95 * shNoise(h * 55.0 + 7.0) * (0.45 + 0.55 * shNoise(h * 170.0 + 3.0));   // rough, uneven stone, not a smooth metal sweep
+  // mineral flecks: pale and dark specks, strongest on the lit planes and on the plinth-like flat areas
+  float gr = shHash(floor(h * 560.0));
+  float fleck = uRkGrain * (0.25 + 0.75 * smoothstep(0.1, 0.7, form * (0.5 + lit)));
+  stone *= 1.0 + (gr - 0.5) * 1.5 * fleck;
+  stone += vec3(0.33, 0.33, 0.34) * step(0.88, gr) * fleck * (0.3 + 0.7 * smoothstep(0.15, 0.6, form));
+  stone *= 1.0 - 0.6 * step(gr, 0.06) * fleck;
+  // pockmarks: small dark pits
   vec2 pc = h * 150.0;
   vec2 pf = fract(pc);
   vec2 po = vec2(shHash(floor(pc) + 1.0), shHash(floor(pc) + 2.0)) * 0.5 + 0.25;
-  float pit = step(0.9 - 0.08 * uRkWear, shHash(floor(pc))) * (1.0 - smoothstep(0.05, 0.2, length(pf - po)));
+  float pit = step(0.92 - 0.06 * uRkWear, shHash(floor(pc))) * (1.0 - smoothstep(0.05, 0.2, length(pf - po)));
   stone *= 1.0 - 0.7 * pit;
-  // chipped edges: where the picture changes brightness fast, planes meet and the edge breaks pale
+  // chipped edges: where the picture changes brightness fast, planes meet and break pale
   float ed = abs(L - luma(textureLod(uImg, uv, 3.0).rgb));
-  float chip = smoothstep(0.03, 0.2, ed) * step(0.3, shNoise(h * 90.0)) * (0.35 + 0.65 * uRkWear);
-  stone = mix(stone, vec3(0.72, 0.70, 0.66) * (0.5 + 0.5 * form), chip * 0.6);
-  // cracks: a warped cell net's edges, thin and jagged, in patches; a finer net branches off it
+  float edgeZone = smoothstep(0.03, 0.2, ed);
+  float chip = edgeZone * step(0.32, shNoise(h * 90.0)) * (0.3 + 0.7 * uRkWear);
+  stone = mix(stone, vec3(0.50, 0.50, 0.51) * (0.4 + 0.6 * form), chip * 0.55);
+  // cracks: a warped cell net's edges, thin and jagged; a finer net branches off. They gather along edges and in patches.
   vec2 cp = h * 7.0 + 0.9 * vec2(shNoise(h * 17.0), shNoise(h * 17.0 + 4.0)) + 0.25 * vec2(shNoise(h * 53.0), shNoise(h * 53.0 + 9.0));
   vec2 v1 = arVor(cp);
   vec2 v2 = arVor(h * 19.0 + 0.5 * vec2(shNoise(h * 41.0), shNoise(h * 41.0 + 6.0)) + 3.0);
-  float line = max(1.0 - smoothstep(0.0, 0.042, v1.y - v1.x), 0.7 * (1.0 - smoothstep(0.0, 0.035, v2.y - v2.x)));
+  float d1 = min(v1.y - v1.x, (v2.y - v2.x) * 1.5);
+  float core = 1.0 - smoothstep(0.0, 0.026, d1);                      // the fissure: black
+  float lip = (1.0 - smoothstep(0.0, 0.07, d1)) - core;               // its chipped lip: pale
   float zn = 0.7 * shNoise(uv * 4.0 + 7.0) + 0.3 * shNoise(uv * 12.0 + 1.0);
-  float zone = smoothstep(0.62 - 0.35 * uRkCracks, 0.78 - 0.35 * uRkCracks, zn);
-  float crack = line * zone;
-  vec3 crackCol = mix(vec3(0.80, 0.78, 0.74), vec3(0.03), smoothstep(0.35, 0.62, form));   // pale dust in the dark, a dark seam on lit faces
-  vec3 col = mix(stone, crackCol, crack * 0.9);
-  return clamp(col, 0.0, 1.0) * present;
+  float zone = clamp(smoothstep(0.64 - 0.35 * uRkCracks, 0.8 - 0.35 * uRkCracks, zn) + edgeZone * uRkCracks * 0.9, 0.0, 1.0);
+  stone = mix(stone, vec3(0.46, 0.46, 0.47) * (0.35 + 0.65 * form), clamp(lip, 0.0, 1.0) * zone * 0.8);
+  stone = mix(stone, vec3(0.008), core * zone * 0.95);
+  return clamp(stone, 0.0, 1.0) * present;
 }
 
 // FUR: a short felt pile, like a tennis ball. Fine fibres lie in coherent swirls; their tips catch light and the gaps between

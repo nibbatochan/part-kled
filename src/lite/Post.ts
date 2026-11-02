@@ -43,7 +43,7 @@ export interface PostParams {
   stackCount: number;   // 4..16 points
   stackWidth: number;   // line width, px
   stackColour: [number, number, number];
-  glowPat: number;      // STACK glow: 0 off, 1 GLOW, 2 DOTS, 3 GRID, 4 SCAN, 5 HAZE
+  glowPat: number;      // STACK glow: 0 off, 1 GLOW, 2 DOTS, 3 GRID, 4 SCAN, 5 HAZE, 6 SPILL
   glowPatAmt: number;   // 0..1.5 strength
   bitMode: number;      // BITMAP overlay: 0 OFF, 1 INK, 2 GRADE, 3 CGA, 4 STIPPLE
   bitAmount: number;    // 0..1 how much of the overlay replaces the picture
@@ -243,6 +243,15 @@ void main() {
     int gp = int(uGPat.x + 0.5);
     vec3 src = texture(uL1, uv).rgb * 0.6 + texture(uL2, uv).rgb * 0.9 + texture(uL3, uv).rgb;
     if (gp == 5) src = texture(uL3, uv).rgb * 0.5 + texture(uL4, uv).rgb * 1.4;
+    if (gp == 6) {
+      // SPILL: only warm light (red and orange, more red than blue) spills onto the dark around it. Its colour follows
+      // the light: deep red-orange in the middle tones, pale salmon in the brightest. Blue sky carries no warmth, so it does not spill.
+      vec3 w = texture(uL3, uv).rgb * 0.5 + texture(uL4, uv).rgb * 1.2;
+      float lw = dot(w, vec3(0.299, 0.587, 0.114));
+      float warm = smoothstep(0.04, 0.3, w.r - w.b);
+      vec3 spill = mix(vec3(0.85, 0.2, 0.1), vec3(1.0, 0.6, 0.5), smoothstep(0.35, 0.9, lw));
+      src = spill * warm * smoothstep(0.1, 0.7, lw);
+    }
     vec2 f = fract(vUv * uRes / 8.0);
     float m = 1.0;
     if (gp == 2) m = 1.0 - smoothstep(0.1, 0.42, length(f - 0.5));

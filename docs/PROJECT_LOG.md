@@ -18,6 +18,15 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-02: ROCK remade from the marble-to-dark-stone pair
+- ROCK now reads the pair (white marble bust, same bust as dark weathered granite): the picture's form through a steep curve, lit from the upper left (warm grey faces, near-black shadow, pale crest highlights), mottled granite with pale and dark mineral flecks, chipped pale edges, and dark fissures with a pale chipped lip that gather along edges and in patches. Controls keep their names: CRACKS, GRAIN, WEAR.
+- Evidence: tsc and 38 tests pass; checked in the browser on slot 5 (the statue). Not tried on non-statue subjects after the remake.
+
+### 2026-11-02: CHROMA 2 remade from a statue pair; slot 5 is now the statue
+- Slot 5 sample is the marble bust (public/samples/sample-10.png, a cut-out) with a baked depth map (sample-10-depth.png: inflated silhouette plus brightness), so it loads instantly. sample-9 stays on disk but is no longer in the default five; main.ts lists sample-10.
+- CHROMA 2 now reads the pair (marble source, blue-steel target with an orange key light): normals from brightness slopes plus depth, cool blue steel on left-facing surfaces, orange-red on right-facing ones, deep navy folds, narrow cool and warm highlights. Controls keep their names: RIM, SPECTRUM, BEVEL.
+- Evidence: tsc and 33 tests pass; checked in the browser on slot 5. The depth map is a heuristic, not the depth estimator.
+
 ### 2026-11-02: ROCK filter (SURFACE)
 - Filter on the dots, slot 38: carved stone like a chiselled concrete letter. Charcoal shade, warm grey lit faces, fine salt-and-pepper grain, pockmarks, pale chipped edges where the picture's planes meet, and pale jagged cracks branching through the dark in patches (warped cell net plus a finer branch net). Controls: CRACKS, GRAIN, WEAR.
 - Evidence: tsc and 33 tests pass; checked in the browser on samples 1 and 4. Not compared on a block-letter subject like the reference.

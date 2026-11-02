@@ -8,13 +8,16 @@ async function main() {
 
   await page.setContent(`<!DOCTYPE html><html><body><canvas id="c"></canvas></body></html>`);
 
-  for (const name of ['sample-1', 'sample-2', 'sample-3']) {
-    const imgPath = `public/samples/${name}.png`;
+  // sample-1..3 depth maps came from the estimator and are kept; this bakes the jpg samples that have none
+  const samples = [['sample-7', 'jpg']]; // sample-8 and -9 are cut out by cut-out-samples.mjs, which writes their depth too
+  for (const [name, ext] of samples) {
+    const imgPath = `public/samples/${name}.${ext}`;
     const b64 = fs.readFileSync(imgPath).toString('base64');
+    const mime = ext === 'jpg' ? 'image/jpeg' : 'image/png';
 
-    const depthB64 = await page.evaluate(async (dataUrl) => {
+    const depthB64 = await page.evaluate(async ({ dataUrl, mime }) => {
       const img = new Image();
-      await new Promise(r => { img.onload = r; img.src = 'data:image/png;base64,' + dataUrl; });
+      await new Promise(r => { img.onload = r; img.src = `data:${mime};base64,` + dataUrl; });
       const c = document.getElementById('c');
       c.width = img.width;
       c.height = img.height;
@@ -55,7 +58,7 @@ async function main() {
 
       ctx.putImageData(depthData, 0, 0);
       return c.toDataURL('image/png');
-    }, b64);
+    }, { dataUrl: b64, mime });
 
     const outPath = `public/samples/${name}-depth.png`;
     const cleanB64 = depthB64.replace(/^data:image\/png;base64,/, '');

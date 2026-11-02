@@ -3,10 +3,6 @@
 // Particles are written in a low-discrepancy shuffled order, so ANY prefix of the buffer is an even
 // subset of the picture. That is what lets the engine drop quality at runtime by drawing fewer points.
 import { buildCDF, computeImportanceWeights, hash01, lowerBound } from '../core/Sampler';
-import { haloGrade } from './haloImage';
-
-/** HALO treatment of the picture: glow strength, reach as a share of the height, and how much it replaces the colour. */
-export interface HaloTreat { glow: number; reach: number; amount: number }
 
 export interface LiteSample {
   /** Interleaved: f32 x, y, z then u8 r, g, b, gain/5. Stride 16 bytes. */
@@ -75,8 +71,7 @@ export function sampleLite(
   depthFull: Float32Array | null,
   dw: number,
   dh: number,
-  count: number,
-  treat?: HaloTreat
+  count: number
 ): LiteSample {
   const sw = img.width;
   const sh = img.height;
@@ -89,9 +84,7 @@ export function sampleLite(
   cv.height = h;
   const ctx = cv.getContext('2d', { willReadFrequently: true })!;
   ctx.drawImage(img, 0, 0, w, h);
-  // HALO: the picture is treated first, so the grid and the particle colours both come from the treated picture
-  const raw = ctx.getImageData(0, 0, w, h).data;
-  const rgba = treat ? haloGrade(raw, w, h, treat.glow, treat.reach, treat.amount) : raw;
+  const rgba = ctx.getImageData(0, 0, w, h).data;
 
   // Depth comes in at picture size (from the estimator); sample it down to the working size
   const depth = new Float32Array(w * h);
