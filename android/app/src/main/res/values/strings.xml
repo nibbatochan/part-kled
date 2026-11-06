@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Particle Depth</string>
+    <string name="wallpaper_description">Depth-driven particle picture that tilts with your phone</string>
+</resources>

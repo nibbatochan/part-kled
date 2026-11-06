@@ -18,6 +18,11 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-06: Android live wallpaper research and scope
+- Research in `docs/RESEARCH_ANDROID_LIVE_WALLPAPER.md`; phased plan and tracker in `docs/ANDROID_SCOPE.md`. Gyro tilt replaces hover tilt on Android.
+- Decision: native Kotlin GLES 3.0 renderer porting `src/lite/`, web studio stays the editor, no WebView in the wallpaper.
+- Evidence: research only, nothing built or tested on a device.
+
 ### 2026-11-02: C-ABR filter (GLASS category)
 - New category GLASS in LOOK_CATEGORIES. Filter on the dots, slot 42: dark smoked obsidian glass with prismatic chromatic aberration caustics and slick high-gloss specular reflections derived from the classical bust paired reference. Curvature and depth gradients tilt dots into surface normals; wavelength-dependent refractive dispersion splits internal transmission along slopes and draped folds into vivid spectral rainbow bands (cyan, amber, magenta, cobalt), while razor-sharp specular crests and dual-tinted Fresnel rim lighting catch curved ridges. Controls: DISPERSION, GLOSS, RIM with presets (FAITHFUL, SUBTLE, EXPRESSIVE).
 - Evidence: tsc and 39 tests pass; automated headless browser test (`scripts/verify-cabr.mjs`) verified in Chromium with zero WebGL errors and screenshots saved to `docs/screenshots/cabr/`.
