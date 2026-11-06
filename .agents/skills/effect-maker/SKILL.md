@@ -12,6 +12,12 @@ Translate the visual material transformation between two related images into a r
 - **IMAGE 1 — SOURCE:** Authority for subject, geometry, silhouette, pose, proportions, and particle placement.
 - **IMAGE 2 — TARGET STYLE:** Authority for material appearance: color palette, lighting, reflectivity, roughness, and micro-texture.
 
+> **Step 0 (mandatory, before any shader work):** Run the `image-to-effect` skill (`../image-to-effect/SKILL.md`). Write the visual brief (material, tonal structure, palette, edges, detail scale, must keep, must avoid) and treat the picture first with `tools/treat/treat.py` or a new treatment. Pass its 6-question fidelity gate. Only port the look into a shader tile if the user wants a built-in tile. Palette extraction alone (Step 2) is not a brief: it loses banding, edge lines, iridescent phase and rim detail, which is why results looked generic.
+>
+> **Archetype rule:** The four archetypes below are starting points, not bins. If the brief's material is none of them (foil, neon line art, stipple, faceted crystal), do not force it into one; write a new finish from the brief.
+>
+> **Fidelity check (replaces "tests pass = done"):** After Step 6, screenshot the effect on the same source and compare it with the reference against the brief's "Must keep / Must avoid". Report which gate lines failed. `tsc` and tests only prove the code compiles.
+
 > **Zero-Friction Rule:** The user should only have to supply the two images. Do NOT ask the user to run commands, paste GLSL, or edit files. Execute the entire pipeline end-to-end autonomously.
 
 ---
