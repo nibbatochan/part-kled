@@ -173,10 +173,15 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
         if (t != null && pp.n("drift") > 0.02f && pp.on("trails") && pp.n("trailAmount") > 0f && trailCount > 0) {
             GLES30.glUseProgram(t.id)
             setUniforms(t, frame)
-            GLES30.glUniform1f(t.loc["uLineW"] ?: -1, 1f)
+            // The web draws a trail as a 1 device-pixel line, right on a desktop screen. A phone has about 3 pixels per dp,
+            // so the same line is a third as wide and nearly invisible. Scale the width with the screen density; above 1.25
+            // the shader switches from plain GL lines to quads (see TRAILS in src/lite/shaders.ts).
+            val lineW = max(1f, density * rs * SpikeConfig.TRAIL_WIDTH)
+            GLES30.glUniform1f(t.loc["uLineW"] ?: -1, lineW)
             GLES30.glUniform1f(t.loc["uTrailFade"] ?: -1, 1f)
             GLES30.glBindVertexArray(vaoTrails)
-            GLES30.glDrawArraysInstanced(GLES30.GL_LINES, 0, 2, trailCount)
+            if (lineW > 1.25f) GLES30.glDrawArraysInstanced(GLES30.GL_TRIANGLE_STRIP, 0, 4, trailCount)
+            else GLES30.glDrawArraysInstanced(GLES30.GL_LINES, 0, 2, trailCount)
         }
         GLES30.glBindVertexArray(0)
         if (rs < 1f) blitToScreen()

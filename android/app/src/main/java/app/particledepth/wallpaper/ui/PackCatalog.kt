@@ -13,7 +13,7 @@ import app.particledepth.wallpaper.pack.ParamSpec
 class PackInfo(val id: String, val config: PackConfig, val thumb: ImageBitmap?)
 
 /** A slider the customise screen shows: a pack number with its range and a short label. */
-class SliderSpec(val key: String, val label: String, val min: Float, val max: Float, val def: Float)
+class SliderSpec(val key: String, val label: String, val min: Float, val max: Float, val percent: Boolean = false)
 
 object PackCatalog {
     /** Every folder under assets/packs with a readable pack.json. A broken pack is skipped, never fatal. */
@@ -38,10 +38,24 @@ object PackCatalog {
         null
     }
 
+    private fun web(key: String): SliderSpec {
+        val w = WebLabels.sliders[key] ?: error("no web label for $key")
+        return SliderSpec(key, w.label, w.min, w.max, w.percent)
+    }
+
+    /**
+     * The first group, in the order of the web studio's panel and with its words: MOVEMENT, 3D DEPTH, SIDE BIAS, VARIETY,
+     * PARTICLE COLOUR, PARTICLE SIZE, TRAIL BEND, TRAIL LENGTH, TRAILS. Then the hover turn and the picture's levels.
+     */
     private val BASIC = listOf(
-        SliderSpec("drift", "FLOW", 0f, 1f, 0f), SliderSpec("depth", "RELIEF", 0f, 1f, 0.5f), SliderSpec("pan", "TILT", 0f, 1f, 0.5f),
-        SliderSpec("trailAmount", "TRAILS", 0f, 2f, 0.35f), SliderSpec("brightness", "LIGHT", 0f, 3f, 1.15f), SliderSpec("pSat", "COLOUR", 0f, 3f, 1.2f),
-    ).map { b -> ParamSpec.num(b.key)!!.let { SliderSpec(b.key, b.label, it.min, it.max, it.def) } }
+        web("drift"), web("depth"), web("lean"), web("randomness"), web("pSat"), web("trailSize"), web("trailAngle"),
+        web("trailLength"), web("trailAmount"),
+        SliderSpec("pan", "HOVER AMOUNT", 0f, 1f),
+        SliderSpec("opacity", "OPACITY", 0f, 1f),
+        SliderSpec("fx.saturation", "SATURATION", 0f, 2f),
+        SliderSpec("fx.black", "SHADOWS", 0f, 0.5f),
+        SliderSpec("fx.white", "HIGHLIGHTS", 0.5f, 1f),
+    )
 
     /**
      * Basic sliders for every pack, then the sliders of each look the pack switches on (a flag "xyzOn" owns the numbers
@@ -54,7 +68,10 @@ object PackCatalog {
             val prefix = flag.key.removeSuffix("On")
             for (num in ParamSpec.numbers) {
                 if (num.key.length > prefix.length && num.key.startsWith(prefix) && num.key[prefix.length].isUpperCase()) {
-                    out.add(SliderSpec(num.key, num.key.substring(prefix.length), num.min, num.max, num.def))
+                    // the web studio's own name and range when it has one, else the setting's name
+                    val w = WebLabels.sliders[num.key]
+                    out.add(if (w != null) SliderSpec(num.key, w.label, w.min, w.max, w.percent)
+                            else SliderSpec(num.key, num.key.substring(prefix.length), num.min, num.max))
                 }
             }
         }

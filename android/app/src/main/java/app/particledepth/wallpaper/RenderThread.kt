@@ -126,6 +126,7 @@ class RenderThread(private val context: Context) {
             lastDrawNanos = 0L
             statStart = 0L; statFrames = 0; statCpuNs = 0L; statMaxCpuNs = 0L // a window must not straddle a hidden gap
             winStart = 0L; winFrames = 0; winLate = 0; prevDrawNanos = 0L
+            policy.setUserCap(AppSettings(context).fpsCap)
             (signals ?: SystemSignals(context, policy, handler).also { signals = it }).start()
             val t = tilt ?: TiltSensor(context).also { tilt = it }
             t.start(handler)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.particledepth.wallpaper.AppSettings
 import app.particledepth.wallpaper.ParticleWallpaperService
 import app.particledepth.wallpaper.SavedStore
 import app.particledepth.wallpaper.SavedWallpaper
@@ -57,6 +60,7 @@ import java.util.Locale
 private sealed interface Screen {
     data object Gallery : Screen
     data object Saved : Screen
+    data object Settings : Screen
     data class Customize(val packId: String, val start: Map<String, Float>) : Screen
 }
 
@@ -73,6 +77,7 @@ fun PdsApp() {
         when (val s = screen) {
             Screen.Gallery -> Gallery(packs) { screen = Screen.Customize(it.id, emptyMap()) }
             Screen.Saved -> SavedList(packs) { w -> screen = Screen.Customize(w.packId, w.overrides) }
+            Screen.Settings -> SettingsScreen()
             is Screen.Customize -> {
                 val info = packs.firstOrNull { it.id == s.packId }
                 if (info == null) BasicText("PACK NOT FOUND", Modifier.padding(Pds.Gutter), style = Pds.Label)
@@ -84,18 +89,49 @@ fun PdsApp() {
 
 @Composable
 private fun Header(screen: Screen, onTab: (Screen) -> Unit) {
-    Column(Modifier.padding(horizontal = Pds.Gutter, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(10.dp).background(Pds.Mark)) // the one green mark
-            BasicText("PARTICLE DEPTH", style = Pds.Title)
+    // One slim row: the mark and name on the left, the two tabs on the right (hidden while an effect is open)
+    Row(Modifier.fillMaxWidth().padding(horizontal = Pds.Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).background(Pds.Mark)) // the one green mark
+        Column(Modifier.padding(start = 8.dp).weight(1f)) {
+            BasicText("PARTICLE DEPTH", style = Pds.Title.copy(fontSize = 15.sp))
+            BasicText("BY SUMANTH REDDY", style = Pds.Label.copy(fontSize = 8.sp))
         }
-        Spacer(Modifier.height(4.dp))
-        BasicText("BY SUMANTH REDDY", style = Pds.Label)
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PdsButton("GALLERY", Modifier.weight(1f), active = screen !is Screen.Saved) { onTab(Screen.Gallery) }
-            PdsButton("SAVED", Modifier.weight(1f), active = screen is Screen.Saved) { onTab(Screen.Saved) }
+        if (screen !is Screen.Customize) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                PdsButton("GALLERY", active = screen is Screen.Gallery, height = 28.dp) { onTab(Screen.Gallery) }
+                PdsButton("SAVED", active = screen is Screen.Saved, height = 28.dp) { onTab(Screen.Saved) }
+                PdsButton("SETTINGS", active = screen is Screen.Settings, height = 28.dp) { onTab(Screen.Settings) }
+            }
         }
+    }
+}
+
+@Composable
+private fun SettingsScreen() {
+    val ctx = LocalContext.current
+    val settings = remember { AppSettings(ctx) }
+    var gyroOn by remember { mutableStateOf(settings.gyroOn) }
+    var range by remember { mutableStateOf(settings.gyroRange) }
+    var fps by remember { mutableStateOf(settings.fpsCap) }
+    var saver by remember { mutableStateOf(settings.saverRule) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Pds.Gutter)) {
+        SectionLabel("MOTION")
+        PdsToggle("GYRO TURN", gyroOn) { gyroOn = it; settings.gyroOn = it }
+        PdsSlider("GYRO RANGE", range, AppSettings.RANGE_MIN, AppSettings.RANGE_MAX, { range = it; settings.gyroRange = it })
+        BasicText("DEGREES OF PHONE ROTATION FOR THE FULL TURN. LOWER = MORE SENSITIVE.", style = Pds.Label.copy(fontSize = 8.sp))
+        SectionLabel("BATTERY")
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { BasicText("FRAME RATE LIMIT", style = Pds.Label) }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                PdsButton("30", active = fps == 30, height = 28.dp) { fps = 30; settings.fpsCap = 30 }
+                PdsButton("60", active = fps == 60, height = 28.dp) { fps = 60; settings.fpsCap = 60 }
+            }
+        }
+        PdsToggle("DRAW LESS ON BATTERY SAVER", saver) { saver = it; settings.saverRule = it }
+        BasicText("SAVER OR BATTERY BELOW 15% UNPLUGGED: NO TRAILS AND 30 FPS.", style = Pds.Label.copy(fontSize = 8.sp))
+        Spacer(Modifier.height(Pds.Gutter))
+        BasicText("CHANGES APPLY THE NEXT TIME THE WALLPAPER IS SHOWN.", style = Pds.Label)
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -144,8 +180,8 @@ private fun SavedList(packs: List<PackInfo>, onOpen: (SavedWallpaper) -> Unit) {
                     BasicText(w.name.uppercase(), style = Pds.LabelActive)
                     BasicText((pack?.config?.name ?: w.packId).uppercase(), style = Pds.Label)
                 }
-                PdsButton("OPEN", Modifier.padding(end = 6.dp)) { onOpen(w) }
-                PdsButton("DELETE", Modifier.padding(end = 6.dp)) { store.delete(w); items.remove(w) }
+                PdsButton("OPEN", Modifier.padding(end = 4.dp), height = 28.dp) { onOpen(w) }
+                PdsButton("DELETE", Modifier.padding(end = 6.dp), height = 28.dp) { store.delete(w); items.remove(w) }
             }
         }
     }
@@ -165,40 +201,44 @@ private fun Customize(info: PackInfo, start: Map<String, Float>, onBack: () -> U
         value = withContext(Dispatchers.Default) { runCatching { PackLoader.load(ctx, info.id, 60_000) }.getOrNull() }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Pds.Gutter)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PdsButton("BACK", onClick = onBack)
+    // The preview stays pinned at the top; only the controls below it scroll, so the picture is always in view
+    Column(Modifier.fillMaxSize().padding(horizontal = Pds.Gutter)) {
+        Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PdsButton("BACK", height = 28.dp, onClick = onBack)
             BasicText(info.config.name.uppercase(), Modifier.weight(1f), style = Pds.Heading)
         }
-        Spacer(Modifier.height(Pds.Gutter))
-        Box(Modifier.fillMaxWidth().aspectRatio(9f / 16f).border(1.dp, Pds.Line).background(Pds.Panel), contentAlignment = Alignment.Center) {
-            val l = loaded
-            if (l == null) BasicText("LOADING", style = Pds.Label)
-            else PreviewView(l, l.config.params.withOverrides(overrides.toMap()), Modifier.fillMaxSize())
-        }
-        SectionLabel("ADJUST")
-        for (s in sliders) {
-            PdsSlider(s.label, overrides[s.key] ?: info.config.params.n(s.key), s.min, s.max, { v -> overrides[s.key] = v })
-        }
-        Spacer(Modifier.height(Pds.Gutter))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PdsButton("RESET", Modifier.weight(1f)) { overrides.clear(); status = "" }
-            PdsButton("SAVE", Modifier.weight(1f)) {
-                val stamp = SimpleDateFormat("dd MMM HH:mm", Locale.US).format(Date())
-                store.save("${info.config.name} $stamp", info.id, overrides.toMap())
-                status = "SAVED"
+        Box(Modifier.fillMaxWidth().weight(0.44f), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxHeight().aspectRatio(9f / 16f).border(1.dp, Pds.Line).background(Pds.Panel), contentAlignment = Alignment.Center) {
+                val l = loaded
+                if (l == null) BasicText("LOADING", style = Pds.Label)
+                else PreviewView(l, l.config.params.withOverrides(overrides.toMap()), Modifier.fillMaxSize())
             }
         }
-        Spacer(Modifier.height(6.dp))
-        PdsButton("APPLY AS WALLPAPER", Modifier.fillMaxWidth(), active = true) {
-            selection.set(info.id, overrides.toMap())
-            status = if (isOurWallpaperActive(ctx)) "UPDATED" else { openWallpaperPicker(ctx); "CONFIRM IN THE SYSTEM PREVIEW" }
+        Column(Modifier.weight(0.56f).verticalScroll(rememberScrollState())) {
+            SectionLabel("ADJUST")
+            for (s in sliders) {
+                PdsSlider(s.label, overrides[s.key] ?: info.config.params.value(s.key), s.min, s.max, { v -> overrides[s.key] = v }, percent = s.percent)
+            }
+            Spacer(Modifier.height(Pds.Gutter))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PdsButton("RESET", Modifier.weight(1f)) { overrides.clear(); status = "" }
+                PdsButton("SAVE", Modifier.weight(1f)) {
+                    val stamp = SimpleDateFormat("dd MMM HH:mm", Locale.US).format(Date())
+                    store.save("${info.config.name} $stamp", info.id, overrides.toMap())
+                    status = "SAVED"
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            PdsButton("APPLY AS WALLPAPER", Modifier.fillMaxWidth(), active = true) {
+                selection.set(info.id, overrides.toMap())
+                status = if (isOurWallpaperActive(ctx)) "UPDATED" else { openWallpaperPicker(ctx); "CONFIRM IN THE SYSTEM PREVIEW" }
+            }
+            if (status.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                BasicText(status, style = Pds.Label)
+            }
+            Spacer(Modifier.height(24.dp))
         }
-        if (status.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            BasicText(status, style = Pds.Label)
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 

@@ -36,6 +36,7 @@ class QualityPolicy(
     private val banLength = FloatArray(6) { BAN_START_S }
     private var floorLevel = 0
     private var fpsCap = 60
+    private var userCap = 60                            // the user's own limit (settings)
     private var slowWindows = 0
     private var stableSeconds = 0f
 
@@ -44,7 +45,7 @@ class QualityPolicy(
 
     private fun make(level: Int): Quality {
         val s = ladder[level]
-        return Quality(level, minOf(s.fps, fpsCap), s.pointShare, s.trailShare, s.renderScale)
+        return Quality(level, minOf(s.fps, fpsCap, userCap), s.pointShare, s.trailShare, s.renderScale)
     }
 
     /** Called every WINDOW_S seconds of drawing with the frame rate achieved in that window. */
@@ -76,6 +77,13 @@ class QualityPolicy(
                 onStable(perfLevel) // holding this level and nothing better is allowed yet: remember it for the next start
             }
         }
+    }
+
+    /** The user's frame-rate limit from settings (30 or 60). */
+    fun setUserCap(fps: Int) {
+        if (fps == userCap) return
+        userCap = fps
+        apply("user limit $fps fps")
     }
 
     /** Power saver or low battery: no trails, 30 fps. */

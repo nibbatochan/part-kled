@@ -48,6 +48,12 @@ object SpikeConfig {
 
 
 
+    /**
+     * Trail line width in device pixels per density-independent pixel (dp). 0.6 gives about 1.6 px at 2.75 px per dp.
+     * The web build's 1 px line was too faint on a phone; chosen by feel on a realme X2 on 2026-11-07, not measured.
+     */
+    const val TRAIL_WIDTH = 0.6f
+
     /** Seconds between stats lines in logcat (tag PDS). */
     const val STATS_EVERY_S = 5
 }

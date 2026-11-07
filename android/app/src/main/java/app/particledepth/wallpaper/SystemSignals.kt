@@ -16,6 +16,7 @@ import android.os.PowerManager
 class SystemSignals(private val context: Context, private val policy: QualityPolicy, private val handler: Handler) {
     private val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private var registered = false
+    private val settings = AppSettings(context)
     private val thermalListener = PowerManager.OnThermalStatusChangedListener { status -> policy.setThermal(status) }
 
     private val receiver = object : BroadcastReceiver() {
@@ -53,6 +54,7 @@ class SystemSignals(private val context: Context, private val policy: QualityPol
         val pct = if (level >= 0) level * 100 / scale else 100
         val low = pct <= LOW_BATTERY_PCT && !plugged
         when {
+            !settings.saverRule -> policy.setSaver(false, "saver rule off in settings")
             pm.isPowerSaveMode -> policy.setSaver(true, "power saver on")
             low -> policy.setSaver(true, "battery $pct%")
             else -> policy.setSaver(false, "no power constraint")

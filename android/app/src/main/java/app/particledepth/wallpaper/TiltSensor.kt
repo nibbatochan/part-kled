@@ -50,12 +50,15 @@ class TiltSensor(private val context: Context) : SensorEventListener {
     private val tmp = FloatArray(9)
     private val vec = FloatArray(4)
     private val d = FloatArray(9)
-    private val fullRad = Math.toRadians(SpikeConfig.TILT_FULL_DEG.toDouble()).toFloat()
+    private val settings = AppSettings(context)
+    private var fullRad = Math.toRadians(SpikeConfig.TILT_FULL_DEG.toDouble()).toFloat()
 
     fun start(handler: Handler) {
         haveRest = false
         x = 0f
         y = 0f
+        if (!settings.gyroOn) return // off: no sensor registered, no battery cost, the picture stays centred
+        fullRad = Math.toRadians(settings.gyroRange.toDouble()).toFloat()
         // One sample per rendered frame; more is wasted battery. Events go to the render thread, not the main thread.
         sensor?.let { sm.registerListener(this, it, 1_000_000 / SpikeConfig.TARGET_FPS, handler) }
     }

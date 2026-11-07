@@ -16,6 +16,13 @@ class PackParams(val num: Map<String, Float>, val flags: Map<String, Boolean>, v
     fun fx(key: String): Float = num["fx.$key"] ?: ParamSpec.fx.first { it.key == key }.def
     fun emit(key: String): Float = num["emit.$key"] ?: ParamSpec.emit.first { it.key == key }.def
 
+    /** Any slider key: a top-level number, or "fx.name" / "emit.name" for the nested groups. */
+    fun value(key: String): Float = when {
+        key.startsWith("fx.") -> fx(key.substring(3))
+        key.startsWith("emit.") -> emit(key.substring(5))
+        else -> n(key)
+    }
+
     /**
      * A copy with the user's changes on top. Unknown keys are dropped and numbers are clamped to their range, the same
      * rule as the pack file, so a stored or hostile override cannot push a value outside what the shader expects.
@@ -24,7 +31,11 @@ class PackParams(val num: Map<String, Float>, val flags: Map<String, Boolean>, v
         if (over.isEmpty() && overFlags.isEmpty()) return this
         val n = HashMap(num)
         for ((k, v) in over) {
-            val spec = ParamSpec.num(k) ?: continue
+            val spec = when {
+                k.startsWith("fx.") -> ParamSpec.fx.firstOrNull { it.key == k.substring(3) }
+                k.startsWith("emit.") -> ParamSpec.emit.firstOrNull { it.key == k.substring(5) }
+                else -> ParamSpec.num(k)
+            } ?: continue
             if (v.isNaN() || v.isInfinite()) continue
             n[k] = v.coerceIn(spec.min, spec.max)
         }
