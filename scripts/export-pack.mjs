@@ -9,8 +9,12 @@
 //        --set glassGreenOn=true --set depth=0.3 --lite brightness=1.15 [--out dir] [--author "Name"]
 //   --set  path=json   a studio setting, dotted path into core/params.ts Params (glassGreen.gloss=0.5)
 //   --lite key=json    a renderer setting written as is, after the studio mapping (light=[0.95,0.9,0.79])
+//   --zip file.pdspack write the pack as one zip file for the phone's IMPORT button (3 files, stored, under 5 MB)
+//   --max-side N       shrink both pictures so the long side is at most N px (the phone samples at most 768); also accepts JPEG input
 // Output: <out>/<id>/pack.json, subject.png, depth.png (PNG only, the format the loader checks).
 import { build } from 'esbuild';
+import sharp from 'sharp';
+import { zipSync } from 'fflate';
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -97,20 +101,30 @@ const notDrawn = skipped.filter((k) => unsupported.has(k));
 const unknown = skipped.filter((k) => !unsupported.has(k));
 
 // ---- assets ----
-function pngInfo(file) {
-  const b = readFileSync(file);
-  if (b.length < 24 || b.readUInt32BE(0) !== 0x89504e47) throw new Error(`${file} is not a PNG`);
-  return { bytes: b, w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+// Always re-encoded as PNG. With --max-side both pictures shrink by the same factor (the depth map must stay aligned).
+async function loadPng(file, scaleTo) {
+  let img = sharp(resolve(file));
+  const meta = await img.metadata();
+  const k = scaleTo ? Math.min(1, scaleTo / Math.max(meta.width, meta.height)) : 1;
+  if (k < 1) img = img.resize(Math.round(meta.width * k), Math.round(meta.height * k), { kernel: 'lanczos3' });
+  const { data, info } = await img.png({ compressionLevel: 9 }).toBuffer({ resolveWithObject: true });
+  return { bytes: data, w: info.width, h: info.height };
 }
-const subject = pngInfo(resolve(opt.image));
-const depth = pngInfo(resolve(opt.depth));
+const maxSide = opt['max-side'] ? Number(opt['max-side']) : 0;
+const subject = await loadPng(opt.image, maxSide);
+const depth = await loadPng(opt.depth, 0);
+// the depth map follows the picture's size, whatever its own was
+if (depth.w !== subject.w || depth.h !== subject.h) {
+  const d = await sharp(depth.bytes).resize(subject.w, subject.h, { kernel: 'lanczos3' }).png({ compressionLevel: 9 }).toBuffer({ resolveWithObject: true });
+  depth.bytes = d.data; depth.w = d.info.width; depth.h = d.info.height;
+}
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
 const outDir = join(outRoot, opt.id);
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
-copyFileSync(resolve(opt.image), join(outDir, 'subject.png'));
-copyFileSync(resolve(opt.depth), join(outDir, 'depth.png'));
+writeFileSync(join(outDir, 'subject.png'), subject.bytes);
+writeFileSync(join(outDir, 'depth.png'), depth.bytes);
 
 const pack = {
   schema: 'pds.effect/1',
@@ -128,6 +142,18 @@ const json = JSON.stringify(pack, null, 2) + '\n';
 if (Buffer.byteLength(json) > 64 * 1024) throw new Error('pack.json would be larger than 64 KB');
 writeFileSync(join(outDir, 'pack.json'), json);
 
+if (opt.zip) {
+  // PNGs are already compressed, so store them (level 0). The phone reads exactly these three names.
+  const files = {
+    'pack.json': [new TextEncoder().encode(json), { level: 0 }],
+    'subject.png': [new Uint8Array(subject.bytes), { level: 0 }],
+    'depth.png': [new Uint8Array(depth.bytes), { level: 0 }],
+  };
+  const zipped = zipSync(files);
+  if (zipped.length > 5 * 1024 * 1024) throw new Error(`the pack is ${(zipped.length / 1048576).toFixed(1)} MB; the phone accepts at most 5 MB. Try a smaller --max-side.`);
+  writeFileSync(resolve(opt.zip), zipped);
+  console.log(`wrote ${resolve(opt.zip)} (${(zipped.length / 1024).toFixed(0)} KB)`);
+}
 console.log(`wrote ${outDir}`);
 console.log(`  ${Object.keys(params).length} settings, ${Buffer.byteLength(json)} bytes, subject ${subject.w}x${subject.h}`);
 if (notDrawn.length) console.log(`  not drawn by the phone yet (left out): ${notDrawn.join(', ')}`);

@@ -74,9 +74,37 @@ Warnings go to logcat, tag `PDS`, one line each. They never stop the wallpaper.
 
 No value from the config is ever placed in shader source. Values reach the GPU only as uniforms.
 
+## Add a photo, or import a pack, on the phone
+
+**ADD PHOTO** (gallery) takes a picture from the phone's gallery (pictures only), shrinks it to 768 px, estimates a rough depth map on the phone and stores it as a plain-dots effect (a normal pack in the app's private storage). Use the LOOK row on its customise screen to restyle it. The depth is a guess, not the web studio's depth model.
+
+**IMPORT PACK** takes a `.pdspack` from the exporter, described next.
+
+### `.pdspack` import
+
+A `.pdspack` is a zip with exactly three files: `pack.json` and the two pictures it names. Make one with the exporter:
+
+```bash
+node scripts/export-pack.mjs --id my-photo --name "My photo" --image photo.png --depth photo-depth.png   --max-side 768 --set glassGreenOn=true --zip my-photo.pdspack
+```
+
+The depth map comes from the web studio's depth model (or any grey depth PNG). Copy the file to the phone and tap **IMPORT** in the gallery. Imported effects are marked with `*`, can be deleted from their customise screen, and are stored in the app's private storage (at most 30).
+
+The importer checks the archive before writing anything, then loads the pack exactly like a built-in one:
+
+| Check | Rule |
+|---|---|
+| Entries | At most 3, flat, plain file names; no folders, no `..`, no repeats; exactly `pack.json` plus the two files the config names |
+| Sizes | `pack.json` 64 KB, each picture 2 MB, 5 MB read in total (a zip bomb is stopped at the cap, not inflated) |
+| Config, hashes, pixels | The same checks as a built-in pack (schema, ranges, SHA-256 of both pictures, 2048 x 2048 pixel cap, decodable) |
+| Id | Must not be the id of a built-in effect; the folder name must match `id` |
+| Failure | Nothing is kept: the temporary folder is removed and the previous wallpaper stays |
+
+Tested on a realme X2 (2026-11-08): a good pack imports and gets a thumbnail; a tampered picture, a built-in id and a `../` entry are each refused with a clear message. 12 JVM tests attack the archive reader (`PackArchiveTest`).
+
 ## Not in format 1
 
-Pack download and signing (phase 4 in `docs/ANDROID_SCOPE.md`), packs read from app storage instead of assets, animated or video sources, per-device tier tables.
+Pack download and signing (phase 4 in `docs/ANDROID_SCOPE.md`), animated or video sources, per-device tier tables.
 
 ## Tests
 

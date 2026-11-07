@@ -2,7 +2,7 @@
 
 Single source of truth for the Android wallpaper build. Update the tracker and the change log whenever something moves. Research behind every decision: `docs/RESEARCH_ANDROID_LIVE_WALLPAPER.md` (cited below as "R", with section letters).
 
-Created: 2026-11-06. Branch: `master-web`. Status: **not started** (research done, no code written).
+Created: 2026-11-06. Branch: `master-web`. Status (2026-11-08): phases 0 and 1 done on one device, phase 2 mostly done, phase 3 first full version working on the phone, phase 4 started (19 packs, photo and pack import), phase 5 started (release build, accessibility). Not done: battery and heat measurement, a second device, post-processing looks, on-device neural depth, signing and the store listing.
 
 Evidence labels used here, same as R: DOCUMENTED (official page), ESTIMATE (reasoned, not measured), PROPOSED (our target, to be tested), UNVERIFIED (not confirmed), TESTED (measured on a device; none yet).
 
@@ -108,6 +108,7 @@ Progress (2026-11-07):
 - [x] Phase 3 feedback round 2 (2026-11-07): the preview scrolled away with the sliders, so the picture was out of view while adjusting. The customise screen now pins the preview at the top (44% of the height, 9:16) and only the controls below it scroll. Header made one slim row (name left, tabs right, tabs hidden while an effect is open); buttons shortened (34 dp, tabs and list buttons 28 dp). Builds, 30 unit tests pass, installed; **not yet seen by the user**.
 - [x] Phase 3 round 2 confirmed by the user ("all work"): pinned preview, slim header, shorter buttons, web slider names, visible trails.
 - [x] Settings screen (2026-11-07): third tab SETTINGS with GYRO TURN on/off (off = sensor never registered), GYRO RANGE 12 to 45 degrees, FRAME RATE LIMIT 30 or 60, and DRAW LESS ON BATTERY SAVER on/off. `AppSettings.kt`; the wallpaper reads them each time it becomes visible. Builds, 30 unit tests pass, installed; **not yet used by the user**.
+- [x] Preview overlay and rename (2026-11-07): the customise screen has a VIEW button that cycles OFF, HOME, LOCK and draws outlines only (status bar, app squares and dock, or a large clock with the date and the two corner shortcuts) over the preview, to judge how the picture sits behind real screen content; saved wallpapers can be renamed. Builds, tests pass, installed; **not yet seen by the user**.
 - [ ] Not drawn yet (skipped with a warning): SHAKE-MASK and SOFTWORD (glyph atlas), glow/bloom/halo/VHS/glitch/grain/holo/duotone/cloud/mesh/stack/bit (Post chain), cell looks (`style` above 0), music, motion, touch.
 - [ ] Sampler port (faithful importance weights) with golden tests; pack download and signing (phase 4); gyro polish.
 
@@ -128,12 +129,25 @@ Status 2026-11-07: first version written and builds; **untested on a device**. O
 Done when: end-to-end journey works on 6 devices; beta users can apply and revert.
 
 ### Phase 4: Effect library (about 6 weeks, rolling)
+Status 2026-11-07: started. **19 packs** (Fur and Chrome removed after the user's review; Chrome looked poor on sample 8 and the user chose to drop it rather than retry on sample 1) built by `scripts/build-packs.mjs` (one row per effect; pictures shrunk to 768 px with `--max-side`, JPEG input accepted, PNG output): Plain dots, Glass Green, Candy, Shake Mask, Chrome, Ecstasy, Chroma 2, C-ABR, Blood, Prismatic, Blight, Convulsions, Blend, Aura, Redmet, Lined, Softword, Rock, Arancia, Cumulus (Chrome dropped). Pack folder total 9.2 MB; debug APK 25 MB. Tests: every pack validates with zero warnings and builds its sliders (30 unit tests pass). User review of the gallery (2026-11-07): Chrome looked poor and Fur was not a good effect; both handled. The other looks were not flagged. To compare a look with the web studio, `scratch/shot-look.mjs <category> <styleId> <slots>` renders it headless (scratch, untracked).
+Not started: signing, pack download or import from storage, per-pack GPU cost check, more filters (each needs GLSL + spec entry).
 - [ ] Web exporter for packs (`.pdspack`), signing.
 - [ ] 10 to 15 packs; more filters (each needs GLSL + mapper + golden test).
 - [ ] Per-pack performance budget check.
 Done when: every pack passes its tier budget; invalid packs are rejected in tests.
 
 ### Phase 5: Production readiness (4 to 6 weeks)
+Status 2026-11-07: started with the build side only.
+- [x] Release build: R8 shrinking and resource shrinking on (`isMinifyEnabled`, `isShrinkResources`, `proguard-rules.pro`), no signing key in the repo. Signs from environment variables `PDS_KEYSTORE`, `PDS_KEYSTORE_PASSWORD`, `PDS_KEY_ALIAS`, `PDS_KEY_PASSWORD`; without them `./gradlew assembleRelease` makes `app-release-unsigned.apk`. Result: **10.3 MB** (debug is 25 MB). Signed with the local debug key for a test only, installed over the debug build and launched on the realme X2 with no crash. The wallpaper itself (service, GL, packs) was **not** exercised in the release build yet.
+- [x] FAITHFUL / SUBTLE / EXPRESSIVE presets for Glass Green, Candy and C-ABR (the three looks the web studio gives presets), copied into `ui/Presets.kt`; `PresetsTest` reads the web `src/core/styles.ts` and fails on drift. 33 unit tests pass.
+- [x] Release build confirmed by the user ("works", 2026-11-07).
+- [x] Accessibility first pass: buttons have the Button role and a selected state, sliders expose their range and accept TalkBack's swipe to change (`setProgress`), gallery cards have a name description. Reduced motion: when Android's remove-animations setting is on (and the new setting STILL WHEN SYSTEM REDUCES MOTION is on, default on) the particle clock holds still, so no drift, trails or sway, while the turn with the phone still works. Builds, 33 tests pass, installed; **not tested with TalkBack or the system setting**.
+- [x] Gallery thumbnails are now the real effect (2026-11-07): `ui/ThumbMaker.kt` draws each pack offscreen (EGL pbuffer, 270 x 480, 50,000 particles, about 1.5 s of motion) with the wallpaper's own renderer, caches the PNG under a name that includes a hash of `pack.json`, and the gallery swaps the source picture for it when ready. All 19 packs rendered on the realme X2 in under 40 s with no error. **Side effect: the thumbnails can be pulled over adb for visual review without unlocking the phone** (`adb exec-out run-as app.particledepth.wallpaper cat cache/thumbs/<file>`). First visual review (by me, contact sheet): glass-green, candy, c-abr, chroma-2, ecstasy, blood, redmet, lined, softword, shake-mask, prismatic and plain dots look right; aura reads as a flat white bust (glow not obvious); arancia, cumulus and rock sit on the small square sample 3 and look small and abstract; blend, blight and convulsions look plain. Not yet judged by the user.
+- [x] Pack picture review round (2026-11-07, from the phone's own thumbnails): Arancia and Cumulus moved to sample 7 (orange and white, much better than the small abstract sample 3); Rock moved to the bust, sample 10 (reads as dark stone); Aura moved to sample 9 with stronger settings (shows a white rim light; the glow stays subtle). `scripts/build-packs.mjs` now accepts JPEG sources. 33 tests pass.
+- [x] Pack import (2026-11-08): `.pdspack` zip import from the file picker (`pack/PackSource.kt`, `pack/PackImporter.kt`, IMPORT button, imported effects marked `*` and deletable), exporter `--zip`. Hardened reader (3 flat entries, size caps, zip-bomb cap, hash and pixel checks, built-in ids protected). 45 unit tests pass. Verified on the realme X2 through a debug-only test hook: a good pack imported and got a thumbnail; a tampered picture, a built-in id and a path entry were each refused. **The IMPORT button and the system file picker were not tapped by a person yet.** This is the route for the user's own photos: process them in the web studio (depth), export a pack, import on the phone. On-device depth from a photo is still not built.
+- [x] Photo import and look picker (2026-11-08, after the user's report that IMPORT on a gallery photo said "archive has no pack.json" and also offered videos; IMPORT had been written for `.pdspack` zip files, not photos): the gallery now has **ADD PHOTO** (system picker restricted to `image/*`, so no videos) and **IMPORT PACK** (zip files). A photo is decoded and shrunk to 768 px (`PhotoImporter`, EXIF rotation applied), a rough depth map is estimated on the phone (`DepthGuess`: flat-background cut-out or distance from the border colour, blurred, blended with a centre weight; **approximate, no neural network**), and it is stored as a plain-dots effect, then the app opens its customise screen. New **LOOK** row on every customise screen switches between 18 looks and PLAIN (look switches are stored as `flag:` overrides, so they save, restore and apply to the running wallpaper); the slider list follows the chosen look. Checked on the realme X2 through the debug hook: a real photo imported (its depth map shows a soft figure against a light backdrop, which is the intended quality), a non-picture was refused with a clear message. 49 unit tests pass. **Not tapped by a person yet**: ADD PHOTO, the gallery picker, the LOOK row. Limits: the depth is a guess, so busy photos get a weaker depth than the web studio's model would give; an on-device neural depth model (about 25 to 100 MB plus a runtime) is the upgrade and needs a decision.
+- [ ] Not started: a real signing key and Play App Signing, 8 h and 24 h soak, battery and thermal acceptance, other devices, crash reporting, accessibility (reduced motion, TalkBack labels, contrast), store listing and policy check, privacy statement (the app collects nothing and has no network permission).
+
 - [ ] 8 h and 24 h soak on the device matrix; OEM matrix.
 - [ ] Battery and thermal acceptance (R section H.5, PROPOSED targets).
 - [ ] Android vitals, crash reporting, reduced-motion handling.
@@ -148,10 +162,10 @@ Update this table, not the phase text above, when progress changes.
 |---|---|---|---|---|---|
 | 0 Prep | done except devices | 2026-11-06 | 2026-11-06 | test devices (Q1) | Project builds, shader export works. Not committed yet. |
 | 1 Spike | running on 1 device, not complete | 2026-11-06 | | needs more devices, battery and thermal runs | Works on realme X2 (Android 11, Adreno 618): renders, gyro tilts, visibility pauses. Go/no-go not written. |
-| 2 Native render | not started | | | needs P1 | |
-| 3 App UI | not started | | | needs P2 | |
-| 4 Library | not started | | | needs P3 | |
-| 5 Production | not started | | | needs P4 | |
+| 2 Native render | mostly done | 2026-11-07 | | post-processing looks, SHAKE-MASK/SOFTWORD checked only by thumbnail | Cache, ladder, render scale, sampler port, packs, all done and tested on the phone |
+| 3 App UI | first version working | 2026-11-07 | | user testing of the newest screens | Gallery, customise, saved, settings, overlay, presets, look picker, photo import |
+| 4 Library | started | 2026-11-07 | | signing, download | 19 packs, `.pdspack` import |
+| 5 Production | started | 2026-11-07 | | devices, soak, store | Release build 10.3 MB, accessibility first pass |
 
 Status values: not started, in progress, blocked, done.
 
@@ -196,6 +210,8 @@ Findings that change the plan:
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Photo import (ADD PHOTO, pictures only, estimated depth), IMPORT PACK for `.pdspack`, LOOK picker; fixes after the user's report that IMPORT rejected a gallery photo. Three commits so far on `master-web`: `0e57062`, `b6bc45c`, `846532f`; a fourth closes this session. |
+| 2026-11-07 | Phases 0 to 2 run on the realme X2; phase 3 UI written and refined over four feedback rounds; phase 4 started; phase 5 started. Details in the phase sections above. |
 | 2026-11-06 | File created. Research complete. Gyro tilt added to scope on user request. |
 | 2026-11-06 | Phase 1 code written (service, EGL14 thread, renderer, simplified sampler, gyro). Builds; not run on any device. Known phase 2 items: keep the GL context across surface recreate, cache the program binary, `postDelayed` pacing instead of waking every vsync, leaky recentre for gyro, real sampler port. |
 | 2026-11-06 | Phase 0 built: `android/` project, `scripts/export-shaders.mjs`, spike pack. Debug APK builds. Observed: `point.vert.glsl` is 77 KB, so shader compile time on mobile GPUs is the first thing to probe in phase 1 (risk R5). |

@@ -24,6 +24,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -35,7 +42,8 @@ fun PdsButton(text: String, modifier: Modifier = Modifier, active: Boolean = fal
             .height(height) // the web studio's command button is 30 css px; 34 dp keeps a usable touch target on a phone
             .border(1.dp, if (active) Pds.LineStrong else Pds.Line)
             .background(if (active) Pds.InkFaint else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable(onClick = onClick)
+            .semantics { selected = active } // a screen reader says "selected" for the active tab or switch
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -57,6 +65,12 @@ fun PdsSlider(label: String, value: Float, min: Float, max: Float, onChange: (Fl
             Modifier
                 .weight(1f)
                 .height(28.dp) // generous vertical touch area around a 14 dp thumb
+                .semantics {
+                    // TalkBack: "label, 40 percent", and swipe up or down to change it
+                    contentDescription = label
+                    progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(min, max), min..max)
+                    setProgress { v -> onChange(v.coerceIn(min, max)); true }
+                }
                 .pointerInput(min, max) {
                     detectTapGestures { o -> onChange(min + (max - min) * (o.x / size.width).coerceIn(0f, 1f)) }
                 }

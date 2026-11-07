@@ -30,8 +30,10 @@ class PackConfigTest {
 
     // ---- golden: the real exporter output must load with no warnings ----
 
-    @Test fun exporterOutputLoadsWithoutWarnings() {
-        for (id in listOf("spike", "glass-green")) {
+    @Test fun everyBuiltInPackLoadsWithoutWarnings() {
+        val ids = File("src/main/assets/packs").listFiles { f -> f.isDirectory }!!.map { it.name }.sorted()
+        assertTrue("expected the built-in packs, found $ids", ids.size >= 15)
+        for (id in ids) {
             val f = File("src/main/assets/packs/$id/pack.json")
             assertTrue("run `node scripts/export-pack.mjs` first: ${f.absolutePath}", f.exists())
             val c = PackConfigParser.parse(f.readText())

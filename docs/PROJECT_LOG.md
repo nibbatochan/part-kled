@@ -18,10 +18,12 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
-### 2026-11-06: Android live wallpaper research and scope
-- Research in `docs/RESEARCH_ANDROID_LIVE_WALLPAPER.md`; phased plan and tracker in `docs/ANDROID_SCOPE.md`. Gyro tilt replaces hover tilt on Android.
-- Decision: native Kotlin GLES 3.0 renderer porting `src/lite/`, web studio stays the editor, no WebView in the wallpaper.
-- Evidence: research only, nothing built or tested on a device.
+### 2026-11-06 to 2026-11-08: Android live wallpaper app, built and tested on a phone
+- What changed: a native Android app in `android/` (Kotlin, EGL14 and GLES 3.0) that draws the web studio's own shaders as a live wallpaper, with gyro tilt in place of the hover tilt, an adaptive quality ladder, a pack format for effects (`docs/PACK_FORMAT.md`), a Compose app built from the web design system, 19 effect packs, photo import and pack import. Plan, tracker, measurements and every decision: `docs/ANDROID_SCOPE.md`. Research behind it: `docs/RESEARCH_ANDROID_LIVE_WALLPAPER.md`.
+- Why: the same render, kept as a phone wallpaper, with the web studio staying the editor.
+- Decisions: native renderer porting `src/lite/` (no WebView); one shader source (exported from `src/lite/shaders.ts`); effects are data (packs carry the web renderer's own setting names, produced by the web `toLiteParams`, so nothing is re-implemented in Kotlin); packs are validated like untrusted input.
+- Evidence (realme X2, Android 11, Adreno 618): steady 60 fps, about 1.5 ms CPU per frame; shader start 2,966 ms down to 26 ms with a program binary cache; release APK 10.3 MB; 49 JVM unit tests. Not measured: battery, heat, GPU time, a second device.
+- Portfolio note: the phone's own offscreen thumbnails made it possible to review every effect without touching the screen; the sampler was ported to Kotlin and checked against the web sampler number for number.
 
 ### 2026-11-02: C-ABR filter (GLASS category)
 - New category GLASS in LOOK_CATEGORIES. Filter on the dots, slot 42: dark smoked obsidian glass with prismatic chromatic aberration caustics and slick high-gloss specular reflections derived from the classical bust paired reference. Curvature and depth gradients tilt dots into surface normals; wavelength-dependent refractive dispersion splits internal transmission along slopes and draped folds into vivid spectral rainbow bands (cyan, amber, magenta, cobalt), while razor-sharp specular crests and dual-tinted Fresnel rim lighting catch curved ridges. Controls: DISPERSION, GLOSS, RIM with presets (FAITHFUL, SUBTLE, EXPRESSIVE).
@@ -162,6 +164,12 @@ Each item: the decision, why, what was rejected, and what it cost.
 - Sliders share one style across the studio, the export dialog and the emitters.
 - Research is delegated to background agents and written to `docs/` with sources and "unverified" marks, so decisions can be traced.
 
+### 4.10 Android: effects as validated data, one shader source
+- **Decision.** The phone app reads effects as packs (config, picture, depth map). The config uses the web renderer's own `LiteParams` names and is produced by the web `toLiteParams`, so there is no second mapping to keep in step. Shaders are exported from `src/lite/shaders.ts` by a script.
+- **Why.** New effects must not need a new app build, and the web and phone looks must not drift. The research rejected a WebView in a wallpaper (no official support) and a hybrid with a separate renderer per platform.
+- **Rejected.** Porting `src/core/` (needs float render targets); porting the studio-to-renderer mapping to Kotlin (a second copy to maintain); effects with their own shader code (Play policy on downloaded code is unclear).
+- **Cost.** About 2,100 lines of TypeScript glue had to be rewritten in Kotlin; golden tests (sampler, presets, pack files) guard the drift.
+
 ## 5. Problems met and how they were solved
 
 | Problem | Cause | Fix |
@@ -174,6 +182,13 @@ Each item: the decision, why, what was rejected, and what it cost.
 | Exported trails fainter at 4K | 1 px lines against scaled dots | Width-scaled quads, measured within 3% |
 | Loop frame 0 and last frame differed by a few pixels | Float rounding in the streamer phase | `fract(fract(t / T * n) + r)` so t = T is exact |
 | Export files showed whole-file diffs | A patch script wrote Windows line endings | Normalized to LF before committing |
+| Android wallpaper crashed on start | `setFixedSize` is refused in a wallpaper ("only support sizing from layout") | Render scale through an offscreen target and a blit |
+| Android stutter every minute | The quality ladder retried trails after each climb, ran at 46 fps with 53 late frames, then stepped down | Late frames count as slow; a failed level is banned for 5 minutes, doubling; last stable level is remembered |
+| Android trails nearly invisible | The web draws 1 device-pixel lines; a phone has about 3 px per dp | Trail width scales with screen density |
+| Android "colour" slider seemed dead | It was `pSat`, which only affects drifting particles and trails | Named PARTICLE COLOUR like the web; trails made visible |
+| Android first draft used its own slider words | Labels written from memory | Names and ranges generated from `index.html`; a test fails if the old words return |
+| IMPORT said "archive has no pack.json" on a photo | The button was built for `.pdspack` zip files, not photos | ADD PHOTO (pictures only, depth estimated on the phone) and IMPORT PACK are separate buttons |
+| Chrome pack looked like noise | Wrong picture for that look | Dropped by the user after review; other packs re-paired by looking at the phone's own thumbnails |
 
 ## 6. Numbers that are safe to quote
 
@@ -183,7 +198,8 @@ Each item: the decision, why, what was rejected, and what it cost.
 - Export trail brightness within about 3% of the viewport at 480p, 720p, 1080p and 4K (measured).
 - Mean brightness match between the two renderers: 10.1 against 10.5 (measured).
 - Seven particle looks, six of them cell looks with 2 to 4 settings each; ratios from phone to ultrawide; sizes 480p to 4K.
-- Unit tests: 21 passing at the last full run.
+- Unit tests: 21 passing at the last full run (web). Android: 49 passing (JVM).
+- Android (realme X2, Android 11, Adreno 618; measured): 60 fps steady with 100,000 particles and trails at full quality; shader compile 2,966 ms on first start and 26 ms from the cache; release APK 10.3 MB; 19 effect packs, 9 MB. Not measured: battery, heat, GPU time.
 
 ## 7. What to say in a portfolio write-up
 
@@ -212,6 +228,7 @@ Each item: the decision, why, what was rejected, and what it cost.
 - Sidebar Phase 3 (look thumbnails, emitter region map, changed-from-default dots, per-group reset); see `docs/RESEARCH_SIDEBAR_UX.md`.
 - Scanner clean-up: drive the scan from image brightness, move burst out of the scanner into a "tap burst" toggle on the hover row.
 - Atkinson dither, shape-matching ASCII, Braille and LED looks.
+- Android: battery and heat runs (1, 4, 8, 24 hours), a second device, post-processing looks (glow, bloom, VHS), an on-device depth model for photos, signing and Play listing. See `docs/ANDROID_SCOPE.md`.
 - Timeline editing for video clips (see `docs/RESEARCH_VIDEO_TIMELINE_EXPORT.md`).
 - Testing in Firefox and Safari; performance checks on low-end devices.
 

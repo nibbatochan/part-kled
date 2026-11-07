@@ -73,6 +73,15 @@ class SavedStore(ctx: Context) {
 
     fun delete(w: SavedWallpaper) { w.file.delete() }
 
+    /** Rewrite the file with a new name; returns the updated entry. */
+    fun rename(w: SavedWallpaper, name: String): SavedWallpaper {
+        val clean = name.trim().take(40).ifEmpty { w.name }
+        val json = JSONObject().put("name", clean).put("pack", w.packId).put("created", w.created)
+            .put("overrides", JSONObject(Selection.encode(w.overrides)))
+        w.file.writeText(json.toString())
+        return SavedWallpaper(w.file, clean, w.packId, w.overrides, w.created)
+    }
+
     private fun read(f: File): SavedWallpaper? = try {
         if (f.length() > 32 * 1024) null else {
             val o = JSONObject(f.readText())

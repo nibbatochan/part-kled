@@ -7,15 +7,15 @@
   "assets": {
     "subject": {
       "file": "subject.png",
-      "sha256": "270cc833e26e03e4a8831212a5abd50cb8ee78a9c11530667cdc9e1dd6e2033e",
-      "w": 1125,
-      "h": 2000
+      "sha256": "ca2ba7a22e554c9a21e022a8c925665483cf2c8d86c001b834c9ef8782bbe0d1",
+      "w": 432,
+      "h": 768
     },
     "depth": {
       "file": "depth.png",
-      "sha256": "25418bf681679947424ccd4c332705b3360f97f23f4d693afa9842ea2c51ffbb",
-      "w": 1125,
-      "h": 2000
+      "sha256": "f0d20b4db47172a9c5c16cb2f6f90e931c4c6e37c2b86c3214868dc248f8a61b",
+      "w": 432,
+      "h": 768
     }
   },
   "params": {
@@ -56,10 +56,10 @@
     "ecstasyDepth": 0.5,
     "ecstasyGlow": 0.5,
     "ecstasyCore": 0.5,
-    "blightSpread": 0.5,
-    "blightGrain": 0.5,
-    "blightInk": 0.5,
-    "blightHaze": 0.5,
+    "blightSpread": 0,
+    "blightGrain": 0.36,
+    "blightInk": 0.15,
+    "blightHaze": 0.31,
     "redmetHeat": 0.7,
     "redmetRim": 0.6,
     "redmetBevel": 0.5,
@@ -89,7 +89,7 @@
     "cumulusSoft": 0.5,
     "blendAmount": 0.6,
     "blendWarm": 0.4,
-    "blendSoft": 0.5,
+    "blendSoft": 0,
     "glassGreenGloss": 0.85,
     "glassGreenRim": 0.9,
     "glassGreenDepth": 0.7,

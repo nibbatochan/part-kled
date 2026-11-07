@@ -29,6 +29,15 @@ class AppSettings(ctx: Context) {
         get() = prefs.getBoolean("saverRule", true)
         set(v) = prefs.edit().putBoolean("saverRule", v).apply()
 
+    /** Hold the particle clock still while the system's "remove animations" setting is on. */
+    var followReduceMotion: Boolean
+        get() = prefs.getBoolean("followReduceMotion", true)
+        set(v) = prefs.edit().putBoolean("followReduceMotion", v).apply()
+
+    /** True when the picture should be still: the setting follows the system and the system asks for no animation. */
+    fun reduceMotionNow(ctx: Context): Boolean = followReduceMotion &&
+        android.provider.Settings.Global.getFloat(ctx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+
     companion object {
         const val RANGE_MIN = 12f
         const val RANGE_MAX = 45f

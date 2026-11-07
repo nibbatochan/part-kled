@@ -40,6 +40,9 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
     private var density = 1f
 
     private var time = 0f
+
+    /** 0 holds the particle clock (no drift, trails or sway) for reduced motion; the turn with the phone still works. */
+    @Volatile var motionScale = 1f
     private var lookX = 0f
     private var lookY = 0f
 
@@ -133,7 +136,7 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
     fun draw(dtSec: Float, tiltX: Float, tiltY: Float, q: QualityPolicy.Quality) {
         val drawn = max(1000, (sample.count * q.pointShare).toInt())
         val dt = max(0f, min(dtSec, 0.05f))
-        time += dt
+        time += dt * motionScale
         // PAN: as LiteEngine.frame(): ease toward target * pan * (0.9, 0.5)
         val k = 1f - exp(-dt * SpikeConfig.TILT_EASE)
         val pan = pp.n("pan")

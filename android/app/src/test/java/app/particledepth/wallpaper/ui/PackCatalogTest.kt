@@ -1,5 +1,6 @@
 package app.particledepth.wallpaper.ui
 
+import app.particledepth.wallpaper.Selection
 import app.particledepth.wallpaper.pack.PackConfigParser
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -43,5 +44,34 @@ class PackCatalogTest {
         val p = c.params.withOverrides(mapOf("fx.saturation" to 9f, "pSat" to 1.7f))
         assertEquals(2f, p.fx("saturation"), 0f) // clamped to its range
         assertEquals(1.7f, p.n("pSat"), 0f)
+    }
+
+    @Test fun chooseALookSwitchesItOnAndTheOthersOff() {
+        val c = PackConfigParser.parse(File("src/main/assets/packs/spike/pack.json").readText())
+        val glass = c.params.withOverrides(Looks.choose("glassGreenOn"))
+        assertTrue(glass.on("glassGreenOn"))
+        assertTrue(Looks.all.filter { it.flag != "glassGreenOn" }.none { glass.on(it.flag) })
+        assertTrue("GLOSS" in PackCatalog.sliders(glass).map { it.label })
+        // PLAIN: every look off, so no look sliders
+        val plain = glass.withOverrides(Looks.choose(null))
+        assertTrue(Looks.all.none { plain.on(it.flag) })
+        assertTrue("GLOSS" !in PackCatalog.sliders(plain).map { it.label })
+        // and switching from one look to another leaves only the new one
+        val candy = glass.withOverrides(Looks.choose("candyOn"))
+        assertTrue(candy.on("candyOn") && !candy.on("glassGreenOn"))
+    }
+
+    @Test fun lookSwitchesSurviveTheSelectionStore() {
+        val saved = Selection.decode(Selection.encode(Looks.choose("auraOn") + mapOf("drift" to 0.7f)))
+        val c = PackConfigParser.parse(File("src/main/assets/packs/spike/pack.json").readText())
+        val p = c.params.withOverrides(saved)
+        assertTrue(p.on("auraOn"))
+        assertEquals(0.7f, p.n("drift"), 0f)
+    }
+
+    @Test fun anUnknownFlagKeyIsIgnored() {
+        val c = PackConfigParser.parse(File("src/main/assets/packs/spike/pack.json").readText())
+        val p = c.params.withOverrides(mapOf("flag:notALook" to 1f))
+        assertTrue(Looks.all.none { p.on(it.flag) })
     }
 }

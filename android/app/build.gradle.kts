@@ -17,7 +17,22 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 shrinks code and resources. No reflection is used (the pack parser reads org.json by name, which is
+            // built into Android), so the default Android rules are enough; see proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Signing: set PDS_KEYSTORE, PDS_KEYSTORE_PASSWORD, PDS_KEY_ALIAS and PDS_KEY_PASSWORD in the environment to sign.
+            // Without them the build is unsigned and cannot be installed: that is intended, no key is stored in the repo.
+            val ks = System.getenv("PDS_KEYSTORE")
+            if (ks != null) {
+                signingConfig = signingConfigs.create("release") {
+                    storeFile = file(ks)
+                    storePassword = System.getenv("PDS_KEYSTORE_PASSWORD")
+                    keyAlias = System.getenv("PDS_KEY_ALIAS")
+                    keyPassword = System.getenv("PDS_KEY_PASSWORD")
+                }
+            }
         }
     }
     compileOptions {

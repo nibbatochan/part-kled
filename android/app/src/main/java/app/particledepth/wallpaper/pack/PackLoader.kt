@@ -11,34 +11,37 @@ import java.security.MessageDigest
 class LoadedPack(val config: PackConfig, val sample: Sample)
 
 /**
- * Reads a pack folder from assets/packs/<id>/: pack.json plus the two images it names.
+ * Reads a pack through a [PackSource] (the app's assets or its private storage): pack.json plus the two images it names.
  * Checks, in order: config size and schema (PackConfigParser), each file's size and sha256, the decoded pixel count.
  * Any failure throws PackException before anything is drawn, so the caller keeps the previous wallpaper.
- * Phase 4 will read packs from app storage the same way; the checks do not change.
+ * Built-in and imported packs go through the same checks.
  */
 object PackLoader {
     private const val TAG = "PDS"
     private const val MAX_IMAGE_BYTES = 2 * 1024 * 1024
     private const val MAX_PIXELS = 2048L * 2048L
 
-    fun load(ctx: Context, packId: String, particleCount: Int): LoadedPack {
-        val dir = "packs/$packId"
+    fun load(ctx: Context, packId: String, particleCount: Int): LoadedPack =
+        load(PackSources.find(ctx, packId) ?: throw PackException("no effect named \"$packId\""), particleCount)
+
+    fun load(source: PackSource, particleCount: Int): LoadedPack {
         val json = try {
-            ctx.assets.open("$dir/pack.json").use { s ->
+            source.open("pack.json").use { s ->
                 val b = readLimited(s, PackConfigParser.MAX_CONFIG_BYTES + 1)
                 if (b.size > PackConfigParser.MAX_CONFIG_BYTES) throw PackException("pack.json larger than ${PackConfigParser.MAX_CONFIG_BYTES} bytes")
                 String(b, Charsets.UTF_8)
             }
         } catch (e: java.io.IOException) {
-            throw PackException("cannot read $dir/pack.json: ${e.message}")
+            throw PackException("cannot read pack.json of ${source.id}: ${e.message}")
         }
         val config = PackConfigParser.parse(json)
+        if (config.id != source.id) throw PackException("pack.json says \"${config.id}\" but the folder is \"${source.id}\"")
         for (w in config.warnings) Log.w(TAG, "pack ${config.id}: $w")
         val ceiling = config.pointCeiling
         val count = if (ceiling != null) minOf(ceiling, particleCount) else particleCount
 
-        val subject = decode(ctx, dir, config.subject, "subject")
-        val depth = decode(ctx, dir, config.depth, "depth")
+        val subject = decode(source, config.subject, "subject")
+        val depth = decode(source, config.depth, "depth")
         return LoadedPack(config, PackSampler.fromBitmaps(subject, depth, count))
     }
 
@@ -56,9 +59,9 @@ object PackLoader {
         return out.toByteArray()
     }
 
-    private fun decode(ctx: Context, dir: String, ref: AssetRef, what: String): Bitmap {
+    private fun decode(source: PackSource, ref: AssetRef, what: String): Bitmap {
         val bytes = try {
-            ctx.assets.open("$dir/${ref.file}").use { readLimited(it, MAX_IMAGE_BYTES + 1) }
+            source.open(ref.file).use { readLimited(it, MAX_IMAGE_BYTES + 1) }
         } catch (e: java.io.IOException) {
             throw PackException("cannot read $what image ${ref.file}: ${e.message}")
         }

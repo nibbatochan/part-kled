@@ -30,7 +30,13 @@ class PackParams(val num: Map<String, Float>, val flags: Map<String, Boolean>, v
     fun withOverrides(over: Map<String, Float>, overFlags: Map<String, Boolean> = emptyMap()): PackParams {
         if (over.isEmpty() && overFlags.isEmpty()) return this
         val n = HashMap(num)
+        val f = HashMap(flags)
         for ((k, v) in over) {
+            if (k.startsWith("flag:")) { // a look switch: 1 = on, 0 = off, stored with the numbers so it saves and restores the same way
+                val key = k.substring(5)
+                if (ParamSpec.flag(key) != null && !v.isNaN()) f[key] = v >= 0.5f
+                continue
+            }
             val spec = when {
                 k.startsWith("fx.") -> ParamSpec.fx.firstOrNull { it.key == k.substring(3) }
                 k.startsWith("emit.") -> ParamSpec.emit.firstOrNull { it.key == k.substring(5) }
@@ -39,7 +45,6 @@ class PackParams(val num: Map<String, Float>, val flags: Map<String, Boolean>, v
             if (v.isNaN() || v.isInfinite()) continue
             n[k] = v.coerceIn(spec.min, spec.max)
         }
-        val f = HashMap(flags)
         for ((k, v) in overFlags) if (ParamSpec.flag(k) != null) f[k] = v
         return PackParams(n, f, light)
     }
