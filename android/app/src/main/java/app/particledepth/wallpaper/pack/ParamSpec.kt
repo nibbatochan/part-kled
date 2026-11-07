@@ -25,7 +25,7 @@ object ParamSpec {
         Num("trailAmount", 0.35f, 0f, 2f), Num("trailLength", 0.6f, -1f, 1.5f), Num("trailStrength", 0.5f, 0f, 2f),
         Num("trailDetail", 0.25f, 0f, 1f), Num("scanMode", 0f, 0f, 6f), Num("scanLevel", 3f, 0f, 10f), Num("style", 0f, 0f, 99f),
         // looks: CHROME, PRISMATIC, AURA, ECSTASY, BLIGHT, REDMET, CHROMA 2, CONVULSIONS, LINED, BLOOD, FUR, ARANCIA, ROCK,
-        // CUMULUS, BLEND, GLASS GREEN, CANDY, C-ABR
+        // CUMULUS, BLEND, GLASS GREEN, CANDY, C-ABR, SHAKE-MASK, SOFTWORD (these two read the glyph atlas)
         Num("chromeBevel", 0.5f, 0f, 1f, "uChromeBevel"), Num("chromeShine", 0.5f, 0f, 1f, "uChromeShine"),
         Num("chromeHue", 0f, -360f, 360f, "uChromeHue", degrees = true), Num("chromeDepth", 0.5f, 0f, 1f, "uChromeDepth"),
         Num("prismaticLength", 0.5f, 0f, 1f, "uPrismLen"), Num("prismaticSpread", 0.5f, 0f, 1f, "uPrismSpread"),
@@ -55,6 +55,8 @@ object ParamSpec {
         Num("glassGreenGloss", 0.85f, 0f, 1f, "uGgGloss"), Num("glassGreenRim", 0.9f, 0f, 1f, "uGgRim"),
         Num("glassGreenDepth", 0.7f, 0f, 1f, "uGgDepth"), Num("glassGreenBevel", 0.65f, 0f, 1f, "uGgBevel"),
         Num("candyGloss", 0.85f, 0f, 1f, "uCdGloss"), Num("candyGlow", 0.7f, 0f, 1f, "uCdGlow"), Num("candyTone", 0.5f, 0f, 1f, "uCdTone"),
+        Num("shakeSmear", 0.5f, 0f, 1f, "uShSmear"), Num("shakeCover", 0.3f, 0f, 1f, "uShCover"), Num("shakePatch", 0.5f, 0f, 1f, "uShPatch"),
+        Num("softwordGlow", 0.6f, 0f, 1f, "uSwGlow"),
         Num("cabrDisp", 0.85f, 0f, 1f, "uCabrDisp"), Num("cabrGloss", 0.9f, 0f, 1f, "uCabrGloss"), Num("cabrRim", 0.85f, 0f, 1f, "uCabrRim"),
     )
 
@@ -65,7 +67,7 @@ object ParamSpec {
         Flag("chroma2On", false, "uC2On"), Flag("convulsionsOn", false, "uConv"), Flag("linedOn", false, "uLined"),
         Flag("bloodOn", false, "uBlood"), Flag("furOn", false, "uFur"), Flag("aranciaOn", false, "uAr"),
         Flag("rockOn", false, "uRock"), Flag("cumulusOn", false, "uCumulus"), Flag("blendOn", false, "uBnOn"),
-        Flag("glassGreenOn", false, "uGlassGreen"), Flag("candyOn", false, "uCandy"), Flag("cabrOn", false, "uCabr"),
+        Flag("shakeOn", false, "uShake"), Flag("softwordOn", false, "uSoftword"), Flag("glassGreenOn", false, "uGlassGreen"), Flag("candyOn", false, "uCandy"), Flag("cabrOn", false, "uCabr"),
     )
 
     /** Nested groups: written as objects in the pack, flattened to "group.key" internally. */
@@ -82,7 +84,6 @@ object ParamSpec {
      * (the picture still renders as the plain DOTS look). Looks that need the glyph atlas or the post-processing chain.
      */
     val unsupported: Set<String> = setOf(
-        "shakeOn", "shakeSmear", "shakeCover", "shakePatch", "softwordOn", "softwordGlow",
         "cell", "gap", "styleSet", "colorMode", "invert", "autoLevels", "ink", "paper", "glow",
         "musicLook", "motionFx", "motionAmount", "motionSpeed", "track", "trackOld", "burst", "threeD",
     )

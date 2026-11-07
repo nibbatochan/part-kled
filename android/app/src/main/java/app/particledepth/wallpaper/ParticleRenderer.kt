@@ -24,7 +24,9 @@ import kotlin.math.sin
  */
 class ParticleRenderer(private val context: Context, private val pack: LoadedPack) {
     private val sample: Sample = pack.sample
-    private val pp: PackParams = pack.config.params
+    /** The live settings: the pack's, with the user's changes on top. Replaced from any thread, read on the GL thread. */
+    @Volatile var params: PackParams = pack.config.params
+    private val pp: PackParams get() = params
     /** A linked GLSL program and its uniform locations. */
     private class Prog(val id: Int, val loc: Map<String, Int>)
 
@@ -51,6 +53,7 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
     ) + ParamSpec.lookUniforms
 
     private var picTex = 0
+    private var atlasTex = 0
 
     fun init() {
         val fsSrc = asset("shaders/point.frag.glsl")
@@ -67,6 +70,19 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
         GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8, sample.texW, sample.texH, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, sample.tex)
         GLES30.glGenerateMipmap(GLES30.GL_TEXTURE_2D)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR_MIPMAP_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
+
+        // The glyph atlas for SHAKE-MASK and SOFTWORD (unit 0)
+        val at = IntArray(1)
+        GLES30.glGenTextures(1, at, 0)
+        atlasTex = at[0]
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex)
+        val atlas = GlyphAtlas.build()
+        android.opengl.GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, atlas, 0)
+        atlas.recycle()
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
@@ -224,7 +240,8 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
         points?.let { GLES30.glDeleteProgram(it.id) }
         trails?.let { GLES30.glDeleteProgram(it.id) }
         if (picTex != 0) GLES30.glDeleteTextures(1, intArrayOf(picTex), 0)
-        picTex = 0
+        if (atlasTex != 0) GLES30.glDeleteTextures(1, intArrayOf(atlasTex), 0)
+        picTex = 0; atlasTex = 0
         if (vbo != 0) GLES30.glDeleteBuffers(1, intArrayOf(vbo), 0)
         if (vaoPoints != 0) GLES30.glDeleteVertexArrays(2, intArrayOf(vaoPoints, vaoTrails), 0)
         if (fbo != 0) { GLES30.glDeleteFramebuffers(1, intArrayOf(fbo), 0); GLES30.glDeleteTextures(1, intArrayOf(fboTex), 0) }
@@ -250,6 +267,8 @@ class ParticleRenderer(private val context: Context, private val pack: LoadedPac
         GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, picTex)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex)
+        GLES30.glUniform1i(l["uAtlas"] ?: -1, 0)
         GLES30.glUniform1i(l["uImg"] ?: -1, 1)
         GLES30.glUniform1i(l["uImg2"] ?: -1, 1)
         f2("uTexSize", sample.texW.toFloat(), sample.texH.toFloat())

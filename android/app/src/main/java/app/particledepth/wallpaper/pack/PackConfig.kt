@@ -15,6 +15,23 @@ class PackParams(val num: Map<String, Float>, val flags: Map<String, Boolean>, v
     fun on(key: String): Boolean = flags[key] ?: ParamSpec.flag(key)?.def ?: error("unknown flag $key")
     fun fx(key: String): Float = num["fx.$key"] ?: ParamSpec.fx.first { it.key == key }.def
     fun emit(key: String): Float = num["emit.$key"] ?: ParamSpec.emit.first { it.key == key }.def
+
+    /**
+     * A copy with the user's changes on top. Unknown keys are dropped and numbers are clamped to their range, the same
+     * rule as the pack file, so a stored or hostile override cannot push a value outside what the shader expects.
+     */
+    fun withOverrides(over: Map<String, Float>, overFlags: Map<String, Boolean> = emptyMap()): PackParams {
+        if (over.isEmpty() && overFlags.isEmpty()) return this
+        val n = HashMap(num)
+        for ((k, v) in over) {
+            val spec = ParamSpec.num(k) ?: continue
+            if (v.isNaN() || v.isInfinite()) continue
+            n[k] = v.coerceIn(spec.min, spec.max)
+        }
+        val f = HashMap(flags)
+        for ((k, v) in overFlags) if (ParamSpec.flag(k) != null) f[k] = v
+        return PackParams(n, f, light)
+    }
 }
 
 class PackConfig(

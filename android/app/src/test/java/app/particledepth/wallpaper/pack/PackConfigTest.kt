@@ -73,10 +73,10 @@ class PackConfigTest {
     }
 
     @Test fun unknownAndUnsupportedKeysAreIgnoredWithAWarning() {
-        val c = PackConfigParser.parse(pack("\"nope\": 1, \"shakeOn\": true, \"glow\": {\"bloomOn\": true}"))
+        val c = PackConfigParser.parse(pack("\"nope\": 1, \"track\": true, \"glow\": {\"bloomOn\": true}"))
         assertEquals(3, c.warnings.size)
         assertTrue(c.warnings.any { it.startsWith("nope: unknown") })
-        assertTrue(c.warnings.any { it.startsWith("shakeOn: not drawn") })
+        assertTrue(c.warnings.any { it.startsWith("track: not drawn") })
         assertFalse(c.params.on("emitOn").not()) // untouched default
     }
 

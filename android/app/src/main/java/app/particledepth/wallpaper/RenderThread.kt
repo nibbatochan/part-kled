@@ -41,11 +41,15 @@ class RenderThread(private val context: Context) {
     private var renderer: ParticleRenderer? = null
     private var pack: LoadedPack? = null
     private val packListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "pack") handler.post { reloadPack() }
+        when (key) {
+            Selection.KEY_PACK -> handler.post { reloadPack() }
+            Selection.KEY_OVERRIDES -> handler.post { applyOverrides() }
+        }
     }
     private var tilt: TiltSensor? = null
     // The last level that held its frame rate is remembered, so a restart does not stutter while it re-learns.
-    private val prefs = context.getSharedPreferences("pds", Context.MODE_PRIVATE)
+    private val selection = Selection(context)
+    private val prefs = selection.prefs
     private val policy = QualityPolicy(
         startLevel = prefs.getInt("level", 0),
         onStable = { level -> if (prefs.getInt("level", 0) != level) prefs.edit().putInt("level", level).apply() },
@@ -205,7 +209,7 @@ class RenderThread(private val context: Context) {
 
     /** The pack the user picked, else the built-in one. A broken pack never stops the wallpaper: fall back and say why. */
     private fun loadPack(): LoadedPack {
-        val wanted = prefs.getString("pack", SpikeConfig.PACK) ?: SpikeConfig.PACK
+        val wanted = selection.packId
         return try {
             PackLoader.load(context, wanted, SpikeConfig.PARTICLES)
         } catch (e: PackException) {
@@ -213,6 +217,12 @@ class RenderThread(private val context: Context) {
             if (wanted == SpikeConfig.PACK) throw e
             PackLoader.load(context, SpikeConfig.PACK, SpikeConfig.PARTICLES)
         }
+    }
+
+    /** The user's slider changes: swap the settings, no GL rebuild, the next frame uses them. */
+    private fun applyOverrides() {
+        val p = pack ?: return
+        renderer?.params = p.config.params.withOverrides(selection.overrides)
     }
 
     /** The pack choice changed while the wallpaper runs: load the new one and rebuild the GL objects. */
@@ -254,6 +264,7 @@ class RenderThread(private val context: Context) {
         val loaded = pack ?: loadPack().also { pack = it }
         Log.i(TAG, "pack \"${loaded.config.id}\" ready in ${SystemClock.elapsedRealtime() - t0} ms (${loaded.sample.count} particles, ${loaded.config.warnings.size} warnings)")
         val r = ParticleRenderer(context, loaded)
+        r.params = loaded.config.params.withOverrides(selection.overrides)
         r.init()
         r.resize(width, height, density)
         renderer = r
