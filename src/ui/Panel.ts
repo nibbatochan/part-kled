@@ -1,5 +1,6 @@
 // src/ui/Panel.ts
 import { MOTION_PRESETS, defaults, lookTone, withEffectsStart, withLightStart, type Params } from '../core/params';
+import { bindPanelTabs } from './panelTabs';
 import { LineWidget, type LineWidgetValue } from './LineWidget';
 import { AURA_FILTER, BLIGHT_FILTER, BLOOD_FILTER, CHROME_FILTER, CONVULSIONS_FILTER, ECSTASY_FILTER, REDMET_FILTER, HALFTONE_CELL, LINED_FILTER, PRISMATIC_FILTER, SHAKE_FILTER, SOFTWORD_FILTER, FUR_FILTER, ARANCIA_FILTER, ROCK_FILTER, CUMULUS_FILTER, BLEND_FILTER, CHROMA2_FILTER, VBRNT_FING_FILTER, GLASS_GREEN_FILTER, GLASS_GREEN_PRESETS, CANDY_FILTER, CANDY_PRESETS, CABR_FILTER, CABR_PRESETS, LOOK_CATEGORIES, LOOK_TONE_DEFAULTS, LOOK_TITLES, STYLE_NAMES, type LookTone } from '../core/styles';
 import { XyPad } from './XyPad';
@@ -69,6 +70,7 @@ export class Panel {
 
     this.buildLookGrid();
     this.buildCollapsibles();
+    bindPanelTabs();
     this.bindDirectionInputs();
     document.querySelectorAll<HTMLElement>('.fx-box .look-dots.sub, .fx-box .seg-wrap').forEach(scrollRow);
     this.bindTopTabs();
@@ -402,7 +404,7 @@ export class Panel {
   /** LIGHT: a pad for each glow (strength x spread, strength x size), and the halo colour. */
   /** EFFECTS RESET: every effect off. The look, its settings and the picture stay. */
   private resetEffects(): void {
-    this.params = withEffectsStart();
+    this.params = { ...withEffectsStart(), emitOn: this.params.emitOn }; // RESET must not flip the emitters
     this.lookCat = 0;
     this.showLookCat();
     this.syncUiToParams();

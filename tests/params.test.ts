@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaults, parseParams, serializeParams, type Params } from '../src/core/params';
+import { defaults, parseParams, serializeParams, withEffectsStart, type Params } from '../src/core/params';
 
 describe('params', () => {
   it('serializes and parses without loss', () => {
@@ -26,5 +26,14 @@ describe('params', () => {
     const withExtra = parseParams('{"drift":0.5,"fakeProperty":123}');
     expect(withExtra.drift).toBe(0.5);
     expect((withExtra as unknown as { fakeProperty: number }).fakeProperty).toBe(123);
+  });
+});
+
+describe('first load', () => {
+  it('has emitters off and nothing else changed', () => {
+    const p = withEffectsStart();
+    expect(p.emitOn).toBe(false);
+    expect({ ...p, emitOn: true }).toEqual({ ...withEffectsStart(), emitOn: true });
+    expect(defaults.emitOn).toBe(true);
   });
 });

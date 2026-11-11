@@ -289,6 +289,7 @@ export function withEffectsStart(): Params {
     ...withLightStart(defaults),
     style: 0,
     drift: 0,
+    emitOn: false, // first load: emitters off (the EMITTER tab ON button turns them on)
     motionFx: 0,
     glow: { ...defaults.glow, glowPat: 0 },
     bloomOn: false,

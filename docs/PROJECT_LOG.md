@@ -18,6 +18,26 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-11: Panel flow, tabs for effect, image, emitter and video
+- What changed: the side panel now has the five picture slots and a tab bar (EFFECT, IMAGE, EMITTER, plus VIDEO in the video view). Sections were moved, not edited. New `src/ui/panelTabs.ts`; `Thumbs.ts` always draws five slots; first load has emitters off (`withEffectsStart`).
+- Why: the panel followed no working order, so a new user could not tell what to do first.
+- Decisions: the open tab is not remembered across reloads; the Video tab exists only in the video view (the lab hides that section); the Effects box still uses lowercase text and larger labels unlike the other boxes (left for a design decision).
+- Evidence: 63 unit tests, `tsc` clean, `scripts/verify-panel.mjs` passes at 1440 and 390 px. Spec and plan in `docs/superpowers/`.
+
+### 2026-11-11: Scoring and analysis tools (phases T1 and T2 of the research)
+- What changed: `tools/analyze/` (`fx.py`, `score.py`, `analyze.py`, `selftest.py`) and `scripts/shot-still.mjs` (motion-off canvas screenshot). No engine or shader change.
+- Why: no effect was ever measured against its reference. `score.py ref out` gives a paired similarity or an unpaired style score; it refuses when it cannot align. `analyze.py` measures palette, tone, edge width, glow radius, grain, halftone, chromatic aberration, vignette.
+- Decision: scikit-image only, no new installs. Weights and divisors are proposals, labelled uncalibrated in every output.
+- Evidence: selftest passes; the glass look scored 73.2 against its own dots screenshot and holo against that shot scored 53.1. Not yet calibrated with owner ratings (phase T3).
+- Not done: wiring the picture pre-pass (R1), skill rewrite (T4), new post passes.
+
+### 2026-11-11: Research on recreating reference images as a stack of treatments
+- What changed: `docs/RESEARCH_EFFECT_RECREATION.md` (research only, no code).
+- Why: effects made with the effect-maker skill were far from their reference images.
+- Findings: the skill's gate judged CPU bakes (`treatBake.ts`) that the studio never runs; nothing was measured against a reference; references are stacks across picture, dots and final frame, while the workflow built one layer.
+- Proposal: a layer model (picture pre-pass, per-dot finish, post chain), an analysis script, a composite similarity score, a feasibility gate, and an effect recipe as data. Not built yet.
+- Evidence: treated picture against its own dots screenshot scored SSIM 0.15-0.25 raw and 0.63-0.67 at 8 px blur (4 looks, rough alignment). Score weights and the 70% threshold are not calibrated.
+
 ### 2026-11-06 to 2026-11-08: Android live wallpaper app, built and tested on a phone
 - What changed: a native Android app in `android/` (Kotlin, EGL14 and GLES 3.0) that draws the web studio's own shaders as a live wallpaper, with gyro tilt in place of the hover tilt, an adaptive quality ladder, a pack format for effects (`docs/PACK_FORMAT.md`), a Compose app built from the web design system, 19 effect packs, photo import and pack import. Plan, tracker, measurements and every decision: `docs/ANDROID_SCOPE.md`. Research behind it: `docs/RESEARCH_ANDROID_LIVE_WALLPAPER.md`.
 - Why: the same render, kept as a phone wallpaper, with the web studio staying the editor.

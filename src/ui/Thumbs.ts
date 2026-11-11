@@ -2,6 +2,13 @@
 import type { ProcessedImage } from '../utils/image';
 
 export const MAX_IMAGES = 5;
+
+/** How the five slots are made: the pictures, then the add button, then empty slots, always five in all. */
+export function slotPlan(count: number): { filled: number; addButton: number; placeholders: number } {
+  const filled = Math.min(Math.max(count, 0), MAX_IMAGES);
+  const addButton = filled < MAX_IMAGES ? 1 : 0;
+  return { filled, addButton, placeholders: MAX_IMAGES - filled - addButton };
+}
 /** Pointer travel before a press on a picture counts as a drag, not a click (px). */
 const DRAG_START = 6;
 /** Settle spring for a picture let go without moving it: critically damped, about 0.3 s to rest (no overshoot). */
@@ -304,8 +311,17 @@ export class Thumbs {
       this.container.appendChild(slot);
     });
 
-    if (this.images.length < MAX_IMAGES) {
-      this.container.appendChild(this.addSlotBtn);
+    const plan = slotPlan(this.images.length);
+    if (plan.addButton) this.container.appendChild(this.addSlotBtn);
+    for (let i = 0; i < plan.placeholders; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'thumb-slot empty-slot';
+      empty.setAttribute('aria-hidden', 'true');
+      const num = document.createElement('span');
+      num.className = 'slot-num';
+      num.textContent = (plan.filled + plan.addButton + i + 1).toString();
+      empty.appendChild(num);
+      this.container.appendChild(empty);
     }
 
     if (fileInput) {

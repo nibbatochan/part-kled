@@ -179,11 +179,8 @@ canvas#stage {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 32px;
-  margin-bottom: 8px;
   padding: 0 12px;
   border-bottom: 1px solid var(--line);
-  font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.14em;
   color: var(--ink);
@@ -1040,7 +1037,7 @@ body.dragging .dropzone-box {
 .head-actions { display: flex; align-items: center; gap: 6px; }
 a.head-btn { text-decoration: none; }
 body[data-mode="lab"] #clip-panel, body[data-mode="lab"] #to-lab { display: none; }
-body[data-mode="video"] #source-box, body[data-mode="video"] #to-video, body[data-mode="video"] #export-btn { display: none; }
+body[data-mode="video"] #thumbnail-strip, body[data-mode="video"] #to-video, body[data-mode="video"] #export-btn { display: none; }
 .clip-steps { margin: 0 10px 6px; font-size: 8.5px; letter-spacing: 0.1em; color: var(--ink-dim); }
 .clip-time-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px 0; font-size: 9px; letter-spacing: 0.08em; }
 .clip-scrub { width: calc(100% - 20px); margin: 6px 10px 0; }
@@ -1391,3 +1388,25 @@ h2 {
 .scroll-arrow:hover { color: var(--ink); border-color: var(--line-strong); }
 .scroll-arrow[hidden] { display: none; }
 .scroll-arrow:disabled { opacity: 0.25; cursor: default; }
+
+/* PANEL TABS: EFFECT | IMAGE | EMITTER | VIDEO. One body shows at a time. */
+.panel-tabs { display: flex; gap: 0; border: 1px solid var(--line); margin-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+.panel-tabs::-webkit-scrollbar { display: none; }
+.panel-tab {
+  flex: 1 1 0; min-width: 0; padding: 10px 6px; border: 0; border-right: 1px solid var(--line); background: none;
+  font: inherit; font-size: var(--label-size); letter-spacing: var(--label-track); color: var(--ink-dim); cursor: pointer;
+  transition: color var(--t) var(--ease), background var(--t) var(--ease);
+}
+.panel-tab:last-child { border-right: 0; }
+.panel-tab:hover { color: var(--ink); }
+.panel-tab.active { color: var(--bg); background: var(--accent); }
+.panel-tab-body { display: flex; flex-direction: column; gap: 8px; }
+.panel-tab-body[hidden] { display: none; }
+#panel-head .strip { padding: 8px 6px 6px; }
+#panel-head .panel-tabs { margin: 0 6px; }
+
+/* An empty picture slot: shows the room that is left, does nothing */
+.thumb-slot.empty-slot { border-style: dashed; opacity: 0.45; pointer-events: none; }
+
+/* The lab has no video section, so it has no video tab either */
+body[data-mode="lab"] [data-panel-tab="video"], body[data-mode="lab"] [data-tab-body="video"] { display: none; }
