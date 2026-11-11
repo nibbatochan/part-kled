@@ -18,6 +18,13 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-11: Effect gate on the real canvas (phase R1, reduced)
+- What changed: `scripts/score-look.mjs` draws a look in the studio (clicking its real tile, motion off), scores the canvas against a reference and against the ceiling `B_max` (the reference as plain dots) with `tools/analyze/gate.py`. `scripts/lib/still.mjs` is the shared screenshot code. `image-to-effect` step 4 now uses it.
+- Why: the old gate judged CPU bakes the studio never runs.
+- Decision: the owner chose to keep treatments shader-side (no picture pre-pass), so R1 became a measurement change only.
+- Evidence: glass reference, original source picture: plain DOTS 47.3, REFRACT GLASS 45.9, NEON TUBE 33.8, against a ceiling of 73.3. So today no look beats plain dots on that reference. Scores are uncalibrated.
+- Not committed: the `effect-maker` skill edit, because it sits on the owner's uncommitted skill rewrite.
+
 ### 2026-11-11: Panel flow, tabs for effect, image, emitter and video
 - What changed: the side panel now has the five picture slots and a tab bar (EFFECT, IMAGE, EMITTER, plus VIDEO in the video view). Sections were moved, not edited. New `src/ui/panelTabs.ts`; `Thumbs.ts` always draws five slots; first load has emitters off (`withEffectsStart`).
 - Why: the panel followed no working order, so a new user could not tell what to do first.

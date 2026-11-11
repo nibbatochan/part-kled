@@ -55,7 +55,14 @@ If the effect does not exist yet, write it as a new function in `treat.py` and a
 
 ## Step 4: Fidelity gate (mandatory, before conversion)
 
-Look at the treated PNG next to the reference and the source. Answer each with yes or no.
+First the measured gate, on the real studio canvas, not the bake sheet (the studio does not run the CPU bakes at runtime):
+
+```bash
+python tools/analyze/analyze.py reference.png
+node scripts/score-look.mjs reference.png --look=<id> --source=<source picture> [--unpaired]
+```
+
+Report Score B, `B_max` and the ratio. They are uncalibrated proposals (`docs/RESEARCH_EFFECT_RECREATION.md` 5.4 to 5.6); never call a number "similarity" for an unpaired reference. Then look at the result next to the reference and the source. Answer each with yes or no.
 
 1. Same subject? Features from "Must keep" recognisable at thumbnail size.
 2. Same silhouette and proportions as the source?

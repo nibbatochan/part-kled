@@ -18,3 +18,13 @@ assert 'refused' in score.score(g, flat)                      # aspect mismatch 
 a = analyze.analyze(g)
 assert a['field_polarity']['light_field'] is False and a['palette'] and a['grain_sigma'] >= 0
 print('selftest ok')
+
+# gate: Score B against its ceiling B_max (the reference rendered as plain dots)
+import gate
+r = gate.gate(g, g, g)
+assert r['ratio'] > 0.99 and r['verdict'] == 'pass', r         # output as good as the ceiling passes
+r = gate.gate(g, blurred, g)
+assert r['ratio'] < 0.99, r                                    # a worse output has a lower ratio
+r = gate.gate(g, flat, g)
+assert r['verdict'] == 'refused', r                            # cannot align: refused, never a number
+print('gate selftest ok')
