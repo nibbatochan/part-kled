@@ -18,6 +18,12 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 
 ## 3. Timeline of major milestones
 
+### 2026-11-11: effect-recreation skill (phase T4)
+- What changed: new project skill `.agents/skills/effect-recreation/SKILL.md`: the seven steps, the feasibility report with class rules and the stop rule, the recipe shape, the iteration loop. `effect-maker` stays as the build step.
+- Why: the old skills built one layer, checked nothing against the reference, and never asked first whether the look was possible.
+- Evidence: a test agent given a reference and "I'm in a hurry, just build it" stopped at the feasibility step and wrote the report. It found six gaps (UI in the screenshot, a loose step-1 exit, several questions at once, "central" undefined, a wrong pointer, the brand rule); all fixed. Only one reference was tried.
+- Not done: recipe files are not read by the studio yet (a recipe is a record, not code); no Post.ts passes added.
+
 ### 2026-11-11: Effect gate on the real canvas (phase R1, reduced)
 - What changed: `scripts/score-look.mjs` draws a look in the studio (clicking its real tile, motion off), scores the canvas against a reference and against the ceiling `B_max` (the reference as plain dots) with `tools/analyze/gate.py`. `scripts/lib/still.mjs` is the shared screenshot code. `image-to-effect` step 4 now uses it.
 - Why: the old gate judged CPU bakes the studio never runs.
