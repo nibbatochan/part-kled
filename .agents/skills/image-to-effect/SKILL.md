@@ -62,7 +62,7 @@ python tools/analyze/analyze.py reference.png
 node scripts/score-look.mjs reference.png --look=<id> --source=<source picture> [--unpaired]
 ```
 
-Report Score B, `B_max` and the ratio. They are uncalibrated proposals (`docs/RESEARCH_EFFECT_RECREATION.md` 5.4 to 5.6); never call a number "similarity" for an unpaired reference. Then look at the result next to the reference and the source. Answer each with yes or no.
+Report Score B (pass at 75) and `B_max`, the plain-dots floor. They are uncalibrated proposals (`docs/RESEARCH_EFFECT_RECREATION.md` 5.4 to 5.6); never call a number "similarity" for an unpaired reference. Then look at the result next to the reference and the source. Answer each with yes or no.
 
 1. Same subject? Features from "Must keep" recognisable at thumbnail size.
 2. Same silhouette and proportions as the source?

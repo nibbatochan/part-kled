@@ -2,15 +2,15 @@
 
   python tools/analyze/gate.py reference.png canvas.png ceiling.png [--unpaired] [--json]
 
-ratio = score_B / B_max. The dots layer caps what any look can reach, so the ratio is the fair number.
-Paired verdict: pass when ratio >= PASS_RATIO. Unpaired: the style score itself must reach PASS_STYLE.
-Both thresholds are PROPOSALS (docs/RESEARCH_EFFECT_RECREATION.md 5.5) and need calibration (5.6).
+Verdict: pass when Score B >= PASS_SCORE (absolute), paired or unpaired.
+B_max (the reference as plain dots) is the floor, not the bar: the owner rated plain dots 0 while they scored 37-55.
+The ratio is reported for information only. PASS_SCORE comes from 20 owner-rated pairs (tools/analyze/calib.py),
+one statue and one rater, so it is still uncalibrated beyond that sample.
 """
 import argparse, json, sys
 import score
 
-PASS_RATIO = 0.70
-PASS_STYLE = 70.0
+PASS_SCORE = 75.0
 
 
 def gate(reference, canvas, ceiling, paired=True):
@@ -23,7 +23,7 @@ def gate(reference, canvas, ceiling, paired=True):
         out.update(verdict='no-ceiling', B_max=None, ratio=None, reason=m.get('refused', 'ceiling score is zero'))
         return out
     out.update(B_max=m['score'], ratio=round(b['score'] / m['score'], 3))
-    ok = out['ratio'] >= PASS_RATIO if paired else b['score'] >= PASS_STYLE
+    ok = b['score'] >= PASS_SCORE
     out['verdict'] = 'pass' if ok else 'below'
     return out
 

@@ -31,6 +31,14 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 - Evidence: glass reference, original source picture: plain DOTS 47.3, REFRACT GLASS 45.9, NEON TUBE 33.8, against a ceiling of 73.3. So today no look beats plain dots on that reference. Scores are uncalibrated.
 - Not committed: the `effect-maker` skill edit, because it sits on the owner's uncommitted skill rewrite.
 
+### 2026-11-12: Score calibration and absolute pass mark 75 (phase T3)
+- What changed: `tools/analyze/calib.py` and `scripts/calib-render.mjs` build a blind rating set (16 pairs: damaged copies of four references plus the studio look meant to match each); the owner rated them 0-100; `calib.py fit` compares the score with the ratings. Data in `docs/effect-library/calibration/`.
+- Result: score vs ratings Spearman 0.60. Close copies (rated 90-100) scored 77.8-96.2. Studio looks (rated 10, 10, 20, 50) scored 45.9-57.0. A heavy blur rated 50 scored 70.8, so a raw threshold near 75 separates this sample, 70 does not. Fitted weights ranked worse (0.53) than the current ones, so weights are unchanged.
+- Finding: the ratio-to-ceiling gate (0.70 of `B_max`, about 51 here) would pass prismatic (rated 20, score 57.0). The ceiling needs anchoring with owner ratings of plain-dots renders.
+- Plain-dots anchor: 4 more pairs (reference vs plain dots) rated 0 by the owner, yet they score 37-55. With all 20 pairs Spearman is 0.77 and ratings reach 70 at a score of about 60.
+- Decision (owner): gate passes on an absolute Score B of 75, paired or unpaired. `B_max` (plain dots, about 45) is the floor, the ratio is information only. Rejected: ratio 0.70 of `B_max` (would pass prismatic, rated 20). Weights unchanged; the NNLS fit put 91% on edges and is trained on the same pairs.
+- Limits: 20 pairs, one statue, mostly synthetic damage, one rater. 75 is still uncalibrated beyond this sample.
+
 ### 2026-11-11: Panel flow, tabs for effect, image, emitter and video
 - What changed: the side panel now has the five picture slots and a tab bar (EFFECT, IMAGE, EMITTER, plus VIDEO in the video view). Sections were moved, not edited. New `src/ui/panelTabs.ts`; `Thumbs.ts` always draws five slots; first load has emitters off (`withEffectsStart`).
 - Why: the panel followed no working order, so a new user could not tell what to do first.

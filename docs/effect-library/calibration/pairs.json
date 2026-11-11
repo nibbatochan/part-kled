@@ -1,0 +1,322 @@
+[
+ {
+  "ref": "glass",
+  "output": "hue 15",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__glass.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-glass-hue-15.png",
+  "id": 1,
+  "score": {
+   "kind": "similarity",
+   "score": 96.2,
+   "components": {
+    "C": 0.88,
+    "S": 0.999,
+    "E": 0.998,
+    "T": 0.964,
+    "G": 0.984
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "holo",
+  "output": "noise 0.2",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__holo.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-holo-noise-0.2.png",
+  "id": 2,
+  "score": {
+   "kind": "similarity",
+   "score": 77.8,
+   "components": {
+    "C": 0.869,
+    "S": 0.654,
+    "E": 0.821,
+    "T": 0.87,
+    "G": 0.743
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "chrome",
+  "output": "blur 1.5",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__chrome.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-chrome-blur-1.5.png",
+  "id": 3,
+  "score": {
+   "kind": "similarity",
+   "score": 89.8,
+   "components": {
+    "C": 0.985,
+    "S": 0.998,
+    "E": 0.842,
+    "T": 0.883,
+    "G": 0.625
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "chrome",
+  "output": "hue 50",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__chrome.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-chrome-hue-50.png",
+  "id": 4,
+  "score": {
+   "kind": "similarity",
+   "score": 95.7,
+   "components": {
+    "C": 0.869,
+    "S": 0.999,
+    "E": 0.975,
+    "T": 0.975,
+    "G": 0.985
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "glass",
+  "output": "gamma 0.6",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__glass.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-glass-gamma-0.6.png",
+  "id": 5,
+  "score": {
+   "kind": "similarity",
+   "score": 89.8,
+   "components": {
+    "C": 0.786,
+    "S": 0.969,
+    "E": 0.932,
+    "T": 0.917,
+    "G": 0.889
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "holo",
+  "output": "hue 15",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__holo.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-holo-hue-15.png",
+  "id": 6,
+  "score": {
+   "kind": "similarity",
+   "score": 95.3,
+   "components": {
+    "C": 0.919,
+    "S": 0.996,
+    "E": 0.88,
+    "T": 0.982,
+    "G": 0.964
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "holo",
+  "output": "blur 1.5",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__holo.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-holo-blur-1.5.png",
+  "id": 7,
+  "score": {
+   "kind": "similarity",
+   "score": 91.7,
+   "components": {
+    "C": 0.96,
+    "S": 0.992,
+    "E": 0.783,
+    "T": 0.921,
+    "G": 0.824
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "chrome",
+  "output": "gamma 1.6",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__chrome.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-chrome-gamma-1.6.png",
+  "id": 8,
+  "score": {
+   "kind": "similarity",
+   "score": 80.1,
+   "components": {
+    "C": 0.843,
+    "S": 0.946,
+    "E": 0.567,
+    "T": 0.966,
+    "G": 0.51
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "chrome",
+  "output": "studio look 25",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__chrome.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-25.png",
+  "id": 9,
+  "score": {
+   "kind": "similarity",
+   "score": 50.0,
+   "components": {
+    "C": 0.574,
+    "S": 0.436,
+    "E": 0.055,
+    "T": 0.888,
+    "G": 0.561
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "crystal",
+  "output": "studio look 49",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__crystal.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-49.png",
+  "id": 10,
+  "score": {
+   "kind": "similarity",
+   "score": 49.3,
+   "components": {
+    "C": 0.607,
+    "S": 0.455,
+    "E": 0.131,
+    "T": 0.755,
+    "G": 0.477
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "glass",
+  "output": "studio look 48",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__glass.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-48.png",
+  "id": 11,
+  "score": {
+   "kind": "similarity",
+   "score": 45.9,
+   "components": {
+    "C": 0.545,
+    "S": 0.479,
+    "E": 0.201,
+    "T": 0.509,
+    "G": 0.482
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "holo",
+  "output": "studio look 26",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__holo.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-26.png",
+  "id": 12,
+  "score": {
+   "kind": "similarity",
+   "score": 57.0,
+   "components": {
+    "C": 0.661,
+    "S": 0.517,
+    "E": 0.176,
+    "T": 0.86,
+    "G": 0.629
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "crystal",
+  "output": "gamma 1.6",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__crystal.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-crystal-gamma-1.6.png",
+  "id": 13,
+  "score": {
+   "kind": "similarity",
+   "score": 82.1,
+   "components": {
+    "C": 0.828,
+    "S": 0.96,
+    "E": 0.732,
+    "T": 0.926,
+    "G": 0.514
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "glass",
+  "output": "noise 0.05",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__glass.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-glass-noise-0.05.png",
+  "id": 14,
+  "score": {
+   "kind": "similarity",
+   "score": 90.5,
+   "components": {
+    "C": 0.976,
+    "S": 0.743,
+    "E": 0.976,
+    "T": 0.968,
+    "G": 0.979
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "crystal",
+  "output": "blur 5",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__crystal.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-crystal-blur-5.png",
+  "id": 15,
+  "score": {
+   "kind": "similarity",
+   "score": 70.8,
+   "components": {
+    "C": 0.941,
+    "S": 0.964,
+    "E": 0.526,
+    "T": 0.192,
+    "G": 0.502
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "ref": "crystal",
+  "output": "noise 0.05",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__crystal.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\deg-crystal-noise-0.05.png",
+  "id": 16,
+  "score": {
+   "kind": "similarity",
+   "score": 83.9,
+   "components": {
+    "C": 0.974,
+    "S": 0.731,
+    "E": 0.961,
+    "T": 0.933,
+    "G": 0.615
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ }
+]

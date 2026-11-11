@@ -1,0 +1,82 @@
+[
+ {
+  "id": 17,
+  "ref": "glass",
+  "output": "plain dots",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__glass.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-0.png",
+  "score": {
+   "kind": "similarity",
+   "score": 47.6,
+   "components": {
+    "C": 0.538,
+    "S": 0.489,
+    "E": 0.172,
+    "T": 0.604,
+    "G": 0.525
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "id": 18,
+  "ref": "crystal",
+  "output": "plain dots",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__crystal.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-0.png",
+  "score": {
+   "kind": "similarity",
+   "score": 46.5,
+   "components": {
+    "C": 0.453,
+    "S": 0.467,
+    "E": 0.165,
+    "T": 0.743,
+    "G": 0.502
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "id": 19,
+  "ref": "holo",
+  "output": "plain dots",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__holo.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-0.png",
+  "score": {
+   "kind": "similarity",
+   "score": 54.5,
+   "components": {
+    "C": 0.663,
+    "S": 0.504,
+    "E": 0.15,
+    "T": 0.78,
+    "G": 0.592
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ },
+ {
+  "id": 20,
+  "ref": "chrome",
+  "output": "plain dots",
+  "refPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\samples\\sample-10__chrome.png",
+  "canvasPath": "C:\\Users\\suman\\Projects\\particled\\tools\\analyze\\..\\..\\docs\\effect-library\\calibration\\canvas-0.png",
+  "score": {
+   "kind": "similarity",
+   "score": 37.3,
+   "components": {
+    "C": 0.457,
+    "S": 0.382,
+    "E": 0.0,
+    "T": 0.566,
+    "G": 0.398
+   },
+   "uncalibrated": true,
+   "notes": []
+  }
+ }
+]

@@ -22,9 +22,9 @@ print('selftest ok')
 # gate: Score B against its ceiling B_max (the reference rendered as plain dots)
 import gate
 r = gate.gate(g, g, g)
-assert r['ratio'] > 0.99 and r['verdict'] == 'pass', r         # output as good as the ceiling passes
+assert r['ratio'] > 0.99 and r['verdict'] == 'pass', r         # identical output passes the absolute bar
 r = gate.gate(g, blurred, g)
-assert r['ratio'] < 0.99, r                                    # a worse output has a lower ratio
+assert r['ratio'] < 0.99 and r['score_B'] < r['B_max'], r     # a worse output has a lower ratio
 r = gate.gate(g, flat, g)
 assert r['verdict'] == 'refused', r                            # cannot align: refused, never a number
 print('gate selftest ok')

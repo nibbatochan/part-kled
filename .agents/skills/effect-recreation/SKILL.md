@@ -9,7 +9,7 @@ A reference is a stack of treatments across three places: the picture, the dots,
 
 **Background:** `docs/RESEARCH_EFFECT_RECREATION.md` (sections 2, 4, 5, 6, 7). Build with `.agents/skills/effect-maker/SKILL.md`. Engine rules in `CLAUDE.md`: do not touch the particle engine, physics or depth.
 
-**Numbers are uncalibrated.** Score weights and the 0.70 threshold are proposals. Say "uncalibrated" whenever you report a score. Never invent a similarity percentage; a range needs a stated basis.
+**Numbers are uncalibrated.** Score weights are proposals. The pass mark (Score B 75) comes from 20 owner ratings of one statue. Say "uncalibrated" whenever you report a score. Never invent a similarity percentage; a range needs a stated basis.
 
 ## The seven steps
 
@@ -21,7 +21,7 @@ A reference is a stack of treatments across three places: the picture, the dots,
 | 4 | Strategy | Give each component exactly one layer and a parameter set (the recipe, below) | The plan reads as one cohesive effect |
 | 5 | Feasibility | Fill the report below and show it | **The owner accepts the class and the plan in chat. No code before this.** |
 | 6 | Develop | Build with `effect-maker`. L0, L2 and L3 parts are a `Partial<Params>`; add new fields to `params.ts` first | `npx tsc --noEmit` and tests pass; it renders in the studio |
-| 7 | Validate | `node scripts/score-look.mjs <reference> --look=<id> --source=<picture>` and look at the canvas | Ratio at or above 0.70 of `B_max`, or 3 rounds used and reported as partial |
+| 7 | Validate | `node scripts/score-look.mjs <reference> --look=<id> --source=<picture>` and look at the canvas | Score B at or above 75, or 3 rounds used and reported as partial. `B_max` (plain dots, about 45) is the floor |
 
 ## Layers (where a component can live)
 
