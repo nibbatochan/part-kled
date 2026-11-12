@@ -698,6 +698,96 @@
                 <output></output>
               </div>
             </div>
+            <div class="row"><span class="row-label">finish</span></div>
+            <div class="row">
+              <span class="row-label">fringe</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="caOn" title="Red and blue slide apart toward the corners">ON</button>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-fin-ca" title="How far the colours split">AMOUNT</label>
+                <input type="range" id="sl-fin-ca" data-path="finish.caAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">vignette</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="vignetteOn" title="Darker corners">ON</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-fin-vig" title="How dark the corners get">AMOUNT</label>
+                <input type="range" id="sl-fin-vig" data-path="finish.vignetteAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-fin-vigs" title="How far the clear middle reaches">SIZE</label>
+                <input type="range" id="sl-fin-vigs" data-path="finish.vignetteSize" min="0.2" max="0.9" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">mix</span>
+              <div class="seg">
+                <button class="mode-btn" type="button" data-mixmode="0" title="The glow brightens the picture and never clips">SCREEN</button>
+                <button class="mode-btn" type="button" data-mixmode="1" title="The glow adds straight onto the picture">ADD</button>
+                <button class="mode-btn" type="button" data-mixmode="2" title="The glow lifts the picture without washing it out">SOFT</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">paper</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="paperOn" title="Ink on a paper field: dark on light">ON</button>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-fin-paper" title="How much of the picture becomes ink on paper">AMOUNT</label>
+                <input type="range" id="sl-fin-paper" data-path="finish.paperAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">soft fill</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="softOn" title="A soft body fills the gaps between the dots">ON</button>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-fin-soft" title="How strong the soft fill is">AMOUNT</label>
+                <input type="range" id="sl-fin-soft" data-path="finish.softAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">smooth bloom</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="tentOn" title="A smoother glow. Works with the bloom">ON</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">streak</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="streakOn" title="Horizontal streaks of light from the bright parts">ON</button>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="slider-group">
+                <label for="sl-fin-st" title="How bright the streaks are">AMOUNT</label>
+                <input type="range" id="sl-fin-st" data-path="finish.streakAmount" min="0" max="1.5" step="0.01" />
+                <output></output>
+              </div>
+              <div class="slider-group">
+                <label for="sl-fin-stl" title="How long the streaks are">LENGTH</label>
+                <input type="range" id="sl-fin-stl" data-path="finish.streakLength" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
           </div>
         </section>
 

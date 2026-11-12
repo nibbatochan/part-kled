@@ -76,6 +76,7 @@ export class Panel {
     this.bindTopTabs();
     document.getElementById('effects-reset')?.addEventListener('click', () => this.resetEffects());
     this.bindGlowPat();
+    this.bindMixMode();
     this.bindBitmode();
     this.bindEffects();
     this.bindValueInputs();
@@ -447,6 +448,23 @@ export class Panel {
     const current = document.querySelector<HTMLButtonElement>('#fx-cats .look-dot.active')?.dataset.ecat ?? '0';
     document.querySelectorAll<HTMLElement>('.ecat-panel').forEach((p) => {
       p.hidden = top === 'stack' ? p.dataset.ecat !== 'stack' : p.dataset.ecat !== current;
+    });
+  }
+
+  /** FINISH: how the glow joins the picture (SCREEN, ADD, SOFT). */
+  private bindMixMode(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-mixmode]').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.params.finish = { ...this.params.finish, mixMode: Number(b.dataset.mixmode) };
+        this.syncMixMode();
+        this.onParamsChangeCb(this.params);
+      });
+    });
+  }
+
+  private syncMixMode(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-mixmode]').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.mixmode) === this.params.finish.mixMode);
     });
   }
 
@@ -970,7 +988,7 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'emitOn', 'trails', 'bloomOn', 'haloOn', 'vhsOn', 'glitchOn', 'glitchBeat', 'holoOn', 'cloudOn', 'meshOn', 'stackOn', 'stackWords'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'emitOn', 'trails', 'bloomOn', 'haloOn', 'vhsOn', 'glitchOn', 'glitchBeat', 'holoOn', 'cloudOn', 'meshOn', 'caOn', 'vignetteOn', 'paperOn', 'softOn', 'tentOn', 'streakOn', 'stackOn', 'stackWords'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
@@ -988,6 +1006,7 @@ export class Panel {
     this.pads.forEach((p) => p.sync());
     this.syncMotionFx();
     this.syncGlowPat();
+    this.syncMixMode();
     this.syncSurface();
     const tint = document.getElementById('in-halo-tint') as HTMLInputElement | null;
     if (tint) tint.value = this.params.glow.haloTint;

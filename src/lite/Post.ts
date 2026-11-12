@@ -53,6 +53,21 @@ export interface PostParams {
   bitMid: number;       // 0.15..0.85 GRADE midpoint
   bitDither: number;    // 0..1 CGA dither
   bitSize: number;      // 0.3..1 INK noise width, STIPPLE dot size
+  caOn: boolean;        // FINISH: colour fringes that grow toward the corners
+  caAmount: number;     // 0..1
+  vignetteOn: boolean;
+  vignetteAmount: number; // 0..1
+  vignetteSize: number;   // 0.2..0.9 how far the clear middle reaches
+  mixMode: number;      // how the glow joins the picture: 0 SCREEN, 1 ADD, 2 SOFT LIGHT
+  paperOn: boolean;     // ink on a paper field
+  paperAmount: number;  // 0..1
+  paperTint: [number, number, number];
+  softOn: boolean;      // soft fill between the dots
+  softAmount: number;   // 0..1
+  tentOn: boolean;      // smoother bloom (needs bloom on)
+  streakOn: boolean;    // horizontal light streaks
+  streakAmount: number; // 0..1.5
+  streakLength: number; // 0..1 short to long
 }
 
 const VERT = `#version 300 es
@@ -96,6 +111,43 @@ void main() {
   o = vec4(r, 1.0);
 }`;
 
+// Tent upsample: a 3 x 3 weighted blur of the smaller level, added to the level above it. Smoother than a plain stretch.
+const FRAG_UP = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uTex;
+uniform sampler2D uBase;
+uniform vec2 uTexel;
+uniform vec2 uW;       // weight of the upsampled level, weight of the base level
+out vec4 o;
+void main() {
+  vec2 t = uTexel;
+  vec3 s = texture(uTex, vUv + t * vec2(-1.0, -1.0)).rgb + 2.0 * texture(uTex, vUv + t * vec2(0.0, -1.0)).rgb + texture(uTex, vUv + t * vec2(1.0, -1.0)).rgb
+         + 2.0 * texture(uTex, vUv + t * vec2(-1.0, 0.0)).rgb + 4.0 * texture(uTex, vUv).rgb + 2.0 * texture(uTex, vUv + t * vec2(1.0, 0.0)).rgb
+         + texture(uTex, vUv + t * vec2(-1.0, 1.0)).rgb + 2.0 * texture(uTex, vUv + t * vec2(0.0, 1.0)).rgb + texture(uTex, vUv + t * vec2(1.0, 1.0)).rgb;
+  o = vec4(s / 16.0 * uW.x + texture(uBase, vUv).rgb * uW.y, 1.0);
+}`;
+
+// One-direction blur along x: the horizontal light streak.
+const FRAG_STREAK = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uTexel;
+uniform float uLen;    // 0..1
+out vec4 o;
+void main() {
+  vec3 acc = vec3(0.0);
+  float wsum = 0.0;
+  float reach = 4.0 + 12.0 * uLen;
+  for (int k = -24; k <= 24; k++) {
+    float w = exp(-abs(float(k)) / reach);
+    acc += texture(uTex, vUv + vec2(uTexel.x * float(k) * (1.0 + 2.0 * uLen), 0.0)).rgb * w;
+    wsum += w;
+  }
+  o = vec4(acc / wsum * (1.0 + 3.0 * uLen), 1.0);
+}`;
+
 const FRAG_COMPOSE = `#version 300 es
 precision highp float;
 in vec2 vUv;
@@ -124,6 +176,15 @@ uniform vec3 uMesh;    // on, amount, palette
 uniform vec4 uStack;   // on, points, line width px, words
 uniform vec3 uStackCol;
 uniform vec2 uGPat;    // STACK glow: pattern (0 off, 1 GLOW, 2 DOTS, 3 GRID, 4 SCAN, 5 HAZE), amount
+uniform vec4 uFx1;     // FINISH: fringe on, fringe amount, vignette on, vignette amount
+uniform vec4 uFx2;     // FINISH: vignette size, mix mode, paper on, paper amount
+uniform vec3 uPaper;
+uniform vec4 uFx3;     // FINISH: soft fill on, soft amount, streak on, streak amount
+uniform float uTent;   // FINISH: smoother bloom on
+uniform sampler2D uSoft1;
+uniform sampler2D uSoft2;
+uniform sampler2D uBU;
+uniform sampler2D uStreak;
 uniform sampler2D uWords; // 16 word tags, 192 x 32 px each, stacked downward
 out vec4 o;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -196,7 +257,9 @@ void main() {
     }
   }
 
-  vec3 s = vec3(texture(uScene, uv + vec2(chroma, 0.0)).r, texture(uScene, uv).g, texture(uScene, uv - vec2(chroma, 0.0)).b);
+  // FINISH fringe: red and blue slide apart along the line from the centre, more toward the corners
+  vec2 ca = uFx1.x > 0.5 ? (vUv - 0.5) * length(vUv - 0.5) * uFx1.y * 0.06 : vec2(0.0);
+  vec3 s = vec3(texture(uScene, uv + vec2(chroma, 0.0) + ca).r, texture(uScene, uv).g, texture(uScene, uv - vec2(chroma, 0.0) - ca).b);
   if (uVhs.x > 0.5) {
     float n = hash(vUv * uRes + tq);
     s += (n - 0.5) * 0.32 * noiseAmt;
@@ -231,7 +294,8 @@ void main() {
   }
   vec3 g = vec3(0.0);
   if (uBloom.x > 0.5) {
-    vec3 b = texture(uL1, uv).rgb * (1.0 - uBloom.z) + texture(uL2, uv).rgb * 0.7 + texture(uL3, uv).rgb * uBloom.z * 1.3;
+    vec3 b = uTent > 0.5 ? texture(uBU, uv).rgb
+             : texture(uL1, uv).rgb * (1.0 - uBloom.z) + texture(uL2, uv).rgb * 0.7 + texture(uL3, uv).rgb * uBloom.z * 1.3;
     g += b * uBloom.y * 1.6;
   }
   if (uHalo.x > 0.5) {
@@ -259,7 +323,24 @@ void main() {
     if (gp == 4) m = 0.35 + 0.65 * step(0.5, fract(vUv.y * uRes.y / 4.0));
     g += src * m * uGPat.y * 2.6;
   }
-  vec3 res = 1.0 - (1.0 - s) * (1.0 - clamp(g, 0.0, 1.0));
+  vec3 gc = clamp(g, 0.0, 1.0);
+  vec3 res = 1.0 - (1.0 - s) * (1.0 - gc);                       // SCREEN
+  if (uFx2.y > 1.5) {                                            // SOFT LIGHT: the glow lifts without washing out
+    vec3 b = 0.5 + 0.5 * gc;
+    res = (1.0 - 2.0 * b) * s * s + 2.0 * b * s;
+  } else if (uFx2.y > 0.5) {
+    res = s + gc;                                                // ADD
+  }
+  // FINISH soft fill: the unthresholded blur fills the gaps between the dots; streak: light smeared sideways
+  if (uFx3.x > 0.5) res = max(res, mix(texture(uSoft1, uv).rgb, texture(uSoft2, uv).rgb, 0.5) * uFx3.y * 1.4);
+  if (uFx3.z > 0.5) res = 1.0 - (1.0 - res) * (1.0 - clamp(texture(uStreak, uv).rgb * vec3(0.8, 0.9, 1.0) * uFx3.w * 1.6, 0.0, 1.0));
+  // FINISH paper: the light becomes ink on a paper field (dark on light)
+  if (uFx2.z > 0.5) {
+    float lp = dot(res, vec3(0.299, 0.587, 0.114));
+    vec3 paper = uPaper * (0.9 + 0.1 * fbm(vUv * uRes / 3.0));
+    vec3 ink = vec3(0.06, 0.06, 0.09) + res * 0.25;
+    res = mix(res, mix(paper, ink, smoothstep(0.0, 0.6, lp)), uFx2.w);
+  }
   if (uStack.x > 0.5) {
     vec2 px = vUv * uRes;
     int n = int(uStack.y + 0.5);
@@ -294,6 +375,7 @@ void main() {
     float w = 0.4 + 0.6 * (1.0 - abs(l - 0.5) * 2.0);
     res += (n - 0.5) * uGrain.y * 0.55 * w;
   }
+  if (uFx1.z > 0.5) res *= 1.0 - uFx1.w * smoothstep(uFx2.x, uFx2.x + 0.45, length(vUv - 0.5) * 1.4142);
   // BITMAP: the last layer, over the finished picture. Mode 0 passes it through.
   res = bitmapStage(res, gl_FragCoord.xy, uRes, uScene, uBit, uBit2);
   o = vec4(clamp(res, 0.0, 1.0), 1.0);
@@ -331,11 +413,17 @@ export class Post {
   private compose: WebGLProgram;
   private vao: WebGLVertexArrayObject;
   private words: WebGLTexture | null = null;
+  private up: WebGLProgram;
+  private streak: WebGLProgram;
+  private extra = new Map<string, Target>(); // soft1, soft2, tent3, tent2, tent1, streak: made only while their pass is on
+  private black: WebGLTexture | null = null;  // stands in on the units of passes that are off
 
   constructor(private gl: WebGL2RenderingContext) {
     this.pre = link(gl, FRAG_PREFILTER);
     this.down = link(gl, FRAG_DOWN);
     this.compose = link(gl, FRAG_COMPOSE);
+    this.up = link(gl, FRAG_UP);
+    this.streak = link(gl, FRAG_STREAK);
     this.vao = gl.createVertexArray()!;
   }
 
@@ -356,6 +444,24 @@ export class Post {
     return { tex, fbo, w, h };
   }
 
+  private freeExtra(keep?: Set<string>): void {
+    this.extra.forEach((t, k) => {
+      if (keep?.has(k)) return;
+      this.free(t);
+      this.extra.delete(k);
+    });
+  }
+
+  /** A target the size of `like`, kept between frames while its pass is on. */
+  private ex(key: string, like: Target): Target {
+    let t = this.extra.get(key);
+    if (!t) {
+      t = this.target(like.w, like.h);
+      this.extra.set(key, t);
+    }
+    return t;
+  }
+
   private free(t: Target | null): void {
     if (!t) return;
     this.gl.deleteTexture(t.tex);
@@ -367,11 +473,24 @@ export class Post {
     if (this.scene && this.scene.w === w && this.scene.h === h) return;
     this.free(this.scene);
     this.levels.forEach((l) => this.free(l));
+    this.freeExtra();
     this.scene = this.target(w, h);
     this.levels = [];
     for (let k = 1; k <= 4; k++) {
       this.levels.push(this.target(Math.max(1, w >> k), Math.max(1, h >> k)));
     }
+  }
+
+  private blackTex(): WebGLTexture {
+    if (!this.black) {
+      const gl = this.gl;
+      this.black = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, this.black);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    }
+    return this.black;
   }
 
   /** The word tags of GRAPHIC STACK: 16 words drawn once into a 192 x 512 texture, white on black, 32 px per row. */
@@ -415,7 +534,7 @@ export class Post {
     gl.disable(gl.BLEND);
     gl.bindVertexArray(this.vao);
 
-    const pass = (prog: WebGLProgram, src: Target, dst: Target | null, thr?: number) => {
+    const pass = (prog: WebGLProgram, src: Target, dst: Target | null, thr?: number, more?: () => void) => {
       gl.useProgram(prog);
       gl.bindFramebuffer(gl.FRAMEBUFFER, dst ? dst.fbo : null);
       gl.viewport(0, 0, dst ? dst.w : w, dst ? dst.h : h);
@@ -424,12 +543,47 @@ export class Post {
       gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 7);
       gl.uniform2f(gl.getUniformLocation(prog, 'uTexel'), 1 / src.w, 1 / src.h);
       if (thr !== undefined) gl.uniform1f(gl.getUniformLocation(prog, 'uThr'), thr);
+      more?.();
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
     pass(this.pre, scene, l1, p.threshold);
     pass(this.down, l1, l2);
     pass(this.down, l2, l3);
     pass(this.down, l3, l4);
+
+    // FINISH passes with their own targets: made while the pass is on, freed when it goes off
+    const tentOn = p.tentOn && p.bloomOn;
+    const keep = new Set<string>();
+    if (p.softOn) ['soft1', 'soft2'].forEach((k) => keep.add(k));
+    if (tentOn) ['tent3', 'tent2', 'tent1'].forEach((k) => keep.add(k));
+    if (p.streakOn) keep.add('streak');
+    this.freeExtra(keep);
+    let soft1: Target | null = null, soft2: Target | null = null, tent1: Target | null = null, streak: Target | null = null;
+    if (p.softOn) {
+      soft1 = this.ex('soft1', l1);
+      soft2 = this.ex('soft2', l2);
+      pass(this.down, scene, soft1);   // not thresholded: the whole picture, softened
+      pass(this.down, soft1, soft2);
+    }
+    if (tentOn) {
+      const r = p.bloomRadius;
+      const t3 = this.ex('tent3', l3), t2 = this.ex('tent2', l2);
+      tent1 = this.ex('tent1', l1);
+      const up = (src: Target, base: Target, dst: Target, wu: number, wb: number) =>
+        pass(this.up, src, dst, undefined, () => {
+          gl.activeTexture(gl.TEXTURE6);
+          gl.bindTexture(gl.TEXTURE_2D, base.tex);
+          gl.uniform1i(gl.getUniformLocation(this.up, 'uBase'), 6);
+          gl.uniform2f(gl.getUniformLocation(this.up, 'uW'), wu, wb);
+        });
+      up(l4, l3, t3, 1, r * 1.3);   // the weights match the plain bloom's mix of levels
+      up(t3, l2, t2, 0.5, 0.7);
+      up(t2, l1, tent1, 0.5, 1 - r);
+    }
+    if (p.streakOn) {
+      streak = this.ex('streak', l2);
+      pass(this.streak, l2, streak, undefined, () => gl.uniform1f(gl.getUniformLocation(this.streak, 'uLen'), p.streakLength));
+    }
 
     gl.useProgram(this.compose);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -463,6 +617,20 @@ export class Post {
     u3('uMesh', p.meshOn ? 1 : 0, p.meshAmount, p.meshPalette);
     gl.uniform4f(gl.getUniformLocation(this.compose, 'uStack'), p.stackOn ? 1 : 0, p.stackCount, p.stackWidth, p.stackWords ? 1 : 0);
     u3('uStackCol', p.stackColour[0], p.stackColour[1], p.stackColour[2]);
+    const slot = (name: string, t: Target | null, u: number) => {   // an idle pass gets a black pixel, never a stale texture
+      gl.activeTexture(gl.TEXTURE0 + u);
+      gl.bindTexture(gl.TEXTURE_2D, t ? t.tex : this.blackTex());
+      gl.uniform1i(gl.getUniformLocation(this.compose, name), u);
+    };
+    slot('uSoft1', soft1, 10);
+    slot('uSoft2', soft2, 11);
+    slot('uBU', tent1, 12);
+    slot('uStreak', streak, 13);
+    gl.uniform4f(gl.getUniformLocation(this.compose, 'uFx3'), p.softOn ? 1 : 0, p.softAmount, p.streakOn ? 1 : 0, p.streakAmount);
+    gl.uniform1f(gl.getUniformLocation(this.compose, 'uTent'), tentOn ? 1 : 0);
+    gl.uniform4f(gl.getUniformLocation(this.compose, 'uFx1'), p.caOn ? 1 : 0, p.caAmount, p.vignetteOn ? 1 : 0, p.vignetteAmount);
+    gl.uniform4f(gl.getUniformLocation(this.compose, 'uFx2'), p.vignetteSize, p.mixMode, p.paperOn ? 1 : 0, p.paperAmount);
+    u3('uPaper', p.paperTint[0], p.paperTint[1], p.paperTint[2]);
     gl.uniform4f(gl.getUniformLocation(this.compose, 'uBit'), p.bitMode, p.bitAmount, p.bitCell, p.bitLevel);
     gl.uniform4f(gl.getUniformLocation(this.compose, 'uBit2'), p.bitRamp, p.bitMid, p.bitDither, p.bitSize);
     if (p.stackOn && p.stackWords) {
@@ -481,6 +649,8 @@ export class Post {
 
   dispose(): void {
     if (this.words) this.gl.deleteTexture(this.words);
+    if (this.black) this.gl.deleteTexture(this.black);
+    this.freeExtra();
     this.free(this.scene);
     this.levels.forEach((l) => this.free(l));
     this.scene = null;

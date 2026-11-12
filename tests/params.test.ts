@@ -29,6 +29,17 @@ describe('params', () => {
   });
 });
 
+describe('finish passes (R2)', () => {
+  const flags = ['caOn', 'vignetteOn', 'paperOn', 'softOn', 'tentOn', 'streakOn'] as const;
+  it('are off by default and after EFFECTS RESET', () => {
+    flags.forEach((k) => {
+      expect(defaults[k]).toBe(false);
+      expect(withEffectsStart()[k]).toBe(false);
+    });
+    expect(defaults.finish.mixMode).toBe(0);
+  });
+});
+
 describe('first load', () => {
   it('has emitters off and nothing else changed', () => {
     const p = withEffectsStart();

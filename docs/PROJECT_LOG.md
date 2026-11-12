@@ -31,6 +31,11 @@ Particle Depth Studio turns a photo into a depth-driven 3D particle animation th
 - Evidence: glass reference, original source picture: plain DOTS 47.3, REFRACT GLASS 45.9, NEON TUBE 33.8, against a ceiling of 73.3. So today no look beats plain dots on that reference. Scores are uncalibrated.
 - Not committed: the `effect-maker` skill edit, because it sits on the owner's uncommitted skill rewrite.
 
+### 2026-11-12: Finish passes, phase R2
+- What changed: seven new passes in `src/lite/Post.ts`, all off by default: radial colour fringe, vignette, mix mode (SCREEN, ADD, SOFT), paper field, soft fill, smooth (tent) bloom, horizontal streak. New fields `finish.*` and six `...On` flags in `params.ts`; controls sit under STACK in the Effect tab ("finish"). Plan: `docs/superpowers/plans/2026-11-12-r2-post-passes.md`.
+- Evidence: `node scripts/verify-finish.mjs` passes 25 checks (each pass changes the frame, switching it off restores it exactly, resize with all on, EFFECTS RESET clears them, no GL errors, 390 px has no sideways scroll). Hero bundle 197.3 kB gzip, under the 200 kB budget (this tree also holds other uncommitted work).
+- Not done: the `adapt()` "halve post resolution" rung (frame time could not be measured in the test browser, it is capped at 60 Hz); paper colour has no picker; Android does not get these passes (post chain not ported); Score B not yet measured on glass and soft references. All strengths are by eye.
+
 ### 2026-11-12: Score calibration and absolute pass mark 75 (phase T3)
 - What changed: `tools/analyze/calib.py` and `scripts/calib-render.mjs` build a blind rating set (16 pairs: damaged copies of four references plus the studio look meant to match each); the owner rated them 0-100; `calib.py fit` compares the score with the ratings. Data in `docs/effect-library/calibration/`.
 - Result: score vs ratings Spearman 0.60. Close copies (rated 90-100) scored 77.8-96.2. Studio looks (rated 10, 10, 20, 50) scored 45.9-57.0. A heavy blur rated 50 scored 70.8, so a raw threshold near 75 separates this sample, 70 does not. Fitted weights ranked worse (0.53) than the current ones, so weights are unchanged.

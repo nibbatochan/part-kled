@@ -112,10 +112,17 @@ export interface Params {
   duoOn: boolean;   // SURFACE: two-colour map of the brightness
   cloudOn: boolean; // SURFACE: drifting haze
   meshOn: boolean;  // SURFACE: soft gradient mesh over the picture
+  caOn: boolean;       // FINISH: colour fringes that grow toward the corners
+  vignetteOn: boolean; // FINISH: dark corners
+  paperOn: boolean;    // FINISH: ink on a paper field (dark on light)
+  softOn: boolean;     // FINISH: soft fill between the dots
+  tentOn: boolean;     // FINISH: smoother bloom
+  streakOn: boolean;   // FINISH: horizontal light streaks
   stackOn: boolean; // GRAPHIC: moving points joined by lines
   stackWords: boolean; // GRAPHIC: a word tag at each point
   graphic: { stackCount: number; stackWidth: number; stackColour: string };
   surface: { grainAmount: number; grainSize: number; holoAmount: number; holoSpeed: number; duoAmount: number; duoShadow: string; duoLight: string; cloudAmount: number; cloudScale: number; cloudTint: string; meshAmount: number; meshPalette: number };
+  finish: { caAmount: number; vignetteAmount: number; vignetteSize: number; mixMode: number; paperAmount: number; paperTint: string; softAmount: number; streakAmount: number; streakLength: number }; // FINISH; mixMode 0 SCREEN, 1 ADD, 2 SOFT LIGHT
   glow: { threshold: number; bloomAmount: number; bloomRadius: number; haloAmount: number; haloSize: number; haloTint: string; glowPat: number; glowPatAmt: number; bitMode: number; bitAmount: number; bitCell: number; bitLevel: number; bitRamp: number; bitMid: number; bitDither: number; bitSize: number };
 
   travel: 'swarm' | 'melt';
@@ -226,10 +233,17 @@ export const defaults: Params = {
   duoOn: false,
   cloudOn: false,
   meshOn: false,
+  caOn: false,
+  vignetteOn: false,
+  paperOn: false,
+  softOn: false,
+  tentOn: false,
+  streakOn: false,
   stackOn: false,
   stackWords: true,
   graphic: { stackCount: 9, stackWidth: 1, stackColour: '#ffffff' },
   surface: { grainAmount: 0.5, grainSize: 0.3, holoAmount: 0.5, holoSpeed: 0.5, duoAmount: 0.8, duoShadow: '#1a0d4d', duoLight: '#ffd980', cloudAmount: 0.5, cloudScale: 0.4, cloudTint: '#ccd9ff', meshAmount: 0.6, meshPalette: 0 },
+  finish: { caAmount: 0.5, vignetteAmount: 0.5, vignetteSize: 0.45, mixMode: 0, paperAmount: 0.9, paperTint: '#efe8d6', softAmount: 0.5, streakAmount: 0.3, streakLength: 0.5 },
   glow: { threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: '#ffd9a0', glowPat: 0, glowPatAmt: 0.8, bitMode: 0, bitAmount: 1, bitCell: 4, bitLevel: 0.5, bitRamp: 0, bitMid: 0.5, bitDither: 0.7, bitSize: 0.9 },
 
   travel: 'swarm',
@@ -323,6 +337,12 @@ export function withEffectsStart(): Params {
     duoOn: false,
     cloudOn: false,
     meshOn: false,
+    caOn: false,
+    vignetteOn: false,
+    paperOn: false,
+    softOn: false,
+    tentOn: false,
+    streakOn: false,
     stackOn: false,
     stackWords: false,
   };
