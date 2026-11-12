@@ -193,7 +193,7 @@ export const liteDefaults: LiteParams = {
   opacity: 1,
   bw: false,
   fx: { black: 0, white: 1, gamma: 1, contrast: 0, hue: 0, saturation: 1 },
-  glow: { bloomOn: false, haloOn: false, threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: [1, 0.85, 0.63], vhsOn: false, vhsAmount: 0.5, vhsNoise: 0.5, glitchOn: false, glitchAmount: 0.5, glitchRate: 0.4, glitchBeat: false, grainOn: false, grainAmount: 0.5, grainSize: 0.3, holoOn: false, holoAmount: 0.5, holoSpeed: 0.5, duoOn: false, duoAmount: 0.8, duoShadow: [0.1, 0.05, 0.3], duoLight: [1, 0.85, 0.5], cloudOn: false, cloudAmount: 0.5, cloudScale: 0.4, cloudTint: [0.8, 0.85, 1], meshOn: false, meshAmount: 0.6, meshPalette: 0, stackOn: false, stackWords: true, stackCount: 9, stackWidth: 1, stackColour: [1, 1, 1], glowPat: 0, glowPatAmt: 0.8, bitMode: 0, bitAmount: 1, bitCell: 4, bitLevel: 0.5, bitRamp: 0, bitMid: 0.5, bitDither: 0.7, bitSize: 0.9, caOn: false, caAmount: 0.5, vignetteOn: false, vignetteAmount: 0.5, vignetteSize: 0.45, mixMode: 0, paperOn: false, paperAmount: 0.9, paperTint: [0.94, 0.91, 0.84], softOn: false, softAmount: 0.5, tentOn: false, streakOn: false, streakAmount: 0.3, streakLength: 0.5 },
+  glow: { bloomOn: false, haloOn: false, threshold: 0.55, bloomAmount: 0.9, bloomRadius: 0.4, haloAmount: 0.7, haloSize: 0.6, haloTint: [1, 0.85, 0.63], vhsOn: false, vhsAmount: 0.5, vhsNoise: 0.5, glitchOn: false, glitchAmount: 0.5, glitchRate: 0.4, glitchBeat: false, grainOn: false, grainAmount: 0.5, grainSize: 0.3, holoOn: false, holoAmount: 0.5, holoSpeed: 0.5, duoOn: false, duoAmount: 0.8, duoShadow: [0.1, 0.05, 0.3], duoLight: [1, 0.85, 0.5], cloudOn: false, cloudAmount: 0.5, cloudScale: 0.4, cloudTint: [0.8, 0.85, 1], meshOn: false, meshAmount: 0.6, meshPalette: 0, stackOn: false, stackWords: true, stackCount: 9, stackWidth: 1, stackColour: [1, 1, 1], glowPat: 0, glowPatAmt: 0.8, bitMode: 0, bitAmount: 1, bitCell: 4, bitLevel: 0.5, bitRamp: 0, bitMid: 0.5, bitDither: 0.7, bitSize: 0.9, caOn: false, caAmount: 0.5, vignetteOn: false, vignetteAmount: 0.5, vignetteSize: 0.45, mixMode: 0, paperOn: false, paperAmount: 0.9, paperTint: [0.94, 0.91, 0.84], softOn: false, softAmount: 0.5, tentOn: false, streakOn: false, streakAmount: 0.3, streakLength: 0.5, hdrOn: false, lutOn: false, lutId: 1, lutAmount: 0.8, blueGrain: false },
   light: [0.95, 0.9, 0.79],
   scan: false,
   scanMode: 0,
@@ -929,10 +929,10 @@ export class LiteEngine {
 
     // LIGHT: with bloom or halo on, the scene is drawn into a texture first and the glow is added after
     const g = p.glow;
-    const lightPost = g.glowPat > 0 || g.bloomOn || g.haloOn || g.vhsOn || g.glitchOn || g.grainOn || g.holoOn || g.duoOn || g.cloudOn || g.meshOn || g.stackOn || g.bitMode > 0 || g.caOn || g.vignetteOn || g.paperOn || g.softOn || g.tentOn || g.streakOn || g.mixMode > 0;
+    const lightPost = g.glowPat > 0 || g.bloomOn || g.haloOn || g.vhsOn || g.glitchOn || g.grainOn || g.holoOn || g.duoOn || g.cloudOn || g.meshOn || g.stackOn || g.bitMode > 0 || g.caOn || g.vignetteOn || g.paperOn || g.softOn || g.tentOn || g.streakOn || g.hdrOn || g.lutOn || g.mixMode > 0;
     if (lightPost) {
       this.post ??= new Post(gl);
-      this.post.begin(this.canvas.width, this.canvas.height);
+      this.post.begin(this.canvas.width, this.canvas.height, g.hdrOn);
     }
     gl.clear(gl.COLOR_BUFFER_BIT);
 

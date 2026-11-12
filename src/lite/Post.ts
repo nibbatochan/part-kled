@@ -68,6 +68,11 @@ export interface PostParams {
   streakOn: boolean;    // horizontal light streaks
   streakAmount: number; // 0..1.5
   streakLength: number; // 0..1 short to long
+  hdrOn: boolean;       // 16-bit scene and glow chain
+  lutOn: boolean;       // colour grade from the grades atlas
+  lutId: number;        // row of the atlas: 0 NEUTRAL .. 7 CROSS
+  lutAmount: number;    // 0..1
+  blueGrain: boolean;   // film grain from the blue-noise texture
 }
 
 const VERT = `#version 300 es
@@ -185,6 +190,10 @@ uniform sampler2D uSoft1;
 uniform sampler2D uSoft2;
 uniform sampler2D uBU;
 uniform sampler2D uStreak;
+uniform vec3 uLut;     // FINISH grade: on, grade row, amount
+uniform sampler2D uLutTex; // 8 grades: 33 x 33 slices side by side, one row of slices per grade
+uniform float uBlue;   // grain from the blue-noise texture
+uniform sampler2D uNoise;
 uniform sampler2D uWords; // 16 word tags, 192 x 32 px each, stacked downward
 out vec4 o;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -222,6 +231,15 @@ vec3 meshCorner(int pal, int k) {
   if (pal == 0) return k == 0 ? vec3(0.17, 0.06, 0.33) : (k == 1 ? vec3(0.46, 0.59, 0.87) : (k == 2 ? vec3(0.96, 0.34, 0.42) : vec3(0.26, 0.91, 0.48)));
   if (pal == 1) return k == 0 ? vec3(1.0, 0.32, 0.18) : (k == 1 ? vec3(0.87, 0.14, 0.46) : (k == 2 ? vec3(0.10, 0.16, 0.42) : vec3(0.99, 0.73, 0.18)));
   return k == 0 ? vec3(0.06, 0.12, 0.15) : (k == 1 ? vec3(0.17, 0.33, 0.39) : (k == 2 ? vec3(0.56, 0.83, 0.96) : vec3(0.52, 0.98, 0.70)));
+}
+// One grade of the atlas: 33 slices (blue) of 33 x 33 (red across, green down), blended between the two nearest slices.
+vec3 lutApply(vec3 c, float row) {
+  vec3 cc = clamp(c, 0.0, 1.0) * 32.0;
+  float s0 = floor(cc.b);
+  float s1 = min(s0 + 1.0, 32.0);
+  vec2 inv = vec2(1.0 / 1089.0, 1.0 / 264.0);
+  vec2 xy = vec2(cc.r + 0.5, row * 33.0 + cc.g + 0.5);
+  return mix(texture(uLutTex, vec2(s0 * 33.0 + xy.x, xy.y) * inv).rgb, texture(uLutTex, vec2(s1 * 33.0 + xy.x, xy.y) * inv).rgb, cc.b - s0);
 }
 void main() {
   vec2 uv = vUv;
@@ -368,9 +386,12 @@ void main() {
     }
     res = mix(res, uStackCol, m);
   }
+  // FINISH grade: after everything that makes the picture, before the grain and the corners
+  if (uLut.x > 0.5) res = mix(res, lutApply(res, uLut.y), uLut.z);
   if (uGrain.x > 0.5) {
     float cell = mix(1.0, 4.0, uGrain.z);
-    float n = hash(floor(vUv * uRes / cell) + tq * 1.37);
+    vec2 gc = floor(vUv * uRes / cell);
+    float n = uBlue > 0.5 ? texelFetch(uNoise, ivec2(mod(gc + vec2(tq * 37.0, tq * 17.0), 64.0)), 0).r : hash(gc + tq * 1.37);
     float l = dot(res, vec3(0.299, 0.587, 0.114));
     float w = 0.4 + 0.6 * (1.0 - abs(l - 0.5) * 2.0);
     res += (n - 0.5) * uGrain.y * 0.55 * w;
@@ -413,6 +434,12 @@ export class Post {
   private compose: WebGLProgram;
   private vao: WebGLVertexArrayObject;
   private words: WebGLTexture | null = null;
+  private hdrWanted = false;
+  private hdrFailed = false;
+  private half = false;                          // the scene is really 16-bit
+  private lut: WebGLTexture | null = null;       // loaded on first use
+  private noise: WebGLTexture | null = null;
+  private loading = new Set<string>();
   private up: WebGLProgram;
   private streak: WebGLProgram;
   private extra = new Map<string, Target>(); // soft1, soft2, tent3, tent2, tent1, streak: made only while their pass is on
@@ -432,7 +459,8 @@ export class Post {
     const tex = gl.createTexture()!;
     gl.activeTexture(gl.TEXTURE7);
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const half = this.hdrWanted && !this.hdrFailed && !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
+    gl.texImage2D(gl.TEXTURE_2D, 0, half ? gl.RGBA16F : gl.RGBA8, w, h, 0, gl.RGBA, half ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -440,7 +468,15 @@ export class Post {
     const fbo = gl.createFramebuffer()!;
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (half && !ok) {   // this device cannot draw into 16-bit: fall back to 8-bit for good
+      this.hdrFailed = true;
+      gl.deleteTexture(tex);
+      gl.deleteFramebuffer(fbo);
+      return this.target(w, h);
+    }
+    this.half = half;
     return { tex, fbo, w, h };
   }
 
@@ -469,8 +505,9 @@ export class Post {
   }
 
   /** Make the targets for this canvas size (the scene, then four copies at 1/2, 1/4, 1/8, 1/16). */
-  private ensure(w: number, h: number): void {
-    if (this.scene && this.scene.w === w && this.scene.h === h) return;
+  private ensure(w: number, h: number, hdr: boolean): void {
+    if (this.scene && this.scene.w === w && this.scene.h === h && this.hdrWanted === hdr) return;
+    this.hdrWanted = hdr;
     this.free(this.scene);
     this.levels.forEach((l) => this.free(l));
     this.freeExtra();
@@ -479,6 +516,35 @@ export class Post {
     for (let k = 1; k <= 4; k++) {
       this.levels.push(this.target(Math.max(1, w >> k), Math.max(1, h >> k)));
     }
+  }
+
+  /** True when the scene and glow chain are really 16-bit (the device allows it and the 16-bit option is on). */
+  get hdrActive(): boolean {
+    return this.half;
+  }
+
+  /** Loads a PNG into a texture on `unit`, once. Until it arrives the effect that needs it is skipped. */
+  private load(url: string, unit: number, nearest: boolean, set: (t: WebGLTexture) => void): void {
+    if (this.loading.has(url)) return;
+    this.loading.add(url);   // a failed load is not retried every frame
+    const img = new Image();
+    img.onload = () => {
+      const gl = this.gl;
+      const t = gl.createTexture()!;
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);   // the values are data, not a picture
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.BROWSER_DEFAULT_WEBGL);
+      const f = nearest ? gl.NEAREST : gl.LINEAR;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.activeTexture(gl.TEXTURE0);
+      set(t);
+    };
+    img.src = url;
   }
 
   private blackTex(): WebGLTexture {
@@ -519,8 +585,8 @@ export class Post {
   }
 
   /** From here the scene is drawn into the scene texture. */
-  begin(w: number, h: number): void {
-    this.ensure(w, h);
+  begin(w: number, h: number, hdr = false): void {
+    this.ensure(w, h, hdr);
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.scene!.fbo);
     gl.viewport(0, 0, w, h);
@@ -626,6 +692,18 @@ export class Post {
     slot('uSoft2', soft2, 11);
     slot('uBU', tent1, 12);
     slot('uStreak', streak, 13);
+    if (p.lutOn && !this.lut) this.load('/luts/grades.png', 14, false, (t) => (this.lut = t));
+    const blue = p.blueGrain && p.grainOn;
+    if (blue && !this.noise) this.load('/noise/blue64.png', 15, true, (t) => (this.noise = t));
+    const bind = (name: string, t: WebGLTexture | null, u: number) => {
+      gl.activeTexture(gl.TEXTURE0 + u);
+      gl.bindTexture(gl.TEXTURE_2D, t ?? this.blackTex());
+      gl.uniform1i(gl.getUniformLocation(this.compose, name), u);
+    };
+    bind('uLutTex', this.lut, 14);
+    bind('uNoise', this.noise, 15);
+    u3('uLut', p.lutOn && this.lut ? 1 : 0, p.lutId, p.lutAmount);
+    gl.uniform1f(gl.getUniformLocation(this.compose, 'uBlue'), blue && this.noise ? 1 : 0);
     gl.uniform4f(gl.getUniformLocation(this.compose, 'uFx3'), p.softOn ? 1 : 0, p.softAmount, p.streakOn ? 1 : 0, p.streakAmount);
     gl.uniform1f(gl.getUniformLocation(this.compose, 'uTent'), tentOn ? 1 : 0);
     gl.uniform4f(gl.getUniformLocation(this.compose, 'uFx1'), p.caOn ? 1 : 0, p.caAmount, p.vignetteOn ? 1 : 0, p.vignetteAmount);
@@ -650,6 +728,8 @@ export class Post {
   dispose(): void {
     if (this.words) this.gl.deleteTexture(this.words);
     if (this.black) this.gl.deleteTexture(this.black);
+    if (this.lut) this.gl.deleteTexture(this.lut);
+    if (this.noise) this.gl.deleteTexture(this.noise);
     this.freeExtra();
     this.free(this.scene);
     this.levels.forEach((l) => this.free(l));

@@ -29,11 +29,17 @@ try {
   await page.waitForFunction(() => window.__app && window.__app.images.length >= 5 && window.__app.engine.lite.sample, null, { timeout: 90000 });
   await page.click('.thumb-slot[data-index="4"] .slot-box');
   await page.waitForFunction(() => window.__app.activeIndex === 4);
-  const still = () => page.evaluate(() => {
-    const a = window.__app;
-    Object.assign(a.params, { panMode: false, panAmount: 0, drift: 0, trails: false });
-    a.engine.setParams(a.params);
-  });
+  // Panel clicks replace the app's params with the panel's own copy, so a setting made on app.params is lost on the next click: set it on the panel's copy
+  const setParam = (path, v) => page.evaluate(([pt, val]) => {
+    const a = window.__app, p = a.panel.params, k = pt.split('.');
+    const o = k.slice(0, -1).reduce((x, n) => x[n], p);
+    o[k.at(-1)] = val;
+    a.params = p;
+    a.engine.setParams(p);
+  }, [path, v]);
+  const still = async () => {
+    for (const [k, v] of [['panMode', false], ['panAmount', 0], ['drift', 0], ['trails', false]]) await setParam(k, v);
+  };
   await still();
   await page.waitForTimeout(3000); // let the picture settle before the first shot
   await page.click('[data-top="stack"]');
@@ -41,8 +47,9 @@ try {
   // freeze the app loop and draw at a fixed time, so equal settings give equal pixels
   await page.evaluate(() => { window.__app.paused = true; });
   const snap = async (name) => {
+    await page.waitForTimeout(650);   // a paused app applies panel changes on a 500 ms tick
     await page.evaluate(() => window.__app.engine.lite.renderAt(1.5));
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(150);
     const buf = await page.locator('canvas').first().screenshot();
     if (name) fs.writeFileSync(path.join(outDir, `${name}.png`), buf);
     return buf.toString('base64');
@@ -57,6 +64,8 @@ try {
     return s / (p.length / 4 * 3);
   }, [a, b]);
   const click = (sel) => page.click(sel);
+  // the app loop is frozen, so a texture that loads on first use needs one frame to start loading and time to arrive
+  const warm = async () => { await page.evaluate(() => window.__app.engine.lite.renderAt(1.5)); await page.waitForTimeout(800); };
   const flag = (k) => page.evaluate((key) => window.__app.params[key], k);
 
   const base = await snap('00-all-off');
@@ -82,7 +91,7 @@ try {
   await click('[data-toggle="paperOn"]');
 
   // mix mode and smooth bloom need the bloom on
-  await page.evaluate(() => { const a = window.__app; a.params.bloomOn = true; a.engine.setParams(a.params); });
+  await setParam('bloomOn', true);
   const bloom = await snap('bloom');
   check((await diff(base, bloom)) > MOVE, 'bloom on changes the canvas');
   await click('[data-toggle="tentOn"]');
@@ -96,24 +105,62 @@ try {
   }
   await click('[data-mixmode="0"]');
   check((await diff(bloom, await snap())) < SAME, 'mix mode SCREEN restores the glow');
-  await page.evaluate(() => { const a = window.__app; a.params.bloomOn = false; a.engine.setParams(a.params); });
+  await setParam('bloomOn', false);
+
+  // R3: 16-bit scene, LUT grades, blue-noise grain
+  await setParam('bloomOn', true);   // 16-bit matters most for the glow chain
+  const bloomAgain = await snap('bloom-again');
+  await click('[data-toggle="hdrOn"]');
+  const hdr = await snap('on-hdrOn');
+  const active = await page.evaluate(() => window.__app.engine.lite.post?.hdrActive);
+  console.log(`16-bit active: ${active}; mean change vs 8-bit with bloom on: ${(await diff(bloomAgain, hdr)).toFixed(4)}`);
+  check(active === true, '16-bit: the scene is really 16-bit here');
+  check((await diff(bloomAgain, hdr)) > 0.0005, '16-bit: differs from 8-bit');
+  await click('[data-toggle="hdrOn"]');
+  const back = await diff(bloomAgain, await snap('hdr-off-again')); check(back < SAME, '16-bit: off again restores the frame');
+  await setParam('bloomOn', false);
+  await click('[data-toggle="lutOn"]');
+  await warm();                      // the atlas loads on the first frame that wants it
+  for (let id = 1; id <= 7; id++) {
+    await click(`[data-lut="${id}"]`);
+    check((await diff(base, await snap(`lut-${id}`))) > MOVE, `grade ${id}: changes the frame`);
+  }
+  await click('[data-lut="0"]');
+  const neutral = await diff(base, await snap('lut-0'));
+  check(neutral < 0.3, `grade NEUTRAL leaves the frame alone (change ${neutral.toFixed(3)})`);
+  await click('[data-lut="4"]');
+  await setParam('finish.lutAmount', 0);
+  check((await diff(base, await snap())) < 0.3, 'grade at amount 0 leaves the frame alone');
+  await setParam('finish.lutAmount', 0.8);
+  await click('[data-toggle="lutOn"]');
+  check((await diff(base, await snap())) < SAME, 'grade: off again restores the frame');
+  await setParam('grainOn', true);
+  const grain = await snap('grain');
+  check((await diff(base, grain)) > MOVE, 'grain on changes the frame');
+  await click('[data-toggle="blueGrainOn"]');
+  await warm();
+  const blueGrain = await snap('grain-blue');
+  check((await diff(grain, blueGrain)) > MOVE, 'blue grain differs from hash grain');
+  await click('[data-toggle="blueGrainOn"]');
+  check((await diff(grain, await snap())) < SAME, 'blue grain: off again restores the hash grain');
+  await setParam('grainOn', false);
 
   // all on, resize, all off
-  for (const k of [...PASSES, 'vignetteOn', 'tentOn']) await click(`[data-toggle="${k}"]`);
-  await page.evaluate(() => { const a = window.__app; a.params.bloomOn = true; a.engine.setParams(a.params); });
+  for (const k of [...PASSES, 'vignetteOn', 'tentOn', 'hdrOn', 'lutOn']) await click(`[data-toggle="${k}"]`);
+  await setParam('bloomOn', true);
   await snap('all-on');
   await page.setViewportSize({ width: 1000, height: 700 });
   await snap('all-on-resized');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.evaluate(() => { const a = window.__app; a.params.bloomOn = false; a.engine.setParams(a.params); });
-  for (const k of [...PASSES, 'vignetteOn', 'tentOn']) await click(`[data-toggle="${k}"]`);
+  await setParam('bloomOn', false);
+  for (const k of [...PASSES, 'vignetteOn', 'tentOn', 'hdrOn', 'lutOn']) await click(`[data-toggle="${k}"]`);
   await still();
   check((await diff(base, await snap())) < SAME, 'all on, resized, all off: frame is back');
 
   // EFFECTS RESET turns every pass off
   for (const k of [...PASSES, 'vignetteOn']) await click(`[data-toggle="${k}"]`);
   await page.evaluate(() => document.getElementById('effects-reset').click());
-  const left = await page.evaluate((ks) => ks.filter((k) => window.__app.params[k]), [...PASSES, 'vignetteOn', 'tentOn']);
+  const left = await page.evaluate((ks) => ks.filter((k) => window.__app.params[k]), [...PASSES, 'vignetteOn', 'tentOn', 'hdrOn', 'lutOn']);
   check(left.length === 0, `EFFECTS RESET turns every finish pass off${left.length ? ' (still on: ' + left.join(', ') + ')' : ''}`);
   await page.evaluate(() => { window.__app.paused = true; });
 
@@ -124,8 +171,8 @@ try {
     requestAnimationFrame(tick);
   }));
   const off = await frameMs();
-  for (const k of [...PASSES, 'vignetteOn', 'tentOn']) await click(`[data-toggle="${k}"]`);
-  await page.evaluate(() => { const a = window.__app; a.params.bloomOn = true; a.engine.setParams(a.params); });
+  for (const k of [...PASSES, 'vignetteOn', 'tentOn', 'hdrOn', 'lutOn']) await click(`[data-toggle="${k}"]`);
+  await setParam('bloomOn', true);
   const allOn = await frameMs();
   console.log(`frame time: all off ${off.toFixed(1)} ms, all on ${allOn.toFixed(1)} ms (this machine, test browser)`);
 

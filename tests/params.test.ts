@@ -30,13 +30,14 @@ describe('params', () => {
 });
 
 describe('finish passes (R2)', () => {
-  const flags = ['caOn', 'vignetteOn', 'paperOn', 'softOn', 'tentOn', 'streakOn'] as const;
+  const flags = ['caOn', 'vignetteOn', 'paperOn', 'softOn', 'tentOn', 'streakOn', 'hdrOn', 'lutOn', 'blueGrainOn'] as const;
   it('are off by default and after EFFECTS RESET', () => {
     flags.forEach((k) => {
       expect(defaults[k]).toBe(false);
       expect(withEffectsStart()[k]).toBe(false);
     });
     expect(defaults.finish.mixMode).toBe(0);
+    expect(defaults.finish.lutId).toBe(1);
   });
 });
 

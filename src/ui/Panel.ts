@@ -76,7 +76,7 @@ export class Panel {
     this.bindTopTabs();
     document.getElementById('effects-reset')?.addEventListener('click', () => this.resetEffects());
     this.bindGlowPat();
-    this.bindMixMode();
+    this.bindFinishSegs();
     this.bindBitmode();
     this.bindEffects();
     this.bindValueInputs();
@@ -451,21 +451,27 @@ export class Panel {
     });
   }
 
-  /** FINISH: how the glow joins the picture (SCREEN, ADD, SOFT). */
-  private bindMixMode(): void {
-    document.querySelectorAll<HTMLButtonElement>('[data-mixmode]').forEach((b) => {
-      b.addEventListener('click', () => {
-        this.params.finish = { ...this.params.finish, mixMode: Number(b.dataset.mixmode) };
-        this.syncMixMode();
-        this.onParamsChangeCb(this.params);
+  /** FINISH: the segmented buttons: how the glow joins the picture (data-mixmode) and which grade (data-lut). */
+  private static readonly FINISH_SEGS = [['mixmode', 'mixMode'], ['lut', 'lutId']] as const;
+
+  private bindFinishSegs(): void {
+    for (const [attr, key] of Panel.FINISH_SEGS) {
+      document.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`).forEach((b) => {
+        b.addEventListener('click', () => {
+          this.params.finish = { ...this.params.finish, [key]: Number(b.dataset[attr]) };
+          this.syncFinishSegs();
+          this.onParamsChangeCb(this.params);
+        });
       });
-    });
+    }
   }
 
-  private syncMixMode(): void {
-    document.querySelectorAll<HTMLButtonElement>('[data-mixmode]').forEach((b) => {
-      b.classList.toggle('active', Number(b.dataset.mixmode) === this.params.finish.mixMode);
-    });
+  private syncFinishSegs(): void {
+    for (const [attr, key] of Panel.FINISH_SEGS) {
+      document.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`).forEach((b) => {
+        b.classList.toggle('active', Number(b.dataset[attr]) === this.params.finish[key]);
+      });
+    }
   }
 
   private syncGlowPat(): void {
@@ -988,7 +994,7 @@ export class Panel {
 
   private syncUiToParams(): void {
     // Toggles
-    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'emitOn', 'trails', 'bloomOn', 'haloOn', 'vhsOn', 'glitchOn', 'glitchBeat', 'holoOn', 'cloudOn', 'meshOn', 'caOn', 'vignetteOn', 'paperOn', 'softOn', 'tentOn', 'streakOn', 'stackOn', 'stackWords'];
+    const toggleKeys: (keyof Params)[] = ['track', 'scan', 'panMode', 'floatOn', 'emitOn', 'trails', 'bloomOn', 'haloOn', 'vhsOn', 'glitchOn', 'glitchBeat', 'holoOn', 'cloudOn', 'meshOn', 'caOn', 'vignetteOn', 'paperOn', 'softOn', 'tentOn', 'streakOn', 'hdrOn', 'lutOn', 'blueGrainOn', 'stackOn', 'stackWords'];
     toggleKeys.forEach((key) => {
       const btn = document.querySelector<HTMLButtonElement>(`[data-toggle="${key}"]`);
       if (btn) btn.classList.toggle('active', Boolean(this.params[key]));
@@ -1006,7 +1012,7 @@ export class Panel {
     this.pads.forEach((p) => p.sync());
     this.syncMotionFx();
     this.syncGlowPat();
-    this.syncMixMode();
+    this.syncFinishSegs();
     this.syncSurface();
     const tint = document.getElementById('in-halo-tint') as HTMLInputElement | null;
     if (tint) tint.value = this.params.glow.haloTint;

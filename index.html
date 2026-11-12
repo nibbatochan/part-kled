@@ -788,6 +788,44 @@
                 <output></output>
               </div>
             </div>
+            <div class="row">
+              <span class="row-label">16-bit</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="hdrOn" title="Draw the picture and its glow in 16-bit colour: smoother glow, less banding. Falls back to 8-bit where the device cannot">ON</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">grade</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="lutOn" title="A colour grade from a lookup table">ON</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="seg">
+                <button class="mode-btn" type="button" data-lut="0" title="No change (the plain table)">NEUTRAL</button>
+                <button class="mode-btn" type="button" data-lut="1" title="Golden hour: warm highlights, gentle contrast">AMBER</button>
+                <button class="mode-btn" type="button" data-lut="2" title="Matte film fade: lifted blacks, muted colour">FADE</button>
+                <button class="mode-btn" type="button" data-lut="3" title="Night city: cyan shadows, magenta highlights">NEON</button>
+                <button class="mode-btn" type="button" data-lut="4" title="Classic filmic: deep contrast, teal shadows">FILM</button>
+                <button class="mode-btn" type="button" data-lut="5" title="Blue hour: indigo shadows, lamp gold">DUSK</button>
+                <button class="mode-btn" type="button" data-lut="6" title="Black and white with a hard curve">B&amp;W</button>
+                <button class="mode-btn" type="button" data-lut="7" title="Cross-process: harsh reds, washed blues">CROSS</button>
+              </div>
+            </div>
+            <div class="pair single">
+              <div class="slider-group">
+                <label for="sl-fin-lut" title="How much of the grade is applied">AMOUNT</label>
+                <input type="range" id="sl-fin-lut" data-path="finish.lutAmount" min="0" max="1" step="0.01" />
+                <output></output>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-label">blue grain</span>
+              <div class="seg">
+                <button class="toggle-btn" type="button" data-toggle="blueGrainOn" title="The film grain uses blue noise: finer, more even grain. Needs the grain on">ON</button>
+              </div>
+            </div>
+            <p class="credit" style="font-size:10px;opacity:.6;margin:2px 0 0">LUTs: slay (CC BY 4.0); DuskTide (MIT); blue noise: Christoph Peters (CC0)</p>
           </div>
         </section>
 

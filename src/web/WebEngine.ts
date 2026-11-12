@@ -222,6 +222,11 @@ export function toLiteParams(p: Params): Partial<LiteParams> {
       streakOn: p.streakOn,
       streakAmount: p.finish.streakAmount,
       streakLength: p.finish.streakLength,
+      hdrOn: p.hdrOn,
+      lutOn: p.lutOn,
+      lutId: p.finish.lutId,
+      lutAmount: p.finish.lutAmount,
+      blueGrain: p.blueGrainOn,
     },
   };
 }
